@@ -14,16 +14,634 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          initial_balance: number
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          initial_balance?: number
+          name: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          initial_balance?: number
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          transaction_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          transaction_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          transaction_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      business_fronts: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          active: boolean
+          created_at: string
+          dre_line_id: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          sort_order: number
+          type: Database["public"]["Enums"]["category_type"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          dre_line_id?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          sort_order?: number
+          type: Database["public"]["Enums"]["category_type"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          dre_line_id?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          sort_order?: number
+          type?: Database["public"]["Enums"]["category_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_dre_line_id_fkey"
+            columns: ["dre_line_id"]
+            isOneToOne: false
+            referencedRelation: "dre_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dre_lines: {
+        Row: {
+          active: boolean
+          code: string | null
+          created_at: string
+          id: string
+          is_subtotal: boolean
+          name: string
+          parent_id: string | null
+          sign: number
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_subtotal?: boolean
+          name: string
+          parent_id?: string | null
+          sign?: number
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_subtotal?: boolean
+          name?: string
+          parent_id?: string | null
+          sign?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dre_lines_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "dre_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partners: {
+        Row: {
+          active: boolean
+          bank_account: string | null
+          bank_agency: string | null
+          bank_name: string | null
+          created_at: string
+          document: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          type: Database["public"]["Enums"]["partner_type"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          bank_account?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          type?: Database["public"]["Enums"]["partner_type"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          bank_account?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          type?: Database["public"]["Enums"]["partner_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      report_templates: {
+        Row: {
+          active: boolean
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transaction_allocations: {
+        Row: {
+          allocation_type: Database["public"]["Enums"]["allocation_type"]
+          amount: number | null
+          created_at: string
+          front_id: string | null
+          id: string
+          percentage: number | null
+          transaction_id: string
+          unit_id: string | null
+        }
+        Insert: {
+          allocation_type?: Database["public"]["Enums"]["allocation_type"]
+          amount?: number | null
+          created_at?: string
+          front_id?: string | null
+          id?: string
+          percentage?: number | null
+          transaction_id: string
+          unit_id?: string | null
+        }
+        Update: {
+          allocation_type?: Database["public"]["Enums"]["allocation_type"]
+          amount?: number | null
+          created_at?: string
+          front_id?: string | null
+          id?: string
+          percentage?: number | null
+          transaction_id?: string
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_allocations_front_id_fkey"
+            columns: ["front_id"]
+            isOneToOne: false
+            referencedRelation: "business_fronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_allocations_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_allocations_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          account_id: string | null
+          amount: number
+          category_id: string | null
+          competence_date: string
+          created_at: string
+          created_by: string | null
+          description: string
+          due_date: string | null
+          front_id: string | null
+          id: string
+          installment_group_id: string | null
+          installment_number: number | null
+          installment_total: number | null
+          net_amount: number
+          notes: string | null
+          partner_id: string | null
+          payment_date: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          status: Database["public"]["Enums"]["transaction_status"]
+          tax_amount: number
+          type: Database["public"]["Enums"]["transaction_type"]
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          category_id?: string | null
+          competence_date: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          due_date?: string | null
+          front_id?: string | null
+          id?: string
+          installment_group_id?: string | null
+          installment_number?: number | null
+          installment_total?: number | null
+          net_amount?: number
+          notes?: string | null
+          partner_id?: string | null
+          payment_date?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          tax_amount?: number
+          type: Database["public"]["Enums"]["transaction_type"]
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          category_id?: string | null
+          competence_date?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          due_date?: string | null
+          front_id?: string | null
+          id?: string
+          installment_group_id?: string | null
+          installment_number?: number | null
+          installment_total?: number | null
+          net_amount?: number
+          notes?: string | null
+          partner_id?: string | null
+          payment_date?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          tax_amount?: number
+          type?: Database["public"]["Enums"]["transaction_type"]
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_front_id_fkey"
+            columns: ["front_id"]
+            isOneToOne: false
+            referencedRelation: "business_fronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      units: {
+        Row: {
+          active: boolean
+          code: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_units: {
+        Row: {
+          created_at: string
+          id: string
+          unit_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          unit_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          unit_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_units_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      allocation_type: "percentual" | "valor"
+      app_role:
+        | "admin"
+        | "financeiro"
+        | "gerente_unidade"
+        | "operador"
+        | "vendedor"
+      category_type: "receita" | "despesa"
+      partner_type: "fornecedor" | "cliente" | "ambos"
+      payment_method:
+        | "dinheiro"
+        | "pix"
+        | "cartao_credito"
+        | "cartao_debito"
+        | "boleto"
+        | "transferencia"
+        | "cheque"
+        | "outro"
+      transaction_status:
+        | "pendente"
+        | "pago"
+        | "recebido"
+        | "cancelado"
+        | "agendado"
+      transaction_type: "receita" | "despesa"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +768,35 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      allocation_type: ["percentual", "valor"],
+      app_role: [
+        "admin",
+        "financeiro",
+        "gerente_unidade",
+        "operador",
+        "vendedor",
+      ],
+      category_type: ["receita", "despesa"],
+      partner_type: ["fornecedor", "cliente", "ambos"],
+      payment_method: [
+        "dinheiro",
+        "pix",
+        "cartao_credito",
+        "cartao_debito",
+        "boleto",
+        "transferencia",
+        "cheque",
+        "outro",
+      ],
+      transaction_status: [
+        "pendente",
+        "pago",
+        "recebido",
+        "cancelado",
+        "agendado",
+      ],
+      transaction_type: ["receita", "despesa"],
+    },
   },
 } as const
