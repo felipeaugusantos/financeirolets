@@ -32,7 +32,16 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
   useEffect(() => {
     if (open) {
       const defaults: Record<string, any> = {};
-      fields.forEach(f => { defaults[f.name] = initialData?.[f.name] ?? ''; });
+      fields.forEach(f => {
+        const val = initialData?.[f.name];
+        if (f.type === 'select' && (val === null || val === undefined || val === '')) {
+          // Find if there's a __none__ option
+          const hasNone = f.options?.some(o => o.value === '__none__');
+          defaults[f.name] = hasNone ? '__none__' : '';
+        } else {
+          defaults[f.name] = val ?? '';
+        }
+      });
       setForm(defaults);
     }
   }, [open, initialData, fields]);

@@ -29,7 +29,7 @@ const fields: FieldConfig[] = [
   { name: 'phone', label: 'Telefone', placeholder: '(11) 99999-9999' },
   { name: 'pix_key', label: 'Chave PIX', placeholder: 'CPF, e-mail, telefone ou aleatória' },
   { name: 'pix_key_type', label: 'Tipo da Chave PIX', type: 'select', options: [
-    { value: '', label: 'Nenhum' },
+    { value: '__none__', label: 'Nenhum' },
     { value: 'cpf', label: 'CPF' },
     { value: 'cnpj', label: 'CNPJ' },
     { value: 'email', label: 'E-mail' },
@@ -49,7 +49,7 @@ export default function PartnersSettings({ onBack }: { onBack: () => void }) {
 
   const handleSave = async (formData: Record<string, any>) => {
     const clean = { ...formData };
-    if (!clean.pix_key_type) delete clean.pix_key_type;
+    if (!clean.pix_key_type || clean.pix_key_type === '__none__') clean.pix_key_type = null;
     return editing ? update(editing.id, clean) : create(clean);
   };
 

@@ -44,11 +44,11 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
       { value: 'despesa', label: 'Despesa' },
     ]},
     { name: 'parent_id', label: 'Categoria Pai (opcional)', type: 'select', options: [
-      { value: '', label: 'Nenhuma (raiz)' },
+      { value: '__none__', label: 'Nenhuma (raiz)' },
       ...data.map((c: any) => ({ value: c.id, label: c.name })),
     ]},
     { name: 'dre_line_id', label: 'Linha do DRE', type: 'select', options: [
-      { value: '', label: 'Nenhuma' },
+      { value: '__none__', label: 'Nenhuma' },
       ...dreLines.map(l => ({ value: l.id, label: `${l.code} - ${l.name}` })),
     ]},
     { name: 'sort_order', label: 'Ordem', type: 'number', placeholder: '0' },
@@ -56,8 +56,8 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
 
   const handleSave = async (formData: Record<string, any>) => {
     const clean = { ...formData };
-    if (!clean.parent_id) delete clean.parent_id;
-    if (!clean.dre_line_id) delete clean.dre_line_id;
+    if (!clean.parent_id || clean.parent_id === '__none__') clean.parent_id = null;
+    if (!clean.dre_line_id || clean.dre_line_id === '__none__') clean.dre_line_id = null;
     if (!clean.sort_order) clean.sort_order = 0;
     return editing ? update(editing.id, clean) : create(clean);
   };
