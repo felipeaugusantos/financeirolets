@@ -1,0 +1,95 @@
+import {
+  LayoutDashboard,
+  Receipt,
+  CreditCard,
+  BarChart3,
+  Settings,
+  LogOut,
+} from 'lucide-react';
+import { NavLink } from '@/components/NavLink';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  SidebarFooter,
+  useSidebar,
+} from '@/components/ui/sidebar';
+
+const navItems = [
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
+  { title: 'Lançamentos', url: '/lancamentos', icon: Receipt },
+  { title: 'Pagar / Receber', url: '/contas', icon: CreditCard },
+  { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings },
+];
+
+export function AppSidebar() {
+  const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
+  const location = useLocation();
+  const { signOut, user } = useAuth();
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="p-4">
+        {!collapsed ? (
+          <div className="flex items-center gap-2">
+            <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
+            <span className="font-heading text-sm font-bold text-card-foreground">Let's Finance</span>
+          </div>
+        ) : (
+          <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full mx-auto" />
+        )}
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                    <NavLink
+                      to={item.url}
+                      end={item.url === '/'}
+                      className="hover:bg-sidebar-accent/50"
+                      activeClassName="bg-sidebar-accent text-primary font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="p-3">
+        {!collapsed && user && (
+          <p className="text-xs text-muted-foreground truncate mb-1 px-2">
+            {user.email}
+          </p>
+        )}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={signOut} className="text-destructive hover:bg-destructive/10">
+              <LogOut className="h-4 w-4" />
+              {!collapsed && <span>Sair</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
