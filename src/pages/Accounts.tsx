@@ -20,6 +20,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import BillFilters, { BillFiltersState, emptyFilters } from '@/components/accounts/BillFilters';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -55,7 +56,8 @@ const paymentMethods = [
 ];
 
 function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
-  const { data, summary, loading, markAs } = useBills(tab);
+  const [filters, setFilters] = useState<BillFiltersState>(emptyFilters);
+  const { data, summary, loading, markAs } = useBills(tab, filters);
   const { data: accounts } = useSupabaseCrud('accounts');
   const { toast } = useToast();
   const [payDialog, setPayDialog] = useState<BillRow | null>(null);
@@ -85,6 +87,9 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
 
   return (
     <div className="space-y-4">
+      {/* Filters */}
+      <BillFilters filters={filters} onChange={setFilters} />
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="shadow-card rounded-xl border-border">

@@ -36,7 +36,14 @@ export interface BillSummary {
   vencendoHoje: number;
 }
 
-export function useBills(tab: 'pagar' | 'receber') {
+export interface BillFilters {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  partnerId?: string | null;
+  unitId?: string | null;
+}
+
+export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
   const [data, setData] = useState<BillRow[]>([]);
   const [summary, setSummary] = useState<BillSummary>({
     totalPagar: 0, totalReceber: 0, vencidasPagar: 0, vencidasReceber: 0, vencendoHoje: 0,
@@ -49,7 +56,7 @@ export function useBills(tab: 'pagar' | 'receber') {
     const today = new Date().toISOString().substring(0, 10);
     const type = tab === 'pagar' ? 'despesa' : 'receita';
 
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from('transactions')
       .select(`
         id, type, description, net_amount, due_date, payment_date, status,
@@ -60,8 +67,14 @@ export function useBills(tab: 'pagar' | 'receber') {
         unit:units(name)
       `)
       .eq('type', type as any)
-      .in('status', ['pendente', 'agendado'] as any)
-      .order('due_date', { ascending: true, nullsFirst: false });
+      .in('status', ['pendente', 'agendado'] as any);
+
+    if (filters?.dateFrom) query = query.gte('due_date', filters.dateFrom);
+    if (filters?.dateTo) query = query.lte('due_date', filters.dateTo);
+    if (filters?.partnerId) query = query.eq('partner_id', filters.partnerId);
+    if (filters?.unitId) query = query.eq('unit_id', filters.unitId);
+
+    const { data: rows, error } = await query.order('due_date', { ascending: true, nullsFirst: false });
 
     if (error) {
       toast({ title: 'Erro ao carregar contas', description: error.message, variant: 'destructive' });
@@ -92,7 +105,7 @@ export function useBills(tab: 'pagar' | 'receber') {
     });
     setSummary(s);
     setLoading(false);
-  }, [tab, toast]);
+  }, [tab, toast, filters?.dateFrom, filters?.dateTo, filters?.partnerId, filters?.unitId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
