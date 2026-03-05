@@ -37,8 +37,8 @@ export default function Dashboard() {
   const { data: fronts } = useSupabaseCrud<any>('business_fronts');
 
   const dashFilters = {
-    unitId: unitId || undefined,
-    frontId: frontId || undefined,
+    unitId: unitId && unitId !== 'all' ? unitId : undefined,
+    frontId: frontId && frontId !== 'all' ? frontId : undefined,
   };
 
   const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading } = useDashboard(dashFilters);
