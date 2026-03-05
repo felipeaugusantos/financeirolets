@@ -1,27 +1,28 @@
 
 
-## Plano: Lançamentos na página de Contas + Filtros no Dashboard
+# Plano: Corrigir warnings e testar Configurações
 
-### 1. Botão "Novo Lançamento" na página de Contas a Pagar/Receber
+## Problema identificado
+- Warning de `forwardRef` no componente `ProtectedRoute` e `Login` — React Router tenta passar ref a function components sem `forwardRef`.
 
-**O que muda:** Cada aba (Pagar / Receber) ganha um botão "+ Novo" que abre o `TransactionFormDialog` já existente, pré-configurando o tipo como `despesa` (aba Pagar) ou `receita` (aba Receber) e status como `pendente`.
+## Correção necessária
+- Verificar `App.tsx` e envolver os componentes de rota com `forwardRef` ou ajustar a forma como são passados ao `Route element`.
 
-**Arquivos:**
-- **`src/pages/Accounts.tsx`** — Importar `TransactionFormDialog` e `useTransactions`. Adicionar estado para controlar o dialog. Botão acima da lista. Após salvar, chamar `fetchData()` do `useBills` para atualizar a lista.
+## Teste das Configurações (após login)
+Após o usuário fazer login no preview:
+1. Navegar para Configurações
+2. Abrir "Unidades" → clicar "Novo" → criar unidade de teste
+3. Verificar persistência (recarregar página)
+4. Abrir "Categorias" → editar uma categoria existente
+5. Verificar se edição persiste
+6. Reportar resultados
 
-### 2. Filtros de Unidade e Frente no Dashboard
+## Notas sobre RLS
+- Todas as tabelas de configuração têm políticas `RESTRICTIVE` — somente usuários com role `admin` ou `financeiro` podem criar/editar. Usuários com role `operador` (padrão no signup) **não conseguirão** criar/editar registros.
+- Será necessário promover o usuário logado para `admin` via migration SQL antes de testar operações de escrita.
 
-**O que muda:** O Dashboard recebe dois selects no topo (Unidade e Frente de Negócio). Ao selecionar, todos os KPIs, gráficos e alertas são filtrados pela unidade/frente escolhida.
-
-**Arquivos:**
-- **`src/hooks/useDashboard.ts`** — Aceitar parâmetros opcionais `unitId` e `frontId`. Aplicar filtros `.eq('unit_id', ...)` e `.eq('front_id', ...)` em todas as queries (transações do período, saldo total, alertas). A query de saldo total por contas (accounts) não é filtrada por unidade (saldo é da conta em si), mas as transações que compõem receitas/despesas sim.
-- **`src/pages/Dashboard.tsx`** — Adicionar selects de Unidade e Frente no topo, usando `useSupabaseCrud` para buscar as opções. Passar os valores selecionados ao `useDashboard`. Opção "Todas" como padrão.
-
-### Resumo técnico
-
-| Tarefa | Arquivo | Complexidade |
-|---|---|---|
-| Botão + Dialog de novo lançamento em Contas | `Accounts.tsx` | Baixa (reutiliza TransactionFormDialog) |
-| Dashboard aceitar filtros unit/front | `useDashboard.ts` | Média (adicionar params em 4 queries) |
-| UI de filtros no Dashboard | `Dashboard.tsx` | Baixa (2 selects + estado) |
+## Ação requerida
+1. Criar migration para atribuir role `admin` aos usuários Kaique e Diogo (após criarem conta)
+2. Corrigir warning de `forwardRef` em `App.tsx`
+3. Executar teste automatizado completo
 
