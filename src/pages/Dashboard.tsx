@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/hooks/useDashboard';
+import { useNavigate } from 'react-router-dom';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -25,7 +27,8 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, monthlyData, categoryData, loading } = useDashboard();
+  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading } = useDashboard();
+  const navigate = useNavigate();
 
   const cards = [
     { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary' },
@@ -80,6 +83,74 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Alerts */}
+      {(overdueBills.length > 0 || dueTodayBills.length > 0) && (
+        <div className="space-y-3">
+          {dueTodayBills.length > 0 && (
+            <Card className="shadow-card rounded-2xl border-warning/50 bg-warning/5 cursor-pointer" onClick={() => navigate('/contas')}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarClock className="h-4 w-4 text-warning" />
+                  <span className="text-sm font-heading font-semibold text-warning">
+                    {dueTodayBills.length} conta{dueTodayBills.length > 1 ? 's' : ''} vencendo hoje
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {dueTodayBills.slice(0, 5).map(b => (
+                    <div key={b.id} className="flex items-center justify-between text-xs">
+                      <span className="text-card-foreground truncate max-w-[60%]">
+                        {b.description} {b.partner_name && <span className="text-muted-foreground">• {b.partner_name}</span>}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] border-warning text-warning">
+                          {b.type === 'despesa' ? 'Pagar' : 'Receber'}
+                        </Badge>
+                        <span className="font-bold font-heading">{fmt(Number(b.net_amount))}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {overdueBills.length > 0 && (
+            <Card className="shadow-card rounded-2xl border-destructive/50 bg-destructive/5 cursor-pointer" onClick={() => navigate('/contas')}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-destructive" />
+                  <span className="text-sm font-heading font-semibold text-destructive">
+                    {overdueBills.length} conta{overdueBills.length > 1 ? 's' : ''} vencida{overdueBills.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {overdueBills.slice(0, 5).map(b => {
+                    const [y, m, d] = b.due_date.split('-');
+                    return (
+                      <div key={b.id} className="flex items-center justify-between text-xs">
+                        <span className="text-card-foreground truncate max-w-[50%]">
+                          {b.description} {b.partner_name && <span className="text-muted-foreground">• {b.partner_name}</span>}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{d}/{m}</span>
+                          <Badge variant="destructive" className="text-[10px]">
+                            {b.type === 'despesa' ? 'Pagar' : 'Receber'}
+                          </Badge>
+                          <span className="font-bold font-heading">{fmt(Number(b.net_amount))}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {overdueBills.length > 5 && (
+                    <p className="text-xs text-muted-foreground mt-1">+ {overdueBills.length - 5} outras</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-4">
