@@ -25,15 +25,15 @@ export function useSupabaseCrud<T extends { id: string }>(table: TableName, orde
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const create = async (row: Partial<T>) => {
-    const { error } = await (supabase.from(table) as any).insert(row);
+  const create = async (row: Partial<T>): Promise<string | false> => {
+    const { data: inserted, error } = await (supabase.from(table) as any).insert(row).select('id').single();
     if (error) {
       toast({ title: 'Erro ao criar', description: error.message, variant: 'destructive' });
       return false;
     }
     toast({ title: 'Criado com sucesso' });
     await fetch();
-    return true;
+    return inserted?.id ?? false;
   };
 
   const update = async (id: string, row: Partial<T>) => {

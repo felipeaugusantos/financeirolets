@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBills, BillRow } from '@/hooks/useBills';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
+import SelectWithAdd from '@/components/ui/select-with-add';
 import {
   DollarSign,
   TrendingUp,
@@ -58,7 +59,7 @@ const paymentMethods = [
 function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   const [filters, setFilters] = useState<BillFiltersState>(emptyFilters);
   const { data, summary, loading, markAs } = useBills(tab, filters);
-  const { data: accounts } = useSupabaseCrud('accounts');
+  const { data: accounts, create: createAccount } = useSupabaseCrud('accounts');
   const { toast } = useToast();
   const [payDialog, setPayDialog] = useState<BillRow | null>(null);
   const [selectedAccount, setSelectedAccount] = useState('');
@@ -269,14 +270,22 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Conta</label>
-                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {(accounts as any[])?.filter((a: any) => a.active).map((a: any) => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SelectWithAdd
+                  value={selectedAccount}
+                  onValueChange={setSelectedAccount}
+                  options={(accounts as any[])?.filter((a: any) => a.active).map((a: any) => ({ id: a.id, name: a.name })) ?? []}
+                  placeholder="Selecione..."
+                  noneLabel="Selecione..."
+                  addLabel="+ Nova Conta"
+                  dialogTitle="Nova Conta"
+                  extraFields={[{ key: 'type', label: 'Tipo', type: 'select', options: [
+                    { value: 'banco', label: 'Banco' }, { value: 'caixa', label: 'Caixa' }, { value: 'carteira', label: 'Carteira Digital' },
+                  ]}]}
+                  onAdd={async (d) => {
+                    const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true } as any);
+                    return id || null;
+                  }}
+                />
               </div>
             </div>
           </div>
