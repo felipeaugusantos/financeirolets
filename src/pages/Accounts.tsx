@@ -10,6 +10,7 @@ import { useBills, BillRow } from '@/hooks/useBills';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import SelectWithAdd from '@/components/ui/select-with-add';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
+import { useTransactions } from '@/hooks/useTransactions';
 import {
   DollarSign,
   TrendingUp,
