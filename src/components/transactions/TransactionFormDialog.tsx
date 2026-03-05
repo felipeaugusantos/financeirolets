@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon, Plus, Trash2, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import SelectWithAdd from '@/components/ui/select-with-add';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import type { TransactionInput, AllocationInput } from '@/hooks/useTransactions';
 
