@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBills, BillRow } from '@/hooks/useBills';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import SelectWithAdd from '@/components/ui/select-with-add';
+import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import {
   DollarSign,
   TrendingUp,
@@ -19,6 +20,7 @@ import {
   Banknote,
   Copy,
   Building2,
+  Plus,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import BillFilters, { BillFiltersState, emptyFilters } from '@/components/accounts/BillFilters';
@@ -58,13 +60,14 @@ const paymentMethods = [
 
 function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   const [filters, setFilters] = useState<BillFiltersState>(emptyFilters);
-  const { data, summary, loading, markAs } = useBills(tab, filters);
+  const { data, summary, loading, markAs, fetchData } = useBills(tab, filters);
   const { data: accounts, create: createAccount } = useSupabaseCrud('accounts');
   const { toast } = useToast();
   const [payDialog, setPayDialog] = useState<BillRow | null>(null);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState('pix');
   const [paying, setPaying] = useState(false);
+  const [newTxOpen, setNewTxOpen] = useState(false);
 
   const handlePay = async () => {
     if (!payDialog) return;
@@ -86,10 +89,20 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
     cpf: 'CPF', cnpj: 'CNPJ', email: 'E-mail', telefone: 'Telefone', aleatoria: 'Chave Aleatória',
   };
 
+  const defaultType = tab === 'pagar' ? 'despesa' : 'receita';
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <BillFilters filters={filters} onChange={setFilters} />
+      {/* Header with filters + add button */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <BillFilters filters={filters} onChange={setFilters} />
+        </div>
+        <Button size="sm" className="gap-1.5 shrink-0" onClick={() => setNewTxOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Novo
+        </Button>
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -299,6 +312,15 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* New Transaction Dialog */}
+      <TransactionFormDialog
+        open={newTxOpen}
+        onClose={() => setNewTxOpen(false)}
+        onSaved={() => { setNewTxOpen(false); fetchData(); }}
+        defaultType={defaultType as 'receita' | 'despesa'}
+        defaultStatus="pendente"
+      />
     </div>
   );
 }

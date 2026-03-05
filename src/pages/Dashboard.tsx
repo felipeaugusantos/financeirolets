@@ -1,24 +1,27 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/hooks/useDashboard';
+import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { useNavigate } from 'react-router-dom';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const PIE_COLORS = [
-  'hsl(340, 82%, 52%)',  // primary pink
-  'hsl(184, 100%, 39%)', // teal
-  'hsl(40, 70%, 50%)',   // honey
-  'hsl(122, 52%, 33%)',  // green
-  'hsl(0, 69%, 50%)',    // red
-  'hsl(260, 60%, 55%)',  // purple
-  'hsl(200, 70%, 50%)',  // blue
-  'hsl(30, 80%, 55%)',   // orange
+  'hsl(340, 82%, 52%)',
+  'hsl(184, 100%, 39%)',
+  'hsl(40, 70%, 50%)',
+  'hsl(122, 52%, 33%)',
+  'hsl(0, 69%, 50%)',
+  'hsl(260, 60%, 55%)',
+  'hsl(200, 70%, 50%)',
+  'hsl(30, 80%, 55%)',
 ];
 
 const chartConfig = {
@@ -27,8 +30,22 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading } = useDashboard();
+  const [unitId, setUnitId] = useState<string>('');
+  const [frontId, setFrontId] = useState<string>('');
+
+  const { data: units } = useSupabaseCrud<any>('units');
+  const { data: fronts } = useSupabaseCrud<any>('business_fronts');
+
+  const dashFilters = {
+    unitId: unitId || undefined,
+    frontId: frontId || undefined,
+  };
+
+  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading } = useDashboard(dashFilters);
   const navigate = useNavigate();
+
+  const activeUnits = (units as any[])?.filter((u: any) => u.active) ?? [];
+  const activeFronts = (fronts as any[])?.filter((f: any) => f.active) ?? [];
 
   const cards = [
     { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary' },
@@ -62,9 +79,35 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={unitId} onValueChange={setUnitId}>
+            <SelectTrigger className="w-[160px] h-9 text-xs">
+              <SelectValue placeholder="Todas Unidades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas Unidades</SelectItem>
+              {activeUnits.map((u: any) => (
+                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={frontId} onValueChange={setFrontId}>
+            <SelectTrigger className="w-[160px] h-9 text-xs">
+              <SelectValue placeholder="Todas Frentes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas Frentes</SelectItem>
+              {activeFronts.map((f: any) => (
+                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -154,7 +197,6 @@ export default function Dashboard() {
 
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Bar Chart - Receitas vs Despesas */}
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
             <CardTitle className="text-sm font-heading">Receitas vs Despesas (últimos 6 meses)</CardTitle>
@@ -179,7 +221,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Pie Chart - Despesas por Categoria */}
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
             <CardTitle className="text-sm font-heading">Despesas por Categoria (mês atual)</CardTitle>
