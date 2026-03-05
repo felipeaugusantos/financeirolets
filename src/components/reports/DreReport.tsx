@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDreReport, DreFilters } from '@/hooks/useDreReport';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, FileText, Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { exportToPdf } from '@/lib/exportPdf';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -22,6 +23,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     regime: 'competencia',
   });
   const [generated, setGenerated] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
@@ -32,6 +35,21 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   const handleGenerate = async () => {
     await generate(filters);
     setGenerated(true);
+  };
+
+  const handleExport = async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      await exportToPdf({
+        title: 'DRE – Demonstrativo de Resultado',
+        subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo} | Regime: ${filters.regime === 'competencia' ? 'Competência' : 'Caixa'}`,
+        filename: `DRE_${filters.dateFrom}_${filters.dateTo}.pdf`,
+        element: reportRef.current,
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -82,10 +100,15 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
-              <Button onClick={handleGenerate} disabled={loading} className="w-full">
+            <div className="flex items-end gap-2">
+              <Button onClick={handleGenerate} disabled={loading} className="flex-1">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
+              {generated && lines.length > 0 && (
+                <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
+                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -93,7 +116,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
 
       {generated && (
         <Card className="shadow-card rounded-2xl border-border">
-          <CardContent className="p-0">
+          <CardContent className="p-0" ref={reportRef}>
             {lines.length === 0 && !loading ? (
               <div className="p-8 text-center text-muted-foreground text-sm">
                 Nenhuma linha DRE configurada ou sem dados no período.
