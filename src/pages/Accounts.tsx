@@ -62,6 +62,7 @@ const paymentMethods = [
 function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   const [filters, setFilters] = useState<BillFiltersState>(emptyFilters);
   const { data, summary, loading, markAs, fetchData } = useBills(tab, filters);
+  const { create: createTransaction } = useTransactions();
   const { data: accounts, create: createAccount } = useSupabaseCrud('accounts');
   const { toast } = useToast();
   const [payDialog, setPayDialog] = useState<BillRow | null>(null);
