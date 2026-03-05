@@ -270,56 +270,87 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Categoria</Label>
-                <Select value={categoryId || '__none__'} onValueChange={v => setCategoryId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {filteredCategories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SelectWithAdd
+                  value={categoryId}
+                  onValueChange={setCategoryId}
+                  options={filteredCategories.map((c: any) => ({ id: c.id, name: c.name }))}
+                  noneLabel="Nenhuma"
+                  addLabel="+ Nova Categoria"
+                  dialogTitle="Nova Categoria"
+                  onAdd={async (d) => {
+                    const id = await createCategory({ name: d.name, type, active: true });
+                    return id || null;
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Conta</Label>
-                <Select value={accountId || '__none__'} onValueChange={v => setAccountId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {accounts.filter((a: any) => a.active).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SelectWithAdd
+                  value={accountId}
+                  onValueChange={setAccountId}
+                  options={activeAccounts.map((a: any) => ({ id: a.id, name: a.name }))}
+                  noneLabel="Nenhuma"
+                  addLabel="+ Nova Conta"
+                  dialogTitle="Nova Conta"
+                  extraFields={[{ key: 'type', label: 'Tipo', type: 'select', options: [
+                    { value: 'banco', label: 'Banco' }, { value: 'caixa', label: 'Caixa' }, { value: 'carteira', label: 'Carteira Digital' },
+                  ]}]}
+                  onAdd={async (d) => {
+                    const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true });
+                    return id || null;
+                  }}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Parceiro</Label>
-                <Select value={partnerId || '__none__'} onValueChange={v => setPartnerId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhum</SelectItem>
-                    {partners.filter((p: any) => p.active).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SelectWithAdd
+                  value={partnerId}
+                  onValueChange={setPartnerId}
+                  options={activePartners.map((p: any) => ({ id: p.id, name: p.name }))}
+                  noneLabel="Nenhum"
+                  addLabel="+ Novo Parceiro"
+                  dialogTitle="Novo Parceiro"
+                  extraFields={[{ key: 'partner_type', label: 'Tipo', type: 'select', options: [
+                    { value: 'fornecedor', label: 'Fornecedor' }, { value: 'cliente', label: 'Cliente' }, { value: 'ambos', label: 'Ambos' },
+                  ]}]}
+                  onAdd={async (d) => {
+                    const id = await createPartner({ name: d.name, type: d.partner_type || 'fornecedor', active: true });
+                    return id || null;
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Unidade</Label>
-                <Select value={unitId || '__none__'} onValueChange={v => setUnitId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {units.filter((u: any) => u.active).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SelectWithAdd
+                  value={unitId}
+                  onValueChange={setUnitId}
+                  options={activeUnits.map((u: any) => ({ id: u.id, name: u.name }))}
+                  noneLabel="Nenhuma"
+                  addLabel="+ Nova Unidade"
+                  dialogTitle="Nova Unidade"
+                  onAdd={async (d) => {
+                    const id = await createUnit({ name: d.name, active: true });
+                    return id || null;
+                  }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Frente</Label>
-                <Select value={frontId || '__none__'} onValueChange={v => setFrontId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {fronts.filter((f: any) => f.active).map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SelectWithAdd
+                  value={frontId}
+                  onValueChange={setFrontId}
+                  options={activeFronts.map((f: any) => ({ id: f.id, name: f.name }))}
+                  noneLabel="Nenhuma"
+                  addLabel="+ Nova Frente"
+                  dialogTitle="Nova Frente"
+                  onAdd={async (d) => {
+                    const id = await createFront({ name: d.name, active: true });
+                    return id || null;
+                  }}
+                />
               </div>
             </div>
 
