@@ -19,7 +19,7 @@ export interface FieldConfig {
 interface CrudDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, any>) => Promise<boolean>;
+  onSave: (data: Record<string, any>) => Promise<boolean | string>;
   title: string;
   fields: FieldConfig[];
   initialData?: Record<string, any>;
