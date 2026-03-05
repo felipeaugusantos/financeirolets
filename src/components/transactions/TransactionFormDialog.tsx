@@ -46,11 +46,11 @@ const PAYMENT_METHODS = [
 ];
 
 export default function TransactionFormDialog({ open, onOpenChange, onSave, initialData }: Props) {
-  const { data: categories, create: createCategory } = useSupabaseCrud<any>('categories', 'name');
-  const { data: accounts, create: createAccount } = useSupabaseCrud<any>('accounts', 'name');
-  const { data: partners, create: createPartner } = useSupabaseCrud<any>('partners', 'name');
-  const { data: units, create: createUnit } = useSupabaseCrud<any>('units', 'name');
-  const { data: fronts, create: createFront } = useSupabaseCrud<any>('business_fronts', 'name');
+  const { data: categories, create: createCategory, fetch: refetchCategories } = useSupabaseCrud<any>('categories', 'name');
+  const { data: accounts, create: createAccount, fetch: refetchAccounts } = useSupabaseCrud<any>('accounts', 'name');
+  const { data: partners, create: createPartner, fetch: refetchPartners } = useSupabaseCrud<any>('partners', 'name');
+  const { data: units, create: createUnit, fetch: refetchUnits } = useSupabaseCrud<any>('units', 'name');
+  const { data: fronts, create: createFront, fetch: refetchFronts } = useSupabaseCrud<any>('business_fronts', 'name');
 
   const [type, setType] = useState<'receita' | 'despesa'>('despesa');
   const [description, setDescription] = useState('');
