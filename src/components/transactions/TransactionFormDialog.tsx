@@ -46,11 +46,11 @@ const PAYMENT_METHODS = [
 ];
 
 export default function TransactionFormDialog({ open, onOpenChange, onSave, initialData }: Props) {
-  const { data: categories } = useSupabaseCrud<any>('categories', 'name');
-  const { data: accounts } = useSupabaseCrud<any>('accounts', 'name');
-  const { data: partners } = useSupabaseCrud<any>('partners', 'name');
-  const { data: units } = useSupabaseCrud<any>('units', 'name');
-  const { data: fronts } = useSupabaseCrud<any>('business_fronts', 'name');
+  const { data: categories, create: createCategory } = useSupabaseCrud<any>('categories', 'name');
+  const { data: accounts, create: createAccount } = useSupabaseCrud<any>('accounts', 'name');
+  const { data: partners, create: createPartner } = useSupabaseCrud<any>('partners', 'name');
+  const { data: units, create: createUnit } = useSupabaseCrud<any>('units', 'name');
+  const { data: fronts, create: createFront } = useSupabaseCrud<any>('business_fronts', 'name');
 
   const [type, setType] = useState<'receita' | 'despesa'>('despesa');
   const [description, setDescription] = useState('');
@@ -123,6 +123,40 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
 
   const netAmount = (parseFloat(amount) || 0) - (parseFloat(taxAmount) || 0);
   const filteredCategories = categories.filter((c: any) => c.active && c.type === type);
+
+  // Quick-add handlers that return the new id
+  const handleAddCategory = useCallback(async (data: Record<string, string>) => {
+    const row = { name: data.name, type, active: true };
+    const ok = await createCategory(row);
+    if (!ok) return null;
+    // Find newly created item after refetch
+    await new Promise(r => setTimeout(r, 300));
+    return '__refetch__';
+  }, [type, createCategory]);
+
+  const handleAddAccount = useCallback(async (data: Record<string, string>) => {
+    const ok = await createAccount({ name: data.name, type: data.type || 'banco', active: true });
+    if (!ok) return null;
+    return '__refetch__';
+  }, [createAccount]);
+
+  const handleAddPartner = useCallback(async (data: Record<string, string>) => {
+    const ok = await createPartner({ name: data.name, type: data.partner_type || 'fornecedor', active: true });
+    if (!ok) return null;
+    return '__refetch__';
+  }, [createPartner]);
+
+  const handleAddUnit = useCallback(async (data: Record<string, string>) => {
+    const ok = await createUnit({ name: data.name, active: true });
+    if (!ok) return null;
+    return '__refetch__';
+  }, [createUnit]);
+
+  const handleAddFront = useCallback(async (data: Record<string, string>) => {
+    const ok = await createFront({ name: data.name, active: true });
+    if (!ok) return null;
+    return '__refetch__';
+  }, [createFront]);
 
   const addAllocation = () => {
     setAllocations(prev => [...prev, { allocation_type: 'percentual', percentage: 0 }]);
