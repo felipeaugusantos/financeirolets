@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { FileText, TrendingUp, Download } from 'lucide-react';
+import { FileText, TrendingUp } from 'lucide-react';
+import DreReport from '@/components/reports/DreReport';
+
+type View = 'menu' | 'dre' | 'cashflow';
 
 export default function Reports() {
+  const [view, setView] = useState<View>('menu');
+
+  if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
+
   return (
     <div className="space-y-6">
       <div>
@@ -11,7 +18,10 @@ export default function Reports() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Card className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow">
+        <Card
+          className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
+          onClick={() => setView('dre')}
+        >
           <CardHeader className="flex flex-row items-center gap-3">
             <div className="p-2 rounded-xl bg-primary/10">
               <FileText className="h-5 w-5 text-primary" />
@@ -28,14 +38,14 @@ export default function Reports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow">
+        <Card className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow opacity-60">
           <CardHeader className="flex flex-row items-center gap-3">
             <div className="p-2 rounded-xl bg-secondary/10">
               <TrendingUp className="h-5 w-5 text-secondary" />
             </div>
             <div>
               <CardTitle className="text-base font-heading">Fluxo de Caixa</CardTitle>
-              <p className="text-xs text-muted-foreground">Entradas, saídas e saldo</p>
+              <p className="text-xs text-muted-foreground">Em breve</p>
             </div>
           </CardHeader>
           <CardContent>
