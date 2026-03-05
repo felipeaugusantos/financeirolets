@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, TrendingUp } from 'lucide-react';
 import DreReport from '@/components/reports/DreReport';
+import CashFlowReport from '@/components/reports/CashFlowReport';
 
 type View = 'menu' | 'dre' | 'cashflow';
 
@@ -9,6 +10,7 @@ export default function Reports() {
   const [view, setView] = useState<View>('menu');
 
   if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
+  if (view === 'cashflow') return <CashFlowReport onBack={() => setView('menu')} />;
 
   return (
     <div className="space-y-6">
@@ -38,14 +40,17 @@ export default function Reports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow opacity-60">
+        <Card
+          className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
+          onClick={() => setView('cashflow')}
+        >
           <CardHeader className="flex flex-row items-center gap-3">
             <div className="p-2 rounded-xl bg-secondary/10">
               <TrendingUp className="h-5 w-5 text-secondary" />
             </div>
             <div>
               <CardTitle className="text-base font-heading">Fluxo de Caixa</CardTitle>
-              <p className="text-xs text-muted-foreground">Em breve</p>
+              <p className="text-xs text-muted-foreground">Entradas, saídas e saldo</p>
             </div>
           </CardHeader>
           <CardContent>
