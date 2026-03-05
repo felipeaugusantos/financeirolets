@@ -318,10 +318,13 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
       {/* New Transaction Dialog */}
       <TransactionFormDialog
         open={newTxOpen}
-        onClose={() => setNewTxOpen(false)}
-        onSaved={() => { setNewTxOpen(false); fetchData(); }}
-        defaultType={defaultType as 'receita' | 'despesa'}
-        defaultStatus="pendente"
+        onOpenChange={(open) => { if (!open) setNewTxOpen(false); }}
+        onSave={async (input) => {
+          const ok = await createTransaction(input);
+          if (ok) fetchData();
+          return ok;
+        }}
+        initialData={{ type: defaultType, status: 'pendente' }}
       />
     </div>
   );
