@@ -1,0 +1,430 @@
+import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { CalendarIcon, Plus, Trash2, Upload, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
+import type { TransactionInput, AllocationInput } from '@/hooks/useTransactions';
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (input: TransactionInput) => Promise<boolean>;
+  initialData?: Partial<TransactionInput> & { id?: string };
+}
+
+const STATUS_OPTIONS = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'pago', label: 'Pago' },
+  { value: 'recebido', label: 'Recebido' },
+  { value: 'cancelado', label: 'Cancelado' },
+  { value: 'agendado', label: 'Agendado' },
+];
+
+const PAYMENT_METHODS = [
+  { value: 'dinheiro', label: 'Dinheiro' },
+  { value: 'pix', label: 'PIX' },
+  { value: 'cartao_credito', label: 'Cartão de Crédito' },
+  { value: 'cartao_debito', label: 'Cartão de Débito' },
+  { value: 'boleto', label: 'Boleto' },
+  { value: 'transferencia', label: 'Transferência' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'outro', label: 'Outro' },
+];
+
+export default function TransactionFormDialog({ open, onOpenChange, onSave, initialData }: Props) {
+  const { data: categories } = useSupabaseCrud<any>('categories', 'name');
+  const { data: accounts } = useSupabaseCrud<any>('accounts', 'name');
+  const { data: partners } = useSupabaseCrud<any>('partners', 'name');
+  const { data: units } = useSupabaseCrud<any>('units', 'name');
+  const { data: fronts } = useSupabaseCrud<any>('business_fronts', 'name');
+
+  const [type, setType] = useState<'receita' | 'despesa'>('despesa');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [taxAmount, setTaxAmount] = useState('0');
+  const [competenceDate, setCompetenceDate] = useState<Date>(new Date());
+  const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [paymentDate, setPaymentDate] = useState<Date | undefined>();
+  const [status, setStatus] = useState('pendente');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [partnerId, setPartnerId] = useState('');
+  const [unitId, setUnitId] = useState('');
+  const [frontId, setFrontId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState('2');
+  const [allocations, setAllocations] = useState<AllocationInput[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [allocOpen, setAllocOpen] = useState(false);
+
+  const isEditing = !!initialData?.id;
+
+  useEffect(() => {
+    if (open && initialData) {
+      setType(initialData.type || 'despesa');
+      setDescription(initialData.description || '');
+      setAmount(String(initialData.amount || ''));
+      setTaxAmount(String(initialData.tax_amount || '0'));
+      setCompetenceDate(initialData.competence_date ? new Date(initialData.competence_date) : new Date());
+      setDueDate(initialData.due_date ? new Date(initialData.due_date) : undefined);
+      setPaymentDate(initialData.payment_date ? new Date(initialData.payment_date) : undefined);
+      setStatus(initialData.status || 'pendente');
+      setPaymentMethod(initialData.payment_method || '');
+      setCategoryId(initialData.category_id || '');
+      setAccountId(initialData.account_id || '');
+      setPartnerId(initialData.partner_id || '');
+      setUnitId(initialData.unit_id || '');
+      setFrontId(initialData.front_id || '');
+      setNotes(initialData.notes || '');
+    } else if (open) {
+      resetForm();
+    }
+  }, [open, initialData]);
+
+  const resetForm = () => {
+    setType('despesa');
+    setDescription('');
+    setAmount('');
+    setTaxAmount('0');
+    setCompetenceDate(new Date());
+    setDueDate(undefined);
+    setPaymentDate(undefined);
+    setStatus('pendente');
+    setPaymentMethod('');
+    setCategoryId('');
+    setAccountId('');
+    setPartnerId('');
+    setUnitId('');
+    setFrontId('');
+    setNotes('');
+    setIsInstallment(false);
+    setInstallmentCount('2');
+    setAllocations([]);
+    setFiles([]);
+    setAllocOpen(false);
+  };
+
+  const netAmount = (parseFloat(amount) || 0) - (parseFloat(taxAmount) || 0);
+  const filteredCategories = categories.filter((c: any) => c.active && c.type === type);
+
+  const addAllocation = () => {
+    setAllocations(prev => [...prev, { allocation_type: 'percentual', percentage: 0 }]);
+  };
+
+  const removeAllocation = (idx: number) => {
+    setAllocations(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateAllocation = (idx: number, field: string, value: any) => {
+    setAllocations(prev => prev.map((a, i) => i === idx ? { ...a, [field]: value } : a));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+  };
+
+  const removeFile = (idx: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSubmit = async () => {
+    if (!description.trim() || !amount) return;
+    setSaving(true);
+    const input: TransactionInput = {
+      type,
+      description: description.trim(),
+      amount: parseFloat(amount),
+      tax_amount: parseFloat(taxAmount) || 0,
+      competence_date: format(competenceDate, 'yyyy-MM-dd'),
+      due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : undefined,
+      payment_date: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : undefined,
+      status,
+      payment_method: paymentMethod || undefined,
+      category_id: categoryId || undefined,
+      account_id: accountId || undefined,
+      partner_id: partnerId || undefined,
+      unit_id: unitId || undefined,
+      front_id: frontId || undefined,
+      notes: notes || undefined,
+      is_installment: isInstallment,
+      installment_count: isInstallment ? parseInt(installmentCount) : undefined,
+      allocations: allocations.length > 0 ? allocations : undefined,
+      files: files.length > 0 ? files : undefined,
+    };
+    const ok = await onSave(input);
+    setSaving(false);
+    if (ok) onOpenChange(false);
+  };
+
+  const DatePickerField = ({ label, value, onChange }: { label: string; value?: Date; onChange: (d?: Date) => void }) => (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className={cn('w-full justify-start text-left font-normal rounded-xl bg-card border-border', !value && 'text-muted-foreground')}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {value ? format(value, 'dd/MM/yyyy') : 'Selecionar'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar mode="single" selected={value} onSelect={(d) => onChange(d || undefined)} initialFocus className="p-3 pointer-events-auto" />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle className="font-heading">{isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-[70vh] px-6">
+          <div className="space-y-5 pb-4">
+            {/* Type toggle */}
+            <div className="flex gap-2">
+              <Button type="button" variant={type === 'receita' ? 'default' : 'outline'} className={cn('flex-1 rounded-xl', type === 'receita' && 'bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90 text-[hsl(var(--success-foreground))]')} onClick={() => setType('receita')}>
+                Receita
+              </Button>
+              <Button type="button" variant={type === 'despesa' ? 'default' : 'outline'} className={cn('flex-1 rounded-xl', type === 'despesa' && 'bg-destructive hover:bg-destructive/90 text-destructive-foreground')} onClick={() => setType('despesa')}>
+                Despesa
+              </Button>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Descrição *</Label>
+              <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Compra de insumos" className="rounded-xl bg-card border-border" />
+            </div>
+
+            {/* Amount row */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Valor Bruto *</Label>
+                <Input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0,00" className="rounded-xl bg-card border-border" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Impostos</Label>
+                <Input type="number" step="0.01" min="0" value={taxAmount} onChange={e => setTaxAmount(e.target.value)} placeholder="0,00" className="rounded-xl bg-card border-border" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Valor Líquido</Label>
+                <Input value={netAmount.toFixed(2)} readOnly className="rounded-xl bg-muted border-border font-semibold" />
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-3 gap-3">
+              <DatePickerField label="Competência *" value={competenceDate} onChange={(d) => d && setCompetenceDate(d)} />
+              <DatePickerField label="Vencimento" value={dueDate} onChange={setDueDate} />
+              <DatePickerField label="Pagamento" value={paymentDate} onChange={setPaymentDate} />
+            </div>
+
+            {/* Status + Payment method */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                <Select value={paymentMethod || '__none__'} onValueChange={v => setPaymentMethod(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {PAYMENT_METHODS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Selects row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Categoria</Label>
+                <Select value={categoryId || '__none__'} onValueChange={v => setCategoryId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {filteredCategories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Conta</Label>
+                <Select value={accountId || '__none__'} onValueChange={v => setAccountId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {accounts.filter((a: any) => a.active).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Parceiro</Label>
+                <Select value={partnerId || '__none__'} onValueChange={v => setPartnerId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
+                    {partners.filter((p: any) => p.active).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Unidade</Label>
+                <Select value={unitId || '__none__'} onValueChange={v => setUnitId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {units.filter((u: any) => u.active).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Frente</Label>
+                <Select value={frontId || '__none__'} onValueChange={v => setFrontId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {fronts.filter((f: any) => f.active).map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Installments */}
+            {!isEditing && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="installment" checked={isInstallment} onCheckedChange={(c) => setIsInstallment(!!c)} />
+                  <Label htmlFor="installment" className="text-sm">Parcelado?</Label>
+                </div>
+                {isInstallment && (
+                  <div className="space-y-1.5 max-w-[200px]">
+                    <Label className="text-xs text-muted-foreground">Número de parcelas</Label>
+                    <Input type="number" min="2" max="60" value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} className="rounded-xl bg-card border-border" />
+                    {parseFloat(amount) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {parseInt(installmentCount)}x de R$ {(parseFloat(amount) / parseInt(installmentCount || '1')).toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Allocations */}
+            {!isEditing && (
+              <Collapsible open={allocOpen} onOpenChange={setAllocOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between text-sm text-muted-foreground">
+                    Rateio por Unidade/Frente ({allocations.length})
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 mt-2">
+                  {allocations.map((alloc, idx) => (
+                    <div key={idx} className="flex gap-2 items-end">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Unidade</Label>
+                        <Select value={alloc.unit_id || '__none__'} onValueChange={v => updateAllocation(idx, 'unit_id', v === '__none__' ? undefined : v)}>
+                          <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            {units.filter((u: any) => u.active).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Frente</Label>
+                        <Select value={alloc.front_id || '__none__'} onValueChange={v => updateAllocation(idx, 'front_id', v === '__none__' ? undefined : v)}>
+                          <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            {fronts.filter((f: any) => f.active).map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <Label className="text-xs">%</Label>
+                        <Input type="number" min="0" max="100" value={alloc.percentage ?? ''} onChange={e => updateAllocation(idx, 'percentage', parseFloat(e.target.value) || 0)} className="rounded-xl bg-card border-border text-xs h-8" />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeAllocation(idx)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" className="rounded-xl" onClick={addAllocation}>
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar linha
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Observações</Label>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas adicionais..." className="rounded-xl bg-card border-border min-h-[60px]" />
+            </div>
+
+            {/* File upload */}
+            {!isEditing && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Comprovantes</Label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-secondary hover:text-secondary/80 transition-colors">
+                  <Upload className="h-4 w-4" />
+                  Anexar arquivo
+                  <input type="file" multiple className="hidden" onChange={handleFileChange} />
+                </label>
+                {files.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {files.map((f, i) => (
+                      <Badge key={i} variant="secondary" className="gap-1">
+                        {f.name}
+                        <X className="h-3 w-3 cursor-pointer" onClick={() => removeFile(i)} />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-6 pt-0">
+          <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button className="rounded-xl" onClick={handleSubmit} disabled={saving || !description.trim() || !amount}>
+            {saving ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
