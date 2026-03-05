@@ -99,8 +99,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
       `)
       .order('competence_date', { ascending: false });
 
-    if (filters.type) query = query.eq('type', filters.type);
-    if (filters.status) query = query.eq('status', filters.status);
+    if (filters.type) query = query.eq('type', filters.type as any);
+    if (filters.status) query = query.eq('status', filters.status as any);
     if (filters.category_id) query = query.eq('category_id', filters.category_id);
     if (filters.account_id) query = query.eq('account_id', filters.account_id);
     if (filters.unit_id) query = query.eq('unit_id', filters.unit_id);
@@ -136,10 +136,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
     const perNet = Math.round((net / count) * 100) / 100;
 
     const baseRow = {
-      type: input.type,
+      type: input.type as any,
       description: input.description,
-      status: input.status,
-      payment_method: input.payment_method || null,
+      status: input.status as any,
+      payment_method: (input.payment_method || null) as any,
       category_id: input.category_id || null,
       account_id: input.account_id || null,
       partner_id: input.partner_id || null,
