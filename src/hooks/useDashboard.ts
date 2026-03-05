@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface OverdueBill {
+  id: string;
+  description: string;
+  net_amount: number;
+  due_date: string;
+  type: string;
+  partner_name?: string;
+}
+
 export interface DashboardData {
   saldoTotal: number;
   receitasMes: number;
   despesasMes: number;
   contasAtrasadas: number;
+  vencendoHoje: number;
+  overdueBills: OverdueBill[];
+  dueTodayBills: OverdueBill[];
   monthlyData: { label: string; receitas: number; despesas: number }[];
   categoryData: { name: string; value: number }[];
   loading: boolean;
@@ -17,6 +29,9 @@ export function useDashboard() {
     receitasMes: 0,
     despesasMes: 0,
     contasAtrasadas: 0,
+    vencendoHoje: 0,
+    overdueBills: [],
+    dueTodayBills: [],
     monthlyData: [],
     categoryData: [],
     loading: true,
@@ -135,11 +150,36 @@ export function useDashboard() {
         saldoTotal += Number(a.initial_balance) || 0;
       });
 
+      // Fetch overdue & due-today bills for alerts
+      const { data: alertBills } = await supabase
+        .from('transactions')
+        .select('id, description, net_amount, due_date, type, partner:partners(name)')
+        .in('status', ['pendente', 'agendado'] as any)
+        .not('due_date', 'is', null)
+        .lte('due_date', today)
+        .order('due_date', { ascending: true })
+        .limit(20);
+
+      const overdueBills: OverdueBill[] = [];
+      const dueTodayBills: OverdueBill[] = [];
+      let vencendoHoje = 0;
+      (alertBills ?? []).forEach((b: any) => {
+        const bill: OverdueBill = {
+          id: b.id, description: b.description, net_amount: b.net_amount,
+          due_date: b.due_date, type: b.type, partner_name: b.partner?.name,
+        };
+        if (b.due_date === today) { dueTodayBills.push(bill); vencendoHoje++; }
+        else overdueBills.push(bill);
+      });
+
       setData({
         saldoTotal,
         receitasMes,
         despesasMes,
         contasAtrasadas,
+        vencendoHoje,
+        overdueBills,
+        dueTodayBills,
         monthlyData,
         categoryData,
         loading: false,
