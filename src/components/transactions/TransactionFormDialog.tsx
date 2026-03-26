@@ -268,7 +268,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
 
             {/* Selects row */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+             <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Categoria</Label>
                 <SelectWithAdd
                   value={categoryId}
@@ -279,6 +279,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                   dialogTitle="Nova Categoria"
                   onAdd={async (d) => {
                     const id = await createCategory({ name: d.name, type, active: true });
+                    if (id) await refetchCategories();
                     return id || null;
                   }}
                 />
@@ -297,6 +298,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                   ]}]}
                   onAdd={async (d) => {
                     const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true });
+                    if (id) await refetchAccounts();
                     return id || null;
                   }}
                 />
@@ -318,6 +320,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                   ]}]}
                   onAdd={async (d) => {
                     const id = await createPartner({ name: d.name, type: d.partner_type || 'fornecedor', active: true });
+                    if (id) await refetchPartners();
                     return id || null;
                   }}
                 />
@@ -333,6 +336,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                   dialogTitle="Nova Unidade"
                   onAdd={async (d) => {
                     const id = await createUnit({ name: d.name, active: true });
+                    if (id) await refetchUnits();
                     return id || null;
                   }}
                 />
@@ -348,6 +352,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                   dialogTitle="Nova Frente"
                   onAdd={async (d) => {
                     const id = await createFront({ name: d.name, active: true });
+                    if (id) await refetchFronts();
                     return id || null;
                   }}
                 />
