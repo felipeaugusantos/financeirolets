@@ -52,7 +52,7 @@ export function useDreReport() {
 
       let txQuery = supabase
         .from('transactions')
-        .select('amount, tax_amount, net_amount, category_id, type, status')
+        .select('id, amount, tax_amount, net_amount, category_id, type, status, unit_id')
         .gte(dateField, filters.dateFrom)
         .lte(dateField, filters.dateTo);
 
@@ -60,12 +60,25 @@ export function useDreReport() {
         txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
       }
 
-      if (filters.unit_id) {
-        txQuery = txQuery.eq('unit_id', filters.unit_id);
-      }
-
       const { data: transactions, error: txErr } = await txQuery;
       if (txErr) throw txErr;
+
+      // 3b. Fetch allocations for these transactions (for rateio)
+      const txIds = (transactions ?? []).map((t: any) => t.id);
+      let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null }[]>();
+      
+      if (txIds.length > 0) {
+        const { data: allocs } = await supabase
+          .from('transaction_allocations')
+          .select('transaction_id, unit_id, allocation_type, percentage, amount')
+          .in('transaction_id', txIds);
+        
+        (allocs ?? []).forEach((a: any) => {
+          const list = allocMap.get(a.transaction_id) || [];
+          list.push(a);
+          allocMap.set(a.transaction_id, list);
+        });
+      }
 
       // 4. Map category_id -> dre_line_id
       const catToDre = new Map<string, string>();
@@ -73,14 +86,42 @@ export function useDreReport() {
         if (c.dre_line_id) catToDre.set(c.id, c.dre_line_id);
       });
 
-      // 5. Sum by dre_line_id
+      // 5. Sum by dre_line_id, considering allocations when filtering by unit
       const lineValues = new Map<string, number>();
       (transactions ?? []).forEach((tx: any) => {
         if (!tx.category_id) return;
         const dreLineId = catToDre.get(tx.category_id);
         if (!dreLineId) return;
-        const val = Number(tx.net_amount) || 0;
-        lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + val);
+        const totalVal = Number(tx.net_amount) || 0;
+
+        // Check if this tx has allocations
+        const allocs = allocMap.get(tx.id);
+        
+        if (filters.unit_id) {
+          // When filtering by unit, check allocations first
+          if (allocs && allocs.length > 0) {
+            // Get the proportion for this unit from allocations
+            const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
+            if (unitAlloc) {
+              let allocVal = 0;
+              if (unitAlloc.allocation_type === 'percentual' && unitAlloc.percentage) {
+                allocVal = totalVal * (unitAlloc.percentage / 100);
+              } else if (unitAlloc.amount) {
+                allocVal = Number(unitAlloc.amount);
+              }
+              lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + allocVal);
+            }
+            // If no allocation for this unit, tx is excluded from this unit's report
+          } else {
+            // No allocations — use direct unit_id match
+            if (tx.unit_id === filters.unit_id) {
+              lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+            }
+          }
+        } else {
+          // No unit filter — use full value
+          lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+        }
       });
 
       // 6. Build tree and calculate subtotals

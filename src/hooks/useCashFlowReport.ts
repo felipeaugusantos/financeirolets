@@ -27,27 +27,60 @@ export function useCashFlowReport() {
     try {
       let query = supabase
         .from('transactions')
-        .select('type, net_amount, payment_date, status')
+        .select('id, type, net_amount, payment_date, status, unit_id')
         .not('payment_date', 'is', null)
         .in('status', ['pago', 'recebido'] as any)
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo);
 
-      if (filters.unit_id) query = query.eq('unit_id', filters.unit_id);
-
       const { data: rows, error } = await query;
       if (error) throw error;
+
+      // Fetch allocations if filtering by unit
+      let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null; allocation_type: string }[]>();
+      if (filters.unit_id && rows && rows.length > 0) {
+        const txIds = rows.map((r: any) => r.id);
+        const { data: allocs } = await supabase
+          .from('transaction_allocations')
+          .select('transaction_id, unit_id, allocation_type, percentage, amount')
+          .in('transaction_id', txIds);
+        (allocs ?? []).forEach((a: any) => {
+          const list = allocMap.get(a.transaction_id) || [];
+          list.push(a);
+          allocMap.set(a.transaction_id, list);
+        });
+      }
 
       // Group by month
       const monthMap = new Map<string, { receitas: number; despesas: number }>();
 
       (rows ?? []).forEach((tx: any) => {
-        const m = tx.payment_date.substring(0, 7); // YYYY-MM
+        const m = tx.payment_date.substring(0, 7);
         const entry = monthMap.get(m) || { receitas: 0, despesas: 0 };
-        const val = Number(tx.net_amount) || 0;
-        if (tx.type === 'receita') entry.receitas += val;
-        else entry.despesas += val;
-        monthMap.set(m, entry);
+        const totalVal = Number(tx.net_amount) || 0;
+
+        let val = totalVal;
+        if (filters.unit_id) {
+          const allocs = allocMap.get(tx.id);
+          if (allocs && allocs.length > 0) {
+            const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
+            if (unitAlloc) {
+              val = unitAlloc.allocation_type === 'percentual' && unitAlloc.percentage
+                ? totalVal * (unitAlloc.percentage / 100)
+                : Number(unitAlloc.amount) || 0;
+            } else {
+              val = 0; // not allocated to this unit
+            }
+          } else if (tx.unit_id !== filters.unit_id) {
+            val = 0;
+          }
+        }
+
+        if (val > 0) {
+          if (tx.type === 'receita') entry.receitas += val;
+          else entry.despesas += val;
+          monthMap.set(m, entry);
+        }
       });
 
       // Fill missing months in range
