@@ -65,7 +65,7 @@ export function useDreReport() {
 
       // 3b. Fetch allocations for these transactions (for rateio)
       const txIds = (transactions ?? []).map((t: any) => t.id);
-      let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null }[]>();
+      let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null; allocation_type: string }[]>();
       
       if (txIds.length > 0) {
         const { data: allocs } = await supabase
