@@ -247,13 +247,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
   };
 
   const remove = async (id: string) => {
+    // Optimistic removal from UI
+    setData(prev => prev.filter(t => t.id !== id));
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) {
       toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      await fetchData(); // revert on error
       return false;
     }
     toast({ title: 'Excluído com sucesso' });
-    await fetchData();
+    // Recalculate totals
+    setData(prev => {
+      const receitas = prev.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
+      const despesas = prev.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.net_amount), 0);
+      setTotals({ receitas, despesas, saldo: receitas - despesas });
+      return prev;
+    });
     return true;
   };
 
