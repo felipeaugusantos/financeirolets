@@ -8,6 +8,7 @@ import AccountsSettings from './settings/AccountsSettings';
 import CategoriesSettings from './settings/CategoriesSettings';
 import PartnersSettings from './settings/PartnersSettings';
 import DreSettings from './settings/DreSettings';
+import ImportExportSettings from './settings/ImportExportSettings';
 
 const sections = [
   { key: 'units', title: 'Unidades', desc: 'Let\'s Café, Boulevard, Fábrica...', icon: Building2 },
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   if (active === 'categories') return <CategoriesSettings onBack={() => setActive(null)} />;
   if (active === 'dre') return <DreSettings onBack={() => setActive(null)} />;
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
+  if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
 
   return (
     <div className="space-y-6">
@@ -40,7 +42,7 @@ export default function SettingsPage() {
           <Card
             key={s.key}
             className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
-            onClick={() => s.key !== 'export' && setActive(s.key)}
+            onClick={() => setActive(s.key)}
           >
             <CardHeader className="flex flex-row items-center gap-3 pb-2">
               <div className="p-2 rounded-xl bg-accent/10">
