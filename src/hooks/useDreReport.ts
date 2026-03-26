@@ -140,13 +140,43 @@ export function useDreReport() {
       allLines.forEach((l: any) => getDepth(l.id));
 
       // Calculate subtotals bottom-up
+      // Cache computed values
+      const computedValues = new Map<string, number>();
       const getLineValue = (line: any): number => {
+        if (computedValues.has(line.id)) return computedValues.get(line.id)!;
+        let val: number;
         if (!line.is_subtotal) {
-          return (lineValues.get(line.id) || 0) * line.sign;
+          val = (lineValues.get(line.id) || 0) * (line.sign < 0 ? 1 : 1);
+        } else {
+          const children = allLines.filter((c: any) => c.parent_id === line.id);
+          if (children.length > 0) {
+            val = children.reduce((sum: number, child: any) => sum + getLineValue(child), 0);
+          } else {
+            // Top-level result lines (3, 5, 8) with no children — compute from prior groups
+            const code = line.code;
+            if (code === '3') {
+              // Resultado Bruto = Receitas + Despesas Variáveis
+              const g1 = allLines.find((l: any) => l.code === '1');
+              const g2 = allLines.find((l: any) => l.code === '2');
+              val = (g1 ? getLineValue(g1) : 0) + (g2 ? getLineValue(g2) : 0);
+            } else if (code === '5') {
+              // Superávit Operacional = Resultado Bruto + Despesas Fixas
+              const g3 = allLines.find((l: any) => l.code === '3');
+              const g4 = allLines.find((l: any) => l.code === '4');
+              val = (g3 ? getLineValue(g3) : 0) + (g4 ? getLineValue(g4) : 0);
+            } else if (code === '8') {
+              // Fluxo de Caixa Retido = Superávit + Entradas + Saídas
+              const g5 = allLines.find((l: any) => l.code === '5');
+              const g6 = allLines.find((l: any) => l.code === '6');
+              const g7 = allLines.find((l: any) => l.code === '7');
+              val = (g5 ? getLineValue(g5) : 0) + (g6 ? getLineValue(g6) : 0) + (g7 ? getLineValue(g7) : 0);
+            } else {
+              val = 0;
+            }
+          }
         }
-        // Sum children
-        const children = allLines.filter((c: any) => c.parent_id === line.id);
-        return children.reduce((sum: number, child: any) => sum + getLineValue(child), 0);
+        computedValues.set(line.id, val);
+        return val;
       };
 
       const result: DreLineResult[] = allLines.map((l: any) => ({
