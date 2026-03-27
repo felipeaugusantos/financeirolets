@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
@@ -16,7 +16,7 @@ const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
-  const { lines, loading, generate } = useDreReport();
+  const { lines, loading, generate, unallocatedTotal, unallocatedCount } = useDreReport();
   const [units, setUnits] = useState<any[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
     dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
