@@ -58,6 +58,18 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const handleExportCsv = () => {
+    const headers = ['Mês', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
+    const rows = data.map(d => [
+      d.month,
+      d.receitas.toFixed(2).replace('.', ','),
+      d.despesas.toFixed(2).replace('.', ','),
+      (d.receitas - d.despesas).toFixed(2).replace('.', ','),
+      d.acumulado.toFixed(2).replace('.', ','),
+    ]);
+    exportToCsv(`FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
+  };
+
   const totalReceitas = data.reduce((s, d) => s + d.receitas, 0);
   const totalDespesas = data.reduce((s, d) => s + d.despesas, 0);
   const totalSaldo = totalReceitas - totalDespesas;
@@ -105,9 +117,14 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
               {generated && data.length > 0 && (
-                <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
-                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                </Button>
+                <>
+                  <Button variant="outline" size="icon" onClick={handleExportCsv} title="Exportar CSV">
+                    <FileSpreadsheet className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
+                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  </Button>
+                </>
               )}
             </div>
           </div>
