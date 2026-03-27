@@ -23,8 +23,9 @@ export interface DreFilters {
 
 export function useDreReport() {
   const [lines, setLines] = useState<DreLineResult[]>([]);
+  const [unallocatedTotal, setUnallocatedTotal] = useState(0);
+  const [unallocatedCount, setUnallocatedCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
   const generate = useCallback(async (filters: DreFilters) => {
     setLoading(true);
@@ -88,19 +89,18 @@ export function useDreReport() {
 
       // 5. Sum by dre_line_id, considering allocations when filtering by unit
       const lineValues = new Map<string, number>();
+      let _unallocTotal = 0;
+      let _unallocCount = 0;
       (transactions ?? []).forEach((tx: any) => {
         if (!tx.category_id) return;
         const dreLineId = catToDre.get(tx.category_id);
         if (!dreLineId) return;
         const totalVal = Number(tx.net_amount) || 0;
 
-        // Check if this tx has allocations
         const allocs = allocMap.get(tx.id);
         
         if (filters.unit_id) {
-          // When filtering by unit, check allocations first
           if (allocs && allocs.length > 0) {
-            // Get the proportion for this unit from allocations
             const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
             if (unitAlloc) {
               let allocVal = 0;
@@ -111,15 +111,16 @@ export function useDreReport() {
               }
               lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + allocVal);
             }
-            // If no allocation for this unit, tx is excluded from this unit's report
           } else {
-            // No allocations — use direct unit_id match
             if (tx.unit_id === filters.unit_id) {
               lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+            } else if (!tx.unit_id) {
+              // Track unallocated transactions
+              _unallocTotal += totalVal;
+              _unallocCount++;
             }
           }
         } else {
-          // No unit filter — use full value
           lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
         }
       });
