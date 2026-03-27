@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon, Plus, Trash2, Upload, X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,26 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       setUnitId(initialData.unit_id || '');
       setFrontId(initialData.front_id || '');
       setNotes(initialData.notes || '');
+      // Load existing allocations for editing
+      if (initialData.id) {
+        supabase.from('transaction_allocations')
+          .select('unit_id, front_id, allocation_type, percentage, amount')
+          .eq('transaction_id', initialData.id)
+          .then(({ data: allocs }) => {
+            if (allocs && allocs.length > 0) {
+              setAllocations(allocs.map((a: any) => ({
+                unit_id: a.unit_id || undefined,
+                front_id: a.front_id || undefined,
+                allocation_type: a.allocation_type || 'percentual',
+                percentage: a.percentage ?? undefined,
+                amount: a.amount ?? undefined,
+              })));
+              setAllocOpen(true);
+            } else {
+              setAllocations([]);
+            }
+          });
+      }
     } else if (open) {
       resetForm();
     }
