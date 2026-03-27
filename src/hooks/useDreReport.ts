@@ -100,7 +100,12 @@ export function useDreReport() {
 
         const allocs = allocMap.get(tx.id);
         
-        if (filters.unit_id) {
+        if (filters.unit_id === '__none__') {
+          // Show only transactions without unit and without allocations
+          if (!tx.unit_id && (!allocs || allocs.length === 0)) {
+            lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+          }
+        } else if (filters.unit_id) {
           if (allocs && allocs.length > 0) {
             const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
             if (unitAlloc) {
@@ -116,7 +121,6 @@ export function useDreReport() {
             if (tx.unit_id === filters.unit_id) {
               lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
             } else if (!tx.unit_id) {
-              // Track unallocated transactions
               _unallocTotal += totalVal;
               _unallocCount++;
             }
