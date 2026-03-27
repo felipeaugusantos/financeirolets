@@ -98,6 +98,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__none__">Sem unidade</SelectItem>
                   {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                 </SelectContent>
               </Select>
