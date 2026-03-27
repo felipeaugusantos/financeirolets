@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, TrendingUp, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
+import { exportToCsv } from '@/lib/exportCsv';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -55,6 +56,18 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Mês', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
+    const rows = data.map(d => [
+      d.month,
+      d.receitas.toFixed(2).replace('.', ','),
+      d.despesas.toFixed(2).replace('.', ','),
+      (d.receitas - d.despesas).toFixed(2).replace('.', ','),
+      d.acumulado.toFixed(2).replace('.', ','),
+    ]);
+    exportToCsv(`FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
   };
 
   const totalReceitas = data.reduce((s, d) => s + d.receitas, 0);
@@ -104,9 +117,14 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
               {generated && data.length > 0 && (
-                <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
-                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                </Button>
+                <>
+                  <Button variant="outline" size="icon" onClick={handleExportCsv} title="Exportar CSV">
+                    <FileSpreadsheet className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
+                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  </Button>
+                </>
               )}
             </div>
           </div>

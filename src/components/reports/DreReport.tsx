@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
+import { exportToCsv } from '@/lib/exportCsv';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -50,6 +51,17 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Código', 'Linha', 'Tipo', 'Valor'];
+    const rows = lines.map(l => [
+      l.code || '',
+      '  '.repeat(l.depth) + l.name,
+      l.is_subtotal ? 'Subtotal' : 'Linha',
+      l.value.toFixed(2).replace('.', ','),
+    ]);
+    exportToCsv(`DRE_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
   };
 
   return (
@@ -105,9 +117,14 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
               {generated && lines.length > 0 && (
-                <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
-                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                </Button>
+                <>
+                  <Button variant="outline" size="icon" onClick={handleExportCsv} title="Exportar CSV">
+                    <FileSpreadsheet className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
+                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  </Button>
+                </>
               )}
             </div>
           </div>
