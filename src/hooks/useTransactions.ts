@@ -241,6 +241,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
       toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
       return false;
     }
+
+    // Update allocations if provided
+    if (input.allocations !== undefined) {
+      await supabase.from('transaction_allocations').delete().eq('transaction_id', id);
+      if (input.allocations && input.allocations.length > 0) {
+        const allocs = input.allocations.map(a => ({
+          transaction_id: id,
+          unit_id: a.unit_id || null,
+          front_id: a.front_id || null,
+          allocation_type: a.allocation_type,
+          percentage: a.percentage ?? null,
+          amount: a.amount ?? null,
+        }));
+        await supabase.from('transaction_allocations').insert(allocs);
+      }
+    }
     toast({ title: 'Atualizado com sucesso' });
     await fetchData();
     return true;
