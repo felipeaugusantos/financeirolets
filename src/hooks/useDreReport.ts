@@ -146,7 +146,7 @@ export function useDreReport() {
         if (computedValues.has(line.id)) return computedValues.get(line.id)!;
         let val: number;
         if (!line.is_subtotal) {
-          val = (lineValues.get(line.id) || 0) * (line.sign < 0 ? 1 : 1);
+          val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
         } else {
           const children = allLines.filter((c: any) => c.parent_id === line.id);
           if (children.length > 0) {
