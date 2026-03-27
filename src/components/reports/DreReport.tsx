@@ -53,6 +53,17 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const handleExportCsv = () => {
+    const headers = ['Código', 'Linha', 'Tipo', 'Valor'];
+    const rows = lines.map(l => [
+      l.code || '',
+      '  '.repeat(l.depth) + l.name,
+      l.is_subtotal ? 'Subtotal' : 'Linha',
+      l.value.toFixed(2).replace('.', ','),
+    ]);
+    exportToCsv(`DRE_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
+  };
+
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
@@ -106,9 +117,14 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
               {generated && lines.length > 0 && (
-                <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
-                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                </Button>
+                <>
+                  <Button variant="outline" size="icon" onClick={handleExportCsv} title="Exportar CSV">
+                    <FileSpreadsheet className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={handleExport} disabled={exporting} title="Exportar PDF">
+                    {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  </Button>
+                </>
               )}
             </div>
           </div>
