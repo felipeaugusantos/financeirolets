@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, TrendingUp } from 'lucide-react';
+import { FileText, TrendingUp, Columns3 } from 'lucide-react';
 import DreReport from '@/components/reports/DreReport';
 import CashFlowReport from '@/components/reports/CashFlowReport';
+import DreComparativo from '@/components/reports/DreComparativo';
 
-type View = 'menu' | 'dre' | 'cashflow';
+type View = 'menu' | 'dre' | 'cashflow' | 'dre-comparativo';
 
 export default function Reports() {
   const [view, setView] = useState<View>('menu');
 
   if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
+  if (view === 'dre-comparativo') return <DreComparativo onBack={() => setView('menu')} />;
   if (view === 'cashflow') return <CashFlowReport onBack={() => setView('menu')} />;
 
   return (
@@ -19,7 +21,7 @@ export default function Reports() {
         <p className="text-sm text-muted-foreground">DRE, fluxo de caixa e análises</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-3 gap-4">
         <Card
           className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
           onClick={() => setView('dre')}
@@ -36,6 +38,26 @@ export default function Reports() {
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Gere DRE por unidade ou consolidado, por período, em regime de caixa ou competência.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
+          onClick={() => setView('dre-comparativo')}
+        >
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Columns3 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-heading">DRE Comparativo</CardTitle>
+              <p className="text-xs text-muted-foreground">Unidades lado a lado</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Compare o resultado de todas as unidades em colunas lado a lado.
             </p>
           </CardContent>
         </Card>
