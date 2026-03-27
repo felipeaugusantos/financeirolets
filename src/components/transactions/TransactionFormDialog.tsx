@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon, Plus, Trash2, Upload, X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,26 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       setUnitId(initialData.unit_id || '');
       setFrontId(initialData.front_id || '');
       setNotes(initialData.notes || '');
+      // Load existing allocations for editing
+      if (initialData.id) {
+        supabase.from('transaction_allocations')
+          .select('unit_id, front_id, allocation_type, percentage, amount')
+          .eq('transaction_id', initialData.id)
+          .then(({ data: allocs }) => {
+            if (allocs && allocs.length > 0) {
+              setAllocations(allocs.map((a: any) => ({
+                unit_id: a.unit_id || undefined,
+                front_id: a.front_id || undefined,
+                allocation_type: a.allocation_type || 'percentual',
+                percentage: a.percentage ?? undefined,
+                amount: a.amount ?? undefined,
+              })));
+              setAllocOpen(true);
+            } else {
+              setAllocations([]);
+            }
+          });
+      }
     } else if (open) {
       resetForm();
     }
@@ -383,17 +404,53 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
             )}
 
             {/* Allocations */}
-            {!isEditing && (
-              <Collapsible open={allocOpen} onOpenChange={setAllocOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between text-sm text-muted-foreground">
-                    Rateio por Unidade/Frente ({allocations.length})
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  {allocations.map((alloc, idx) => (
-                    <div key={idx} className="flex gap-2 items-end">
+            <Collapsible open={allocOpen} onOpenChange={setAllocOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between text-sm text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    Rateio por Unidade/Frente
+                    {allocations.length > 0 && (
+                      <Badge variant="secondary" className="text-xs rounded-full">{allocations.length}</Badge>
+                    )}
+                  </span>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 mt-2">
+                {/* Allocation type selector */}
+                {allocations.length > 0 && (
+                  <div className="flex gap-2 items-center">
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Tipo:</Label>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant={allocations[0]?.allocation_type === 'percentual' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs h-7 rounded-lg"
+                        onClick={() => setAllocations(prev => prev.map(a => ({ ...a, allocation_type: 'percentual', amount: undefined })))}
+                      >
+                        % Percentual
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={allocations[0]?.allocation_type === 'valor' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs h-7 rounded-lg"
+                        onClick={() => setAllocations(prev => prev.map(a => ({ ...a, allocation_type: 'valor', percentage: undefined })))}
+                      >
+                        R$ Valor Fixo
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {allocations.map((alloc, idx) => {
+                  const isPercent = alloc.allocation_type === 'percentual';
+                  const computedAmount = isPercent && alloc.percentage
+                    ? ((parseFloat(amount) || 0) * alloc.percentage / 100)
+                    : (alloc.amount || 0);
+                  return (
+                    <div key={idx} className="flex gap-2 items-end rounded-xl border border-border p-2 bg-muted/30">
                       <div className="flex-1 space-y-1">
                         <Label className="text-xs">Unidade</Label>
                         <Select value={alloc.unit_id || '__none__'} onValueChange={v => updateAllocation(idx, 'unit_id', v === '__none__' ? undefined : v)}>
@@ -414,21 +471,56 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="w-20 space-y-1">
-                        <Label className="text-xs">%</Label>
-                        <Input type="number" min="0" max="100" value={alloc.percentage ?? ''} onChange={e => updateAllocation(idx, 'percentage', parseFloat(e.target.value) || 0)} className="rounded-xl bg-card border-border text-xs h-8" />
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeAllocation(idx)}>
+                      {isPercent ? (
+                        <div className="w-20 space-y-1">
+                          <Label className="text-xs">%</Label>
+                          <Input type="number" min="0" max="100" step="0.01" value={alloc.percentage ?? ''} onChange={e => updateAllocation(idx, 'percentage', parseFloat(e.target.value) || 0)} className="rounded-xl bg-card border-border text-xs h-8" />
+                        </div>
+                      ) : (
+                        <div className="w-24 space-y-1">
+                          <Label className="text-xs">Valor R$</Label>
+                          <Input type="number" min="0" step="0.01" value={alloc.amount ?? ''} onChange={e => updateAllocation(idx, 'amount', parseFloat(e.target.value) || 0)} className="rounded-xl bg-card border-border text-xs h-8" />
+                        </div>
+                      )}
+                      {isPercent && computedAmount > 0 && (
+                        <div className="w-20 text-xs text-muted-foreground text-right pb-1 self-end">
+                          = R$ {computedAmount.toFixed(2)}
+                        </div>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => removeAllocation(idx)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
-                  ))}
-                  <Button variant="outline" size="sm" className="rounded-xl" onClick={addAllocation}>
-                    <Plus className="h-3 w-3 mr-1" /> Adicionar linha
-                  </Button>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+                  );
+                })}
+
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={addAllocation}>
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar linha
+                </Button>
+
+                {/* Validation summary */}
+                {allocations.length > 0 && (() => {
+                  const isPercent = allocations[0]?.allocation_type === 'percentual';
+                  const total = isPercent
+                    ? allocations.reduce((s, a) => s + (a.percentage || 0), 0)
+                    : allocations.reduce((s, a) => s + (a.amount || 0), 0);
+                  const expected = isPercent ? 100 : (parseFloat(amount) || 0);
+                  const diff = Math.abs(total - expected);
+                  const isValid = diff < 0.01;
+                  return (
+                    <div className={cn(
+                      'text-xs px-3 py-2 rounded-lg',
+                      isValid ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'
+                    )}>
+                      {isPercent
+                        ? `Total: ${total.toFixed(1)}% de 100% ${isValid ? '✓' : `(faltam ${(100 - total).toFixed(1)}%)`}`
+                        : `Total: R$ ${total.toFixed(2)} de R$ ${expected.toFixed(2)} ${isValid ? '✓' : `(diferença: R$ ${(expected - total).toFixed(2)})`}`
+                      }
+                    </div>
+                  );
+                })()}
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Notes */}
             <div className="space-y-1.5">
