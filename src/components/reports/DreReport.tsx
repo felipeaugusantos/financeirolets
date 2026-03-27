@@ -131,6 +131,15 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
         </CardContent>
       </Card>
 
+      {generated && filters.unit_id && unallocatedCount > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <span className="text-amber-800 dark:text-amber-300">
+            <strong>{unallocatedCount} lançamento(s)</strong> sem unidade atribuída ({fmt(Math.abs(unallocatedTotal))}) não estão incluídos neste relatório filtrado. Atribua uma unidade ou configure rateio nesses lançamentos para incluí-los.
+          </span>
+        </div>
+      )}
+
       {generated && (
         <Card className="shadow-card rounded-2xl border-border">
           <CardContent className="p-0" ref={reportRef}>
