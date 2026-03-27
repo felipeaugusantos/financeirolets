@@ -194,6 +194,8 @@ export function useDreReport() {
       }));
 
       setLines(result);
+      setUnallocatedTotal(_unallocTotal);
+      setUnallocatedCount(_unallocCount);
     } catch (err: any) {
       toast({ title: 'Erro ao gerar DRE', description: err.message, variant: 'destructive' });
       setLines([]);
@@ -202,5 +204,5 @@ export function useDreReport() {
     }
   }, [toast]);
 
-  return { lines, loading, generate };
+  return { lines, loading, generate, unallocatedTotal, unallocatedCount };
 }
