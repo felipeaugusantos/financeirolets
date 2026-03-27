@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
+import { exportToCsv } from '@/lib/exportCsv';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
