@@ -26,6 +26,7 @@ export function useDreReport() {
   const [unallocatedTotal, setUnallocatedTotal] = useState(0);
   const [unallocatedCount, setUnallocatedCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   const generate = useCallback(async (filters: DreFilters) => {
     setLoading(true);
