@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, TrendingUp } from 'lucide-react';
+import { FileText, TrendingUp, Columns3 } from 'lucide-react';
 import DreReport from '@/components/reports/DreReport';
 import CashFlowReport from '@/components/reports/CashFlowReport';
+import DreComparativo from '@/components/reports/DreComparativo';
 
-type View = 'menu' | 'dre' | 'cashflow';
+type View = 'menu' | 'dre' | 'cashflow' | 'dre-comparativo';
 
 export default function Reports() {
   const [view, setView] = useState<View>('menu');
