@@ -11,6 +11,7 @@ export default function Reports() {
   const [view, setView] = useState<View>('menu');
 
   if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
+  if (view === 'dre-comparativo') return <DreComparativo onBack={() => setView('menu')} />;
   if (view === 'cashflow') return <CashFlowReport onBack={() => setView('menu')} />;
 
   return (
