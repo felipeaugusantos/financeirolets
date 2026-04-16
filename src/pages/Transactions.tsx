@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle } from 'lucide-react';
 import { useTransactions, TransactionFilters as TFilters, TransactionRow } from '@/hooks/useTransactions';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import TransactionFilters from '@/components/transactions/TransactionFilters';
@@ -20,6 +21,12 @@ export default function Transactions() {
 
   const appliedFilters = { ...filters, search: search || undefined };
   const { data, loading, totals, create, update, remove, markAs } = useTransactions(appliedFilters);
+
+  const incompleteStats = useMemo(() => {
+    const noCategory = data.filter(t => !t.category_id && t.status !== 'cancelado').length;
+    const noUnit = data.filter(t => !t.unit_id && t.status !== 'cancelado').length;
+    return { noCategory, noUnit };
+  }, [data]);
 
   const handleEdit = (tx: TransactionRow) => {
     setEditingTx(tx);
@@ -72,6 +79,21 @@ export default function Transactions() {
           </Card>
         ))}
       </div>
+
+      {/* Incomplete data alerts */}
+      {(incompleteStats.noCategory > 0 || incompleteStats.noUnit > 0) && (
+        <Alert variant="default" className="border-warning/50 bg-warning/5">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-xs text-warning">
+            {incompleteStats.noCategory > 0 && (
+              <span>{incompleteStats.noCategory} lançamento{incompleteStats.noCategory > 1 ? 's' : ''} sem categoria (não aparecerão no DRE). </span>
+            )}
+            {incompleteStats.noUnit > 0 && (
+              <span>{incompleteStats.noUnit} lançamento{incompleteStats.noUnit > 1 ? 's' : ''} sem unidade (ficarão em "Sem unidade" no DRE). </span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Search + filters */}
       <div className="flex gap-2">
