@@ -322,7 +322,8 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
                     {unitCols.map(col => (
                       <TableHead key={col.id} className={cn(
                         'text-right min-w-[120px]',
-                        col.id === '__all__' && 'font-bold bg-muted/30'
+                        col.id === '__all__' && 'font-bold bg-muted/30',
+                        col.id === '__none__' && 'bg-warning/10 text-warning border-l border-warning/30'
                       )}>
                         {col.label}
                       </TableHead>
@@ -355,10 +356,11 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
                         return (
                           <TableCell key={col.id} className={cn(
                             'text-right tabular-nums text-sm',
-                            v > 0 && 'text-emerald-600',
-                            v < 0 && 'text-red-500',
+                            v > 0 && 'text-[hsl(var(--success))]',
+                            v < 0 && 'text-destructive',
                             line.is_subtotal && 'font-semibold',
-                            col.id === '__all__' && 'bg-muted/30'
+                            col.id === '__all__' && 'bg-muted/30',
+                            col.id === '__none__' && 'bg-warning/10 border-l border-warning/30'
                           )}>
                             {fmt(v)}
                           </TableCell>
