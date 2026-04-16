@@ -154,7 +154,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       front_id: input.front_id || null,
       notes: input.notes || null,
       created_by: user.id,
+      // Recorrência só é aplicada à 1ª linha (matriz). Veja loop abaixo.
     };
+
+    const isRecurring = !!input.is_recurring && !!input.recurrence_frequency && count === 1;
 
     const rows = Array.from({ length: count }, (_, i) => {
       let dueDate: string | null = null;
