@@ -70,6 +70,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const [notes, setNotes] = useState('');
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentCount, setInstallmentCount] = useState('2');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'semanal' | 'mensal' | 'anual'>('mensal');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
   const [allocations, setAllocations] = useState<AllocationInput[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -137,6 +140,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setNotes('');
     setIsInstallment(false);
     setInstallmentCount('2');
+    setIsRecurring(false);
+    setRecurrenceFrequency('mensal');
+    setRecurrenceEndDate(undefined);
     setAllocations([]);
     setFiles([]);
     setAllocOpen(false);
@@ -192,6 +198,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       installment_count: isInstallment ? parseInt(installmentCount) : undefined,
       allocations: allocations.length > 0 ? allocations : undefined,
       files: files.length > 0 ? files : undefined,
+      is_recurring: isRecurring && !isInstallment,
+      recurrence_frequency: isRecurring && !isInstallment ? recurrenceFrequency : undefined,
+      recurrence_end_date: isRecurring && !isInstallment && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : undefined,
     };
     const ok = await onSave(input);
     setSaving(false);
@@ -398,6 +407,35 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                         {parseInt(installmentCount)}x de R$ {(parseFloat(amount) / parseInt(installmentCount || '1')).toFixed(2)}
                       </p>
                     )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Recurrence (only for new, non-installment) */}
+            {!isEditing && !isInstallment && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="recurring" checked={isRecurring} onCheckedChange={(c) => setIsRecurring(!!c)} />
+                  <Label htmlFor="recurring" className="text-sm">Lançamento recorrente?</Label>
+                </div>
+                {isRecurring && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Frequência</Label>
+                      <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as any)}>
+                        <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="semanal">Semanal</SelectItem>
+                          <SelectItem value="mensal">Mensal</SelectItem>
+                          <SelectItem value="anual">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DatePickerField label="Termina em (opcional)" value={recurrenceEndDate} onChange={setRecurrenceEndDate} />
+                    <p className="col-span-2 text-xs text-muted-foreground">
+                      Próximas ocorrências serão geradas automaticamente em "Contas a Pagar/Receber".
+                    </p>
                   </div>
                 )}
               </div>

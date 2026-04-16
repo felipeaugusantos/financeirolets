@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useBills, BillRow } from '@/hooks/useBills';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import SelectWithAdd from '@/components/ui/select-with-add';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
+import BatchPayDialog from '@/components/accounts/BatchPayDialog';
 import { useTransactions } from '@/hooks/useTransactions';
 import {
-  DollarSign,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
@@ -22,6 +23,8 @@ import {
   Copy,
   Building2,
   Plus,
+  RefreshCw,
+  Repeat,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import BillFilters, { BillFiltersState, emptyFilters } from '@/components/accounts/BillFilters';
@@ -62,7 +65,7 @@ const paymentMethods = [
 function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   const [filters, setFilters] = useState<BillFiltersState>(emptyFilters);
   const { data, summary, loading, markAs, fetchData } = useBills(tab, filters);
-  const { create: createTransaction } = useTransactions();
+  const { create: createTransaction, generateRecurring } = useTransactions();
   const { data: accounts, create: createAccount } = useSupabaseCrud('accounts');
   const { toast } = useToast();
   const [payDialog, setPayDialog] = useState<BillRow | null>(null);
@@ -70,6 +73,25 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   const [selectedMethod, setSelectedMethod] = useState('pix');
   const [paying, setPaying] = useState(false);
   const [newTxOpen, setNewTxOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === data.length) setSelected(new Set());
+    else setSelected(new Set(data.map((b) => b.id)));
+  };
+
+  const clearSelection = () => setSelected(new Set());
 
   const handlePay = async () => {
     if (!payDialog) return;
@@ -82,6 +104,13 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
     setSelectedMethod('pix');
   };
 
+  const handleGenerate = async () => {
+    setGenerating(true);
+    await generateRecurring();
+    setGenerating(false);
+    fetchData();
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: 'Copiado!' });
@@ -92,18 +121,25 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   };
 
   const defaultType = tab === 'pagar' ? 'despesa' : 'receita';
+  const selectedTotal = data.filter((b) => selected.has(b.id)).reduce((s, b) => s + Number(b.net_amount || 0), 0);
 
   return (
     <div className="space-y-4">
-      {/* Header with filters + add button */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
+      {/* Header with filters + actions */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
           <BillFilters filters={filters} onChange={setFilters} />
         </div>
-        <Button size="sm" className="gap-1.5 shrink-0" onClick={() => setNewTxOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Novo
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={handleGenerate} disabled={generating}>
+            <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+            Gerar Recorrências
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => setNewTxOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Novo
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -146,6 +182,31 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
         </Card>
       </div>
 
+      {/* Selection bar */}
+      {data.length > 0 && (
+        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-muted/50 border border-border">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={selected.size === data.length && data.length > 0}
+              onCheckedChange={toggleSelectAll}
+              id="select-all"
+            />
+            <label htmlFor="select-all" className="text-xs text-muted-foreground cursor-pointer">
+              {selected.size > 0 ? `${selected.size} selecionada(s) · ${fmt(selectedTotal)}` : 'Selecionar tudo'}
+            </label>
+          </div>
+          {selected.size > 0 && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={clearSelection} className="text-xs h-7">Limpar</Button>
+              <Button size="sm" onClick={() => setBatchOpen(true)} className="gap-1 text-xs h-7">
+                <Banknote className="h-3 w-3" />
+                Baixar em lote
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bills List */}
       {loading ? (
         <div className="space-y-3">
@@ -164,13 +225,20 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
           {data.map(bill => {
             const statusInfo = getStatusInfo(bill);
             const isOverdue = statusInfo.label === 'Vencida';
+            const isSelected = selected.has(bill.id);
+            const isRecurring = (bill as any).is_recurring || (bill as any).recurrence_parent_id;
             return (
               <Card
                 key={bill.id}
-                className={`shadow-card rounded-xl border-border transition-colors ${isOverdue ? 'border-l-4 border-l-destructive' : ''}`}
+                className={`shadow-card rounded-xl border-border transition-colors ${isOverdue ? 'border-l-4 border-l-destructive' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelect(bill.id)}
+                      className="mt-1 shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-medium text-sm text-card-foreground truncate">
@@ -182,6 +250,12 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
                         {bill.installment_total && bill.installment_total > 1 && (
                           <Badge variant="outline" className="text-[10px]">
                             {bill.installment_number}/{bill.installment_total}
+                          </Badge>
+                        )}
+                        {isRecurring && (
+                          <Badge variant="outline" className="text-[10px] gap-1 border-accent text-accent">
+                            <Repeat className="h-3 w-3" />
+                            Recorrente
                           </Badge>
                         )}
                       </div>
@@ -314,6 +388,18 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Batch Payment */}
+      <BatchPayDialog
+        open={batchOpen}
+        onOpenChange={setBatchOpen}
+        ids={Array.from(selected)}
+        tab={tab}
+        onDone={() => {
+          clearSelection();
+          fetchData();
+        }}
+      />
 
       {/* New Transaction Dialog */}
       <TransactionFormDialog

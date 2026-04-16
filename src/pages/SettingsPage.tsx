@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown } from 'lucide-react';
+import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History } from 'lucide-react';
 import UnitsSettings from './settings/UnitsSettings';
 import FrontsSettings from './settings/FrontsSettings';
 import AccountsSettings from './settings/AccountsSettings';
@@ -9,8 +9,11 @@ import CategoriesSettings from './settings/CategoriesSettings';
 import PartnersSettings from './settings/PartnersSettings';
 import DreSettings from './settings/DreSettings';
 import ImportExportSettings from './settings/ImportExportSettings';
+import UsersSettings from './settings/UsersSettings';
+import AuditSettings from './settings/AuditSettings';
+import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 
-const sections = [
+const baseSections = [
   { key: 'units', title: 'Unidades', desc: 'Let\'s Café, Boulevard, Fábrica...', icon: Building2 },
   { key: 'fronts', title: 'Frentes de Negócio', desc: 'Loja, Produção, Distribuição', icon: Layers },
   { key: 'accounts', title: 'Contas', desc: 'Caixa, Banco, Cartão', icon: Wallet },
@@ -20,8 +23,14 @@ const sections = [
   { key: 'export', title: 'Importar / Exportar', desc: 'CSV e backup de dados', icon: FileDown },
 ];
 
+const adminSections = [
+  { key: 'users', title: 'Usuários e Permissões', desc: 'Atribuir perfis e unidades', icon: Shield },
+  { key: 'audit', title: 'Auditoria', desc: 'Histórico de alterações', icon: History },
+];
+
 export default function SettingsPage() {
   const [active, setActive] = useState<string | null>(null);
+  const { isAdmin } = useCurrentUserRoles();
 
   if (active === 'units') return <UnitsSettings onBack={() => setActive(null)} />;
   if (active === 'fronts') return <FrontsSettings onBack={() => setActive(null)} />;
@@ -30,6 +39,10 @@ export default function SettingsPage() {
   if (active === 'dre') return <DreSettings onBack={() => setActive(null)} />;
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
   if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
+  if (active === 'users') return <UsersSettings onBack={() => setActive(null)} />;
+  if (active === 'audit') return <AuditSettings onBack={() => setActive(null)} />;
+
+  const sections = isAdmin ? [...baseSections, ...adminSections] : baseSections;
 
   return (
     <div className="space-y-6">

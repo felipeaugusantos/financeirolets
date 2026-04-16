@@ -27,6 +27,10 @@ export interface TransactionRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  is_recurring?: boolean;
+  recurrence_frequency?: 'semanal' | 'mensal' | 'anual' | null;
+  recurrence_end_date?: string | null;
+  recurrence_parent_id?: string | null;
   // joined
   category?: { name: string; type: string } | null;
   account?: { name: string } | null;
@@ -76,6 +80,9 @@ export interface TransactionInput {
   installment_count?: number;
   allocations?: AllocationInput[];
   files?: File[];
+  is_recurring?: boolean;
+  recurrence_frequency?: 'semanal' | 'mensal' | 'anual';
+  recurrence_end_date?: string;
 }
 
 export function useTransactions(filters: TransactionFilters = {}) {
@@ -147,7 +154,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       front_id: input.front_id || null,
       notes: input.notes || null,
       created_by: user.id,
+      // Recorrência só é aplicada à 1ª linha (matriz). Veja loop abaixo.
     };
+
+    const isRecurring = !!input.is_recurring && !!input.recurrence_frequency && count === 1;
 
     const rows = Array.from({ length: count }, (_, i) => {
       let dueDate: string | null = null;
@@ -167,6 +177,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
         installment_group_id: groupId,
         installment_number: count > 1 ? i + 1 : null,
         installment_total: count > 1 ? count : null,
+        is_recurring: i === 0 && isRecurring,
+        recurrence_frequency: i === 0 && isRecurring ? (input.recurrence_frequency as any) : null,
+        recurrence_end_date: i === 0 && isRecurring ? (input.recurrence_end_date || null) : null,
       };
     });
 
@@ -242,6 +255,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (input.unit_id !== undefined) updateData.unit_id = input.unit_id || null;
     if (input.front_id !== undefined) updateData.front_id = input.front_id || null;
     if (input.notes !== undefined) updateData.notes = input.notes || null;
+    if (input.is_recurring !== undefined) updateData.is_recurring = input.is_recurring;
+    if (input.recurrence_frequency !== undefined) updateData.recurrence_frequency = input.recurrence_frequency || null;
+    if (input.recurrence_end_date !== undefined) updateData.recurrence_end_date = input.recurrence_end_date || null;
 
     const { error } = await supabase.from('transactions').update(updateData).eq('id', id);
     if (error) {
@@ -311,5 +327,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return true;
   };
 
-  return { data, loading, totals, fetchData, create, update, remove, markAs };
+  const generateRecurring = async () => {
+    const { data, error } = await supabase.rpc('generate_recurring_transactions' as any);
+    if (error) {
+      toast({ title: 'Erro ao gerar recorrências', description: error.message, variant: 'destructive' });
+      return 0;
+    }
+    const count = (data as number) ?? 0;
+    toast({
+      title: count > 0 ? `${count} lançamento(s) gerados` : 'Tudo em dia',
+      description: count > 0 ? 'Próximas ocorrências de lançamentos recorrentes foram criadas.' : 'Nenhuma nova ocorrência a gerar.',
+    });
+    if (count > 0) await fetchData();
+    return count;
+  };
+
+  return { data, loading, totals, fetchData, create, update, remove, markAs, generateRecurring };
 }

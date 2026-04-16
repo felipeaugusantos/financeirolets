@@ -427,11 +427,18 @@ export type Database = {
           installment_group_id: string | null
           installment_number: number | null
           installment_total: number | null
+          is_recurring: boolean
+          last_recurrence_generated_at: string | null
           net_amount: number
           notes: string | null
           partner_id: string | null
           payment_date: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
+          recurrence_end_date: string | null
+          recurrence_frequency:
+            | Database["public"]["Enums"]["recurrence_frequency"]
+            | null
+          recurrence_parent_id: string | null
           status: Database["public"]["Enums"]["transaction_status"]
           tax_amount: number
           type: Database["public"]["Enums"]["transaction_type"]
@@ -452,11 +459,18 @@ export type Database = {
           installment_group_id?: string | null
           installment_number?: number | null
           installment_total?: number | null
+          is_recurring?: boolean
+          last_recurrence_generated_at?: string | null
           net_amount?: number
           notes?: string | null
           partner_id?: string | null
           payment_date?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          recurrence_end_date?: string | null
+          recurrence_frequency?:
+            | Database["public"]["Enums"]["recurrence_frequency"]
+            | null
+          recurrence_parent_id?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
           tax_amount?: number
           type: Database["public"]["Enums"]["transaction_type"]
@@ -477,11 +491,18 @@ export type Database = {
           installment_group_id?: string | null
           installment_number?: number | null
           installment_total?: number | null
+          is_recurring?: boolean
+          last_recurrence_generated_at?: string | null
           net_amount?: number
           notes?: string | null
           partner_id?: string | null
           payment_date?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          recurrence_end_date?: string | null
+          recurrence_frequency?:
+            | Database["public"]["Enums"]["recurrence_frequency"]
+            | null
+          recurrence_parent_id?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
           tax_amount?: number
           type?: Database["public"]["Enums"]["transaction_type"]
@@ -515,6 +536,13 @@ export type Database = {
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
           {
@@ -608,6 +636,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_recurring_transactions: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -635,6 +664,7 @@ export type Database = {
         | "transferencia"
         | "cheque"
         | "outro"
+      recurrence_frequency: "semanal" | "mensal" | "anual"
       transaction_status:
         | "pendente"
         | "pago"
@@ -789,6 +819,7 @@ export const Constants = {
         "cheque",
         "outro",
       ],
+      recurrence_frequency: ["semanal", "mensal", "anual"],
       transaction_status: [
         "pendente",
         "pago",

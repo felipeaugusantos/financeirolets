@@ -15,6 +15,8 @@ export interface BillRow {
   account_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
+  is_recurring?: boolean;
+  recurrence_parent_id?: string | null;
   partner?: {
     name: string;
     pix_key: string | null;
@@ -61,6 +63,7 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
       .select(`
         id, type, description, net_amount, due_date, payment_date, status,
         payment_method, partner_id, account_id, installment_number, installment_total,
+        is_recurring, recurrence_parent_id,
         partner:partners(name, pix_key, pix_key_type, bank_name, bank_agency, bank_account),
         account:accounts(name),
         category:categories(name),
