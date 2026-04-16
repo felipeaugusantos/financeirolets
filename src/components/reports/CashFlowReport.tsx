@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useCashFlowReport, CashFlowFilters } from '@/hooks/useCashFlowReport';
+import { useCashFlowProjected } from '@/hooks/useCashFlowProjected';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, TrendingUp, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
@@ -21,12 +23,16 @@ const fmtShort = (v: number) => {
   return v.toFixed(0);
 };
 
+type Mode = 'realizado' | 'projetado' | 'comparativo';
+
 export default function CashFlowReport({ onBack }: { onBack: () => void }) {
-  const { data, loading, generate } = useCashFlowReport();
+  const { data: realizedData, loading: loadingReal, generate: genRealized } = useCashFlowReport();
+  const { data: projectedData, loading: loadingProj, generate: genProjected } = useCashFlowProjected();
+  const [mode, setMode] = useState<Mode>('realizado');
   const [units, setUnits] = useState<any[]>([]);
   const [filters, setFilters] = useState<CashFlowFilters>({
     dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateTo: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
   });
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -38,8 +44,16 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     });
   }, []);
 
+  const loading = loadingReal || loadingProj;
+
   const handleGenerate = async () => {
-    await generate(filters);
+    if (mode === 'realizado') {
+      await genRealized(filters);
+    } else if (mode === 'projetado') {
+      await genProjected(filters);
+    } else {
+      await Promise.all([genRealized(filters), genProjected(filters)]);
+    }
     setGenerated(true);
   };
 
@@ -48,9 +62,9 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     setExporting(true);
     try {
       await exportToPdf({
-        title: 'Fluxo de Caixa',
+        title: `Fluxo de Caixa — ${mode === 'realizado' ? 'Realizado' : mode === 'projetado' ? 'Projetado' : 'Comparativo'}`,
         subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo}`,
-        filename: `FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.pdf`,
+        filename: `FluxoCaixa_${mode}_${filters.dateFrom}_${filters.dateTo}.pdf`,
         element: reportRef.current,
       });
     } finally {
@@ -58,21 +72,77 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     }
   };
 
+  // CSV depending on mode
   const handleExportCsv = () => {
-    const headers = ['Mês', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
-    const rows = data.map(d => [
-      d.month,
-      d.receitas.toFixed(2).replace('.', ','),
-      d.despesas.toFixed(2).replace('.', ','),
-      (d.receitas - d.despesas).toFixed(2).replace('.', ','),
-      d.acumulado.toFixed(2).replace('.', ','),
-    ]);
-    exportToCsv(`FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
+    if (mode === 'realizado') {
+      const headers = ['Mês', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
+      const rows = realizedData.map(d => [
+        d.month,
+        d.receitas.toFixed(2).replace('.', ','),
+        d.despesas.toFixed(2).replace('.', ','),
+        (d.receitas - d.despesas).toFixed(2).replace('.', ','),
+        d.acumulado.toFixed(2).replace('.', ','),
+      ]);
+      exportToCsv(`FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
+    } else if (mode === 'projetado') {
+      const headers = ['Mês', 'Receitas Realiz.', 'Despesas Realiz.', 'Receitas Proj.', 'Despesas Proj.', 'Saldo Total', 'Acumulado'];
+      const rows = projectedData.map(d => [
+        d.month,
+        d.receitasRealizadas.toFixed(2).replace('.', ','),
+        d.despesasRealizadas.toFixed(2).replace('.', ','),
+        d.receitasProjetadas.toFixed(2).replace('.', ','),
+        d.despesasProjetadas.toFixed(2).replace('.', ','),
+        d.saldoTotal.toFixed(2).replace('.', ','),
+        d.acumulado.toFixed(2).replace('.', ','),
+      ]);
+      exportToCsv(`FluxoCaixa_Projetado_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
+    } else {
+      // Comparativo: realizado vs projetado lado a lado
+      const headers = ['Mês', 'Saldo Realizado', 'Saldo Projetado', 'Diferença'];
+      const months = new Set<string>([
+        ...realizedData.map(d => d.month),
+        ...projectedData.map(d => d.month),
+      ]);
+      const rows = Array.from(months).sort().map(m => {
+        const r = realizedData.find(d => d.month === m);
+        const p = projectedData.find(d => d.month === m);
+        const sr = r ? r.receitas - r.despesas : 0;
+        const sp = p ? p.saldoTotal : 0;
+        return [m, sr.toFixed(2).replace('.', ','), sp.toFixed(2).replace('.', ','), (sp - sr).toFixed(2).replace('.', ',')];
+      });
+      exportToCsv(`FluxoCaixa_Comparativo_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
+    }
   };
 
-  const totalReceitas = data.reduce((s, d) => s + d.receitas, 0);
-  const totalDespesas = data.reduce((s, d) => s + d.despesas, 0);
-  const totalSaldo = totalReceitas - totalDespesas;
+  const totalRecReal = realizedData.reduce((s, d) => s + d.receitas, 0);
+  const totalDespReal = realizedData.reduce((s, d) => s + d.despesas, 0);
+  const totalSaldoReal = totalRecReal - totalDespReal;
+
+  const totalRecProj = projectedData.reduce((s, d) => s + d.receitasProjetadas, 0);
+  const totalDespProj = projectedData.reduce((s, d) => s + d.despesasProjetadas, 0);
+
+  // Comparativo dataset
+  const comparativeData = (() => {
+    const months = new Set<string>([
+      ...realizedData.map(d => d.month),
+      ...projectedData.map(d => d.month),
+    ]);
+    return Array.from(months).sort().map(m => {
+      const r = realizedData.find(d => d.month === m);
+      const p = projectedData.find(d => d.month === m);
+      return {
+        month: m,
+        label: r?.label || p?.label || m,
+        realizado: r ? r.receitas - r.despesas : 0,
+        projetado: p ? p.saldoTotal : 0,
+      };
+    });
+  })();
+
+  const dataAvailable =
+    (mode === 'realizado' && realizedData.length > 0) ||
+    (mode === 'projetado' && projectedData.length > 0) ||
+    (mode === 'comparativo' && comparativeData.length > 0);
 
   return (
     <div className="space-y-4">
@@ -87,10 +157,18 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
           </div>
           <div>
             <CardTitle className="text-base font-heading">Fluxo de Caixa</CardTitle>
-            <p className="text-xs text-muted-foreground">Entradas, saídas e saldo acumulado por mês</p>
+            <p className="text-xs text-muted-foreground">Realizado, projetado e comparativo</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Tabs value={mode} onValueChange={(v) => { setMode(v as Mode); setGenerated(false); }}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="realizado">Realizado</TabsTrigger>
+              <TabsTrigger value="projetado">Projetado</TabsTrigger>
+              <TabsTrigger value="comparativo">Comparativo</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Data Início</Label>
@@ -116,7 +194,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
               <Button onClick={handleGenerate} disabled={loading} className="flex-1">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
-              {generated && data.length > 0 && (
+              {generated && dataAvailable && (
                 <>
                   <Button variant="outline" size="icon" onClick={handleExportCsv} title="Exportar CSV">
                     <FileSpreadsheet className="h-4 w-4" />
@@ -131,87 +209,210 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
         </CardContent>
       </Card>
 
-      {generated && data.length > 0 && (
+      {generated && (
         <div ref={reportRef} className="space-y-4">
-          {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <Card className="shadow-card rounded-2xl border-border">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs text-muted-foreground">Total Receitas</p>
-                <p className="text-lg font-bold text-emerald-600">{fmt(totalReceitas)}</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-card rounded-2xl border-border">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs text-muted-foreground">Total Despesas</p>
-                <p className="text-lg font-bold text-red-500">{fmt(totalDespesas)}</p>
-              </CardContent>
-            </Card>
-            <Card className="shadow-card rounded-2xl border-border">
-              <CardContent className="p-4 text-center">
-                <p className="text-xs text-muted-foreground">Saldo Período</p>
-                <p className={cn('text-lg font-bold', totalSaldo >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(totalSaldo)}</p>
-              </CardContent>
-            </Card>
-          </div>
+          {mode === 'realizado' && realizedData.length > 0 && (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <Card className="shadow-card rounded-2xl border-border">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Total Receitas</p>
+                    <p className="text-lg font-bold text-emerald-600">{fmt(totalRecReal)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-card rounded-2xl border-border">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Total Despesas</p>
+                    <p className="text-lg font-bold text-red-500">{fmt(totalDespReal)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-card rounded-2xl border-border">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Saldo Período</p>
+                    <p className={cn('text-lg font-bold', totalSaldoReal >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(totalSaldoReal)}</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-          {/* Chart */}
-          <Card className="shadow-card rounded-2xl border-border">
-            <CardContent className="p-4">
-              <ResponsiveContainer width="100%" height={320}>
-                <ComposedChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                  <YAxis tickFormatter={fmtShort} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                  <Tooltip
-                    formatter={(v: number, name: string) => [fmt(v), name === 'receitas' ? 'Receitas' : name === 'despesas' ? 'Despesas' : 'Acumulado']}
-                    contentStyle={{ borderRadius: 12, fontSize: 13 }}
-                  />
-                  <Legend formatter={v => v === 'receitas' ? 'Receitas' : v === 'despesas' ? 'Despesas' : 'Acumulado'} />
-                  <Bar dataKey="receitas" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="despesas" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="acumulado" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={{ r: 3 }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+              <Card className="shadow-card rounded-2xl border-border">
+                <CardContent className="p-4">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <ComposedChart data={realizedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                      <YAxis tickFormatter={fmtShort} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 12, fontSize: 13 }} />
+                      <Legend />
+                      <Bar dataKey="receitas" name="Receitas" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="despesas" name="Despesas" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-          {/* Table */}
-          <Card className="shadow-card rounded-2xl border-border">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mês</TableHead>
-                    <TableHead className="text-right">Receitas</TableHead>
-                    <TableHead className="text-right">Despesas</TableHead>
-                    <TableHead className="text-right">Saldo</TableHead>
-                    <TableHead className="text-right">Acumulado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.map(row => (
-                    <TableRow key={row.month}>
-                      <TableCell className="font-medium">{row.label}</TableCell>
-                      <TableCell className="text-right text-emerald-600 tabular-nums">{fmt(row.receitas)}</TableCell>
-                      <TableCell className="text-right text-red-500 tabular-nums">{fmt(row.despesas)}</TableCell>
-                      <TableCell className={cn('text-right tabular-nums font-medium', row.saldo >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.saldo)}</TableCell>
-                      <TableCell className={cn('text-right tabular-nums font-semibold', row.acumulado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.acumulado)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+              <Card className="shadow-card rounded-2xl border-border">
+                <CardContent className="p-0 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mês</TableHead>
+                        <TableHead className="text-right">Receitas</TableHead>
+                        <TableHead className="text-right">Despesas</TableHead>
+                        <TableHead className="text-right">Saldo</TableHead>
+                        <TableHead className="text-right">Acumulado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {realizedData.map(row => (
+                        <TableRow key={row.month}>
+                          <TableCell className="font-medium">{row.label}</TableCell>
+                          <TableCell className="text-right text-emerald-600 tabular-nums">{fmt(row.receitas)}</TableCell>
+                          <TableCell className="text-right text-red-500 tabular-nums">{fmt(row.despesas)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums font-medium', row.saldo >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.saldo)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums font-semibold', row.acumulado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.acumulado)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {mode === 'projetado' && projectedData.length > 0 && (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <Card className="shadow-card rounded-2xl border-border">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Receitas Projetadas</p>
+                    <p className="text-lg font-bold text-emerald-600">{fmt(totalRecProj)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-card rounded-2xl border-border">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Despesas Projetadas</p>
+                    <p className="text-lg font-bold text-red-500">{fmt(totalDespProj)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-card rounded-2xl border-border">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Saldo Final Projetado</p>
+                    <p className={cn('text-lg font-bold', (projectedData[projectedData.length - 1]?.acumulado ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                      {fmt(projectedData[projectedData.length - 1]?.acumulado ?? 0)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="shadow-card rounded-2xl border-border">
+                <CardContent className="p-4">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <ComposedChart data={projectedData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                      <YAxis tickFormatter={fmtShort} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 12, fontSize: 13 }} />
+                      <Legend />
+                      <Bar dataKey="receitasRealizadas" name="Receitas Realiz." stackId="r" fill="hsl(142, 71%, 45%)" />
+                      <Bar dataKey="receitasProjetadas" name="Receitas Proj." stackId="r" fill="hsl(142, 71%, 70%)" />
+                      <Bar dataKey="despesasRealizadas" name="Despesas Realiz." stackId="d" fill="hsl(0, 84%, 60%)" />
+                      <Bar dataKey="despesasProjetadas" name="Despesas Proj." stackId="d" fill="hsl(0, 84%, 78%)" />
+                      <Line type="monotone" dataKey="acumulado" name="Saldo Acumulado" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-card rounded-2xl border-border">
+                <CardContent className="p-0 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mês</TableHead>
+                        <TableHead className="text-right">Receitas Realiz.</TableHead>
+                        <TableHead className="text-right">Receitas Proj.</TableHead>
+                        <TableHead className="text-right">Despesas Realiz.</TableHead>
+                        <TableHead className="text-right">Despesas Proj.</TableHead>
+                        <TableHead className="text-right">Saldo</TableHead>
+                        <TableHead className="text-right">Acumulado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projectedData.map(row => (
+                        <TableRow key={row.month}>
+                          <TableCell className="font-medium">{row.label}</TableCell>
+                          <TableCell className="text-right tabular-nums text-emerald-600">{fmt(row.receitasRealizadas)}</TableCell>
+                          <TableCell className="text-right tabular-nums text-emerald-600/70">{fmt(row.receitasProjetadas)}</TableCell>
+                          <TableCell className="text-right tabular-nums text-red-500">{fmt(row.despesasRealizadas)}</TableCell>
+                          <TableCell className="text-right tabular-nums text-red-500/70">{fmt(row.despesasProjetadas)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums font-medium', row.saldoTotal >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.saldoTotal)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums font-semibold', row.acumulado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.acumulado)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {mode === 'comparativo' && comparativeData.length > 0 && (
+            <>
+              <Card className="shadow-card rounded-2xl border-border">
+                <CardContent className="p-4">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <ComposedChart data={comparativeData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                      <YAxis tickFormatter={fmtShort} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 12, fontSize: 13 }} />
+                      <Legend />
+                      <Bar dataKey="realizado" name="Realizado" fill="hsl(221, 83%, 53%)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="projetado" name="Projetado" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-card rounded-2xl border-border">
+                <CardContent className="p-0 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mês</TableHead>
+                        <TableHead className="text-right">Saldo Realizado</TableHead>
+                        <TableHead className="text-right">Saldo Projetado</TableHead>
+                        <TableHead className="text-right">Diferença</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {comparativeData.map(row => {
+                        const diff = row.projetado - row.realizado;
+                        return (
+                          <TableRow key={row.month}>
+                            <TableCell className="font-medium">{row.label}</TableCell>
+                            <TableCell className={cn('text-right tabular-nums', row.realizado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.realizado)}</TableCell>
+                            <TableCell className={cn('text-right tabular-nums', row.projetado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.projetado)}</TableCell>
+                            <TableCell className={cn('text-right tabular-nums font-medium', diff >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(diff)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {!dataAvailable && !loading && (
+            <Card className="shadow-card rounded-2xl border-border">
+              <CardContent className="p-8 text-center text-muted-foreground text-sm">
+                Nenhum dado encontrado para o período selecionado.
+              </CardContent>
+            </Card>
+          )}
         </div>
-      )}
-
-      {generated && data.length === 0 && !loading && (
-        <Card className="shadow-card rounded-2xl border-border">
-          <CardContent className="p-8 text-center text-muted-foreground text-sm">
-            Nenhuma transação paga/recebida no período selecionado.
-          </CardContent>
-        </Card>
       )}
     </div>
   );

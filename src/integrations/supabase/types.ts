@@ -118,6 +118,60 @@ export type Database = {
         }
         Relationships: []
       }
+      budgets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dre_line_id: string
+          id: string
+          month: number
+          notes: string | null
+          planned_amount: number
+          unit_id: string | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dre_line_id: string
+          id?: string
+          month: number
+          notes?: string | null
+          planned_amount?: number
+          unit_id?: string | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dre_line_id?: string
+          id?: string
+          month?: number
+          notes?: string | null
+          planned_amount?: number
+          unit_id?: string | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_dre_line_id_fkey"
+            columns: ["dre_line_id"]
+            isOneToOne: false
+            referencedRelation: "dre_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_fronts: {
         Row: {
           active: boolean
