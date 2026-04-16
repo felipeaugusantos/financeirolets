@@ -255,6 +255,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (input.unit_id !== undefined) updateData.unit_id = input.unit_id || null;
     if (input.front_id !== undefined) updateData.front_id = input.front_id || null;
     if (input.notes !== undefined) updateData.notes = input.notes || null;
+    if (input.is_recurring !== undefined) updateData.is_recurring = input.is_recurring;
+    if (input.recurrence_frequency !== undefined) updateData.recurrence_frequency = input.recurrence_frequency || null;
+    if (input.recurrence_end_date !== undefined) updateData.recurrence_end_date = input.recurrence_end_date || null;
 
     const { error } = await supabase.from('transactions').update(updateData).eq('id', id);
     if (error) {
