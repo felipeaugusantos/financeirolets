@@ -70,6 +70,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const [notes, setNotes] = useState('');
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentCount, setInstallmentCount] = useState('2');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'semanal' | 'mensal' | 'anual'>('mensal');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
   const [allocations, setAllocations] = useState<AllocationInput[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
