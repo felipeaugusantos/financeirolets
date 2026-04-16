@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,9 @@ import { exportToCsv } from '@/lib/exportCsv';
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const fmtPct = (v: number) =>
+  `${(v >= 0 ? '+' : '')}${v.toFixed(1)}%`;
+
 export default function DreReport({ onBack }: { onBack: () => void }) {
   const { lines, loading, generate, unallocatedTotal, unallocatedCount } = useDreReport();
   const [units, setUnits] = useState<any[]>([]);
@@ -22,7 +26,10 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
     dateTo: new Date().toISOString().split('T')[0],
     regime: 'competencia',
+    includeBudget: false,
+    includePrevious: false,
   });
+  const [showAV, setShowAV] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -37,6 +44,10 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     await generate(filters);
     setGenerated(true);
   };
+
+  // Find revenue base for AV (Group 1: Receita Bruta or similar)
+  const revenueBase = lines.find(l => l.code === '1')?.value ?? 0;
+  const avFor = (v: number) => (revenueBase !== 0 ? (v / revenueBase) * 100 : 0);
 
   const handleExport = async () => {
     if (!reportRef.current) return;
@@ -54,13 +65,33 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   };
 
   const handleExportCsv = () => {
-    const headers = ['Código', 'Linha', 'Tipo', 'Valor'];
-    const rows = lines.map(l => [
-      l.code || '',
-      '  '.repeat(l.depth) + l.name,
-      l.is_subtotal ? 'Subtotal' : 'Linha',
-      l.value.toFixed(2).replace('.', ','),
-    ]);
+    const headers = ['Código', 'Linha', 'Tipo', 'Realizado'];
+    if (filters.includeBudget) headers.push('Orçado', 'Variação %');
+    if (filters.includePrevious) headers.push('Período Anterior', 'AH %');
+    if (showAV) headers.push('AV %');
+
+    const rows = lines.map(l => {
+      const r: (string | number)[] = [
+        l.code || '',
+        '  '.repeat(l.depth) + l.name,
+        l.is_subtotal ? 'Subtotal' : 'Linha',
+        l.value.toFixed(2).replace('.', ','),
+      ];
+      if (filters.includeBudget) {
+        const b = l.budgetValue ?? 0;
+        const v = b !== 0 ? ((l.value - b) / Math.abs(b)) * 100 : 0;
+        r.push(b.toFixed(2).replace('.', ','), v.toFixed(1).replace('.', ','));
+      }
+      if (filters.includePrevious) {
+        const p = l.previousValue ?? 0;
+        const v = p !== 0 ? ((l.value - p) / Math.abs(p)) * 100 : 0;
+        r.push(p.toFixed(2).replace('.', ','), v.toFixed(1).replace('.', ','));
+      }
+      if (showAV) {
+        r.push(avFor(l.value).toFixed(1).replace('.', ','));
+      }
+      return r;
+    });
     exportToCsv(`DRE_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
   };
 
@@ -77,7 +108,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           </div>
           <div>
             <CardTitle className="text-base font-heading">DRE – Demonstrativo de Resultado</CardTitle>
-            <p className="text-xs text-muted-foreground">Configure período, unidade e regime</p>
+            <p className="text-xs text-muted-foreground">Configure período, unidade, regime e análises</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -129,6 +160,29 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
               )}
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="budget"
+                checked={!!filters.includeBudget}
+                onCheckedChange={v => setFilters(f => ({ ...f, includeBudget: v }))}
+              />
+              <Label htmlFor="budget" className="text-sm cursor-pointer">Orçado vs Realizado</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="previous"
+                checked={!!filters.includePrevious}
+                onCheckedChange={v => setFilters(f => ({ ...f, includePrevious: v }))}
+              />
+              <Label htmlFor="previous" className="text-sm cursor-pointer">Análise Horizontal (vs ano anterior)</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="av" checked={showAV} onCheckedChange={setShowAV} />
+              <Label htmlFor="av" className="text-sm cursor-pointer">Análise Vertical (% receita)</Label>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -143,7 +197,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
 
       {generated && (
         <Card className="shadow-card rounded-2xl border-border">
-          <CardContent className="p-0" ref={reportRef}>
+          <CardContent className="p-0 overflow-x-auto" ref={reportRef}>
             {lines.length === 0 && !loading ? (
               <div className="p-8 text-center text-muted-foreground text-sm">
                 Nenhuma linha DRE configurada ou sem dados no período.
@@ -154,35 +208,77 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                   <TableRow>
                     <TableHead className="w-16">#</TableHead>
                     <TableHead>Linha</TableHead>
-                    <TableHead className="text-right w-40">Valor</TableHead>
+                    <TableHead className="text-right w-36">Realizado</TableHead>
+                    {showAV && <TableHead className="text-right w-20">AV %</TableHead>}
+                    {filters.includeBudget && <TableHead className="text-right w-32">Orçado</TableHead>}
+                    {filters.includeBudget && <TableHead className="text-right w-24">Var %</TableHead>}
+                    {filters.includePrevious && <TableHead className="text-right w-32">Ano Anterior</TableHead>}
+                    {filters.includePrevious && <TableHead className="text-right w-24">AH %</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map(line => (
-                    <TableRow
-                      key={line.id}
-                      className={cn(
-                        line.is_subtotal && 'bg-muted/50 font-semibold',
-                        line.depth === 0 && line.is_subtotal && 'border-t-2 border-border'
-                      )}
-                    >
-                      <TableCell className="text-xs text-muted-foreground">{line.code || ''}</TableCell>
-                      <TableCell
-                        style={{ paddingLeft: `${(line.depth * 1.5) + 1}rem` }}
-                        className={cn(line.is_subtotal ? 'font-semibold' : 'text-sm')}
+                  {lines.map(line => {
+                    const budget = line.budgetValue ?? 0;
+                    const prev = line.previousValue ?? 0;
+                    const budgetVar = budget !== 0 ? ((line.value - budget) / Math.abs(budget)) * 100 : 0;
+                    const ahVar = prev !== 0 ? ((line.value - prev) / Math.abs(prev)) * 100 : 0;
+                    // For revenues, positive variance = good (green); for expenses (sign -1), inverse
+                    const goodWhenHigher = (line.sign ?? 1) > 0;
+                    const budgetClass = budget === 0 ? 'text-muted-foreground' :
+                      (budgetVar > 0 === goodWhenHigher) ? 'text-emerald-600' : 'text-red-500';
+                    const ahClass = prev === 0 ? 'text-muted-foreground' :
+                      (ahVar > 0 === goodWhenHigher) ? 'text-emerald-600' : 'text-red-500';
+                    return (
+                      <TableRow
+                        key={line.id}
+                        className={cn(
+                          line.is_subtotal && 'bg-muted/50 font-semibold',
+                          line.depth === 0 && line.is_subtotal && 'border-t-2 border-border'
+                        )}
                       >
-                        {line.name}
-                      </TableCell>
-                      <TableCell className={cn(
-                        'text-right tabular-nums',
-                        line.value > 0 && 'text-emerald-600',
-                        line.value < 0 && 'text-red-500',
-                        line.is_subtotal && 'font-semibold'
-                      )}>
-                        {fmt(line.value)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        <TableCell className="text-xs text-muted-foreground">{line.code || ''}</TableCell>
+                        <TableCell
+                          style={{ paddingLeft: `${(line.depth * 1.5) + 1}rem` }}
+                          className={cn(line.is_subtotal ? 'font-semibold' : 'text-sm')}
+                        >
+                          {line.name}
+                        </TableCell>
+                        <TableCell className={cn(
+                          'text-right tabular-nums',
+                          line.value > 0 && 'text-emerald-600',
+                          line.value < 0 && 'text-red-500',
+                          line.is_subtotal && 'font-semibold'
+                        )}>
+                          {fmt(line.value)}
+                        </TableCell>
+                        {showAV && (
+                          <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                            {revenueBase ? `${avFor(line.value).toFixed(1)}%` : '—'}
+                          </TableCell>
+                        )}
+                        {filters.includeBudget && (
+                          <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                            {budget !== 0 ? fmt(budget) : '—'}
+                          </TableCell>
+                        )}
+                        {filters.includeBudget && (
+                          <TableCell className={cn('text-right tabular-nums text-xs font-medium', budgetClass)}>
+                            {budget !== 0 ? fmtPct(budgetVar) : '—'}
+                          </TableCell>
+                        )}
+                        {filters.includePrevious && (
+                          <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                            {prev !== 0 ? fmt(prev) : '—'}
+                          </TableCell>
+                        )}
+                        {filters.includePrevious && (
+                          <TableCell className={cn('text-right tabular-nums text-xs font-medium', ahClass)}>
+                            {prev !== 0 ? fmtPct(ahVar) : '—'}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
