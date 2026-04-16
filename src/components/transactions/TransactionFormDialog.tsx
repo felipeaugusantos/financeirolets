@@ -412,6 +412,35 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
               </div>
             )}
 
+            {/* Recurrence (only for new, non-installment) */}
+            {!isEditing && !isInstallment && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="recurring" checked={isRecurring} onCheckedChange={(c) => setIsRecurring(!!c)} />
+                  <Label htmlFor="recurring" className="text-sm">Lançamento recorrente?</Label>
+                </div>
+                {isRecurring && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Frequência</Label>
+                      <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as any)}>
+                        <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="semanal">Semanal</SelectItem>
+                          <SelectItem value="mensal">Mensal</SelectItem>
+                          <SelectItem value="anual">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DatePickerField label="Termina em (opcional)" value={recurrenceEndDate} onChange={setRecurrenceEndDate} />
+                    <p className="col-span-2 text-xs text-muted-foreground">
+                      Próximas ocorrências serão geradas automaticamente em "Contas a Pagar/Receber".
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Allocations */}
             <Collapsible open={allocOpen} onOpenChange={setAllocOpen}>
               <CollapsibleTrigger asChild>
