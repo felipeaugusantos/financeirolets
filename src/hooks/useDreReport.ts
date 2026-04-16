@@ -11,6 +11,8 @@ export interface DreLineResult {
   sign: number;
   parent_id: string | null;
   value: number;
+  budgetValue?: number;
+  previousValue?: number;
   depth: number;
 }
 
@@ -19,6 +21,14 @@ export interface DreFilters {
   dateTo: string;
   unit_id?: string;
   regime: 'competencia' | 'caixa';
+  includeBudget?: boolean;
+  includePrevious?: boolean;
+}
+
+function shiftDateBackOneYear(d: string) {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setFullYear(dt.getFullYear() - 1);
+  return dt.toISOString().split('T')[0];
 }
 
 export function useDreReport() {
