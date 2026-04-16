@@ -10,6 +10,13 @@ export interface OverdueBill {
   partner_name?: string;
 }
 
+export interface UnitRanking {
+  unitId: string;
+  unitName: string;
+  despesas: number;
+  receitas: number;
+}
+
 export interface DashboardData {
   saldoTotal: number;
   receitasMes: number;
@@ -21,12 +28,12 @@ export interface DashboardData {
   monthlyData: { label: string; receitas: number; despesas: number }[];
   categoryData: { name: string; value: number }[];
   loading: boolean;
-  // BI metrics
   semCategoria: number;
   semUnidade: number;
   margemContribuicao: number;
-  variacaoReceita: number | null; // % change month over month
+  variacaoReceita: number | null;
   variacaoDespesa: number | null;
+  unitRanking: UnitRanking[];
 }
 
 export interface DashboardFilters {
@@ -51,6 +58,7 @@ export function useDashboard(filters?: DashboardFilters) {
     margemContribuicao: 0,
     variacaoReceita: null,
     variacaoDespesa: null,
+    unitRanking: [],
   });
 
   useEffect(() => {
@@ -217,10 +225,35 @@ export function useDashboard(filters?: DashboardFilters) {
       // Margem de contribuição = receitas - despesas do mês
       const margemContribuicao = receitasMes - despesasMes;
 
+      // Unit ranking - despesas por unidade no mês atual
+      const unitDespMap = new Map<string, { despesas: number; receitas: number }>();
+      rows.forEach((tx: any) => {
+        const isPaid = tx.status === 'pago' || tx.status === 'recebido';
+        const competenceMonth = tx.competence_date?.substring(0, 7);
+        if (isPaid && competenceMonth === currentMonth && tx.unit_id) {
+          const entry = unitDespMap.get(tx.unit_id) || { despesas: 0, receitas: 0 };
+          const val = Number(tx.net_amount) || 0;
+          if (tx.type === 'despesa') entry.despesas += val;
+          else entry.receitas += val;
+          unitDespMap.set(tx.unit_id, entry);
+        }
+      });
+
+      let unitRanking: UnitRanking[] = [];
+      if (unitDespMap.size > 0) {
+        const unitIds = Array.from(unitDespMap.keys());
+        const { data: unitRows } = await supabase.from('units').select('id, name').in('id', unitIds);
+        const nameMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.name]));
+        unitRanking = Array.from(unitDespMap.entries())
+          .map(([id, v]) => ({ unitId: id, unitName: nameMap.get(id) || 'Desconhecida', despesas: v.despesas, receitas: v.receitas }))
+          .sort((a, b) => b.despesas - a.despesas);
+      }
+
       setData({
         saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje,
         overdueBills, dueTodayBills, monthlyData, categoryData, loading: false,
         semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa,
+        unitRanking,
       });
     } catch {
       setData(prev => ({ ...prev, loading: false }));
