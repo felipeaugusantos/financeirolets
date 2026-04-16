@@ -177,6 +177,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
         installment_group_id: groupId,
         installment_number: count > 1 ? i + 1 : null,
         installment_total: count > 1 ? count : null,
+        is_recurring: i === 0 && isRecurring,
+        recurrence_frequency: i === 0 && isRecurring ? (input.recurrence_frequency as any) : null,
+        recurrence_end_date: i === 0 && isRecurring ? (input.recurrence_end_date || null) : null,
       };
     });
 
