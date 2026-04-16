@@ -1,84 +1,107 @@
 
 
-# Diagnóstico Completo e Plano de Correções — Let's Finance
+# Roadmap Completo — Próximas Evoluções do Let's Finance
 
-## Achados da Análise de Dados
+Já entregue: Onda 1 (RBAC, Auditoria, Recorrência, Baixa em Lote) + segurança zerada.
+Abaixo, o caminho recomendado para evoluir de "ERP funcional" para "ERP de gestão inteligente".
 
-### Dados Atuais no Banco
-- **15 transações** (2 receitas, 13 despesas), todas com status "pago"
-- **0 allocations** (rateios) — tabela `transaction_allocations` vazia
-- **9 transações sem categoria** ou **sem unidade** — essas não aparecem no DRE
-- Unidades com dados: Let's Café (5 tx), Let's Boulevard (2 tx); demais 5 unidades sem lançamentos
+---
 
-### Problemas Identificados
+## Diagnóstico rápido por módulo
 
-#### 1. Transações sem categoria não aparecem no DRE
-5 transações (TESTE, Nutricionista x2, Pagamento Motoca, Royalties Monte Alto) não têm `category_id`. Sem categoria → sem vínculo com linha DRE → **invisível nos relatórios**. Isso é esperado pelo design, mas o usuário precisa de um alerta visual.
+| Módulo | Estado | Maior lacuna |
+|---|---|---|
+| Dashboard | KPIs e gráficos básicos | Sem drill-down, sem comparativo MoM/YoY, sem projeção |
+| Lançamentos | CRUD + rateio + recorrência | Sem aprovação, sem conciliação, sem lançamento rápido |
+| Contas P/R | Vencimentos + baixa lote | Sem lembretes automáticos, sem agendamento bancário |
+| Relatórios | DRE, DRE Comparativo, Fluxo Caixa | Sem Orçado vs Realizado, sem AV/AH, sem Fluxo Projetado |
+| Comissões | Estrutura definida (memory) | Cálculo automático ainda não implementado |
+| Notificações | Inexistente | Sem sino, sem alertas de vencimento |
+| Auditoria | Tela com filtros e diff | Sem export CSV, sem paginação real |
 
-**Ação**: Adicionar banner de alerta na página de Lançamentos informando quantas transações estão "sem categoria" e não aparecerão nos relatórios.
+---
 
-#### 2. Transações sem unidade distorcem o DRE filtrado
-8 transações não têm `unit_id` (incluindo R$ 5.620 de Impostos e R$ 5.000 de Royalties). Ao gerar DRE por unidade, esses valores somem. No consolidado, aparecem.
+## ONDA 2 — Inteligência Financeira (recomendada agora)
 
-**Ação**: Já existe lógica para "Sem unidade" no DRE Comparativo. Verificar que funciona corretamente e que o alerta visual aparece.
+### 2.1 Orçamento (Budget) vs Realizado
+- Tabela `budgets (year, month, dre_line_id, unit_id, planned_amount)`.
+- Tela `/configuracoes/orcamento`: grid editável linhas DRE × meses, botão "copiar ano anterior +X%".
+- DRE ganha colunas **Orçado | Realizado | Variação % | Status** (verde/vermelho).
+- **Correlação:** reutiliza `dre_lines` + `units` — zero impacto em rateios/exportações.
 
-#### 3. Rateio continua com tabela vazia
-A correção anterior no código foi aplicada (tratamento de `__none__` → `null`), mas **nenhum rateio foi salvo** de fato. Pode ser que o usuário não tenha tentado novamente após o fix, ou há um problema adicional no formulário.
+### 2.2 Fluxo de Caixa Projetado
+- Estende `useCashFlowReport` para incluir `pendente`/`agendado` além de `pago`.
+- Tabs no relatório: **Realizado | Projetado | Comparativo**.
+- Gráfico de linha de saldo futuro baseado em `due_date` + recorrências geradas.
 
-**Ação**: Testar o fluxo de criação de rateio no formulário para garantir que os dados chegam à tabela.
+### 2.3 Análise Vertical e Horizontal no DRE
+- **AV:** % de cada linha sobre receita líquida.
+- **AH:** variação % período-a-período.
+- Toggles `[ ] AV` `[ ] AH` no DRE; PDF/CSV incorporam colunas automaticamente.
 
-#### 4. Dashboard: Saldo Total = receitas - despesas (all-time)
-O cálculo está correto: soma todos os pagos. Com os dados atuais: R$ 5.422,18 (receitas) - R$ 11.856,45 (despesas) = **R$ -6.434,27**. Nenhum saldo inicial nas contas bancárias.
+### 2.4 Conciliação Bancária
+- Coluna `reconciled` em `transactions` + tela de upload OFX/CSV de extrato.
+- Match automático (valor + data ±2 dias) e fila manual para o restante.
+- KPI "% conciliado por conta" no Dashboard.
 
-**Ação**: Sugerir ao usuário que configure saldos iniciais nas contas bancárias para refletir a realidade.
+---
 
-#### 5. DRE: Sign de despesas inverte o sinal
-Grupos 2 (Despesas Variáveis) e 4 (Despesas Fixas) têm `sign: -1`, o que faz valores de despesas aparecerem como negativos no DRE. Isso é o **comportamento correto** para DRE contábil (receitas positivas, despesas negativas).
+## ONDA 3 — Automação e UX
 
-**Sem ação necessária** — está correto.
+- **3.1 Cron diário** para `generate_recurring_transactions()` (pg_cron) — elimina o botão manual.
+- **3.2 Workflow de Aprovação** — novo status `aguardando_aprovacao`, fila para Financeiro/Admin.
+- **3.3 Sino de Notificações** — tabela `notifications` + edge function diária (vencimentos, aprovações, recorrências) + realtime.
+- **3.4 Dashboard Drill-down** — KPIs/barras clicáveis abrem lista filtrada; toggles "vs mês anterior" e "vs mesmo mês ano anterior".
+- **3.5 Filtros Salvos** — visões pessoais por usuário em Lançamentos e Relatórios.
 
-#### 6. Correlação DRE ↔ Transações
-- "Vendas Recebimento Loja" (código 1.1.01) = R$ 422,18 ← transação "Stone Master Debito" ✅
-- "Salários Fábrica" (código 4.5.01) = R$ 1.295,00 ← Barbara + Nutricionista ✅
-- "Energia Elétrica" (código 4.3.01) = R$ 1.740,70 ← CPFL + Cpfl Relogio 1 ✅
-- Transações sem categoria (R$ 7.470): **NÃO aparecem** no DRE
+---
 
-## Plano de Implementação
+## ONDA 4 — Estratégico
 
-### 1. Alerta de transações incompletas na lista de Lançamentos
-Adicionar um banner no topo da lista avisando: "X lançamentos sem categoria — não aparecerão nos relatórios DRE".
+- Comissões automatizadas (cálculo no fechamento → despesa vinculada).
+- Balanço Patrimonial.
+- Builder visual de relatórios (já existe `report_templates`, falta UI).
+- PWA push + instalação no iPhone.
+- API/Webhooks para integração com PDV e contabilidade.
 
-**Arquivo**: `src/pages/Transactions.tsx`
+---
 
-### 2. Alerta de transações sem unidade no Dashboard
-Quando há transações sem unidade, mostrar indicador sutil no Dashboard.
+## Mapa de Correlações
 
-**Arquivo**: `src/hooks/useDashboard.ts` (adicionar contagem) + `src/pages/Dashboard.tsx` (exibir)
+````text
+                ┌─────────────────┐
+                │  transactions   │ ← núcleo
+                └────────┬────────┘
+     ┌──────────┬────────┼────────┬──────────────┐
+     ▼          ▼        ▼        ▼              ▼
+allocations category recurrence approval    reconciled
+     │          │        │        │              │
+     ▼          ▼        ▼        ▼              ▼
+DRE/Fluxo   dre_lines  cron   workflow      extrato
+por unidade    │
+               ▼
+           budgets ──► DRE Orçado vs Realizado
+               │
+               ▼
+       Análise Vertical/Horizontal
+````
 
-### 3. Verificar e corrigir formulário de rateio
-Inspecionar `TransactionFormDialog.tsx` para garantir que os `allocations` são passados corretamente no `onSave`. Adicionar log temporário se necessário.
+Toda nova feature reutiliza chaves existentes (`category_id`, `unit_id`, `dre_line_id`) — relatórios, exportações e rateios continuam íntegros.
 
-**Arquivo**: `src/components/transactions/TransactionFormDialog.tsx`
+---
 
-### 4. Melhorar feedback de dados no DRE Comparativo  
-Quando uma coluna "Sem unidade" aparece com valores significativos, destacá-la visualmente.
+## Sequência sugerida (maior valor primeiro)
 
-**Arquivo**: `src/components/reports/DreComparativo.tsx`
+1. **2.1 Orçamento vs Realizado** — base para análise de gestão.
+2. **2.2 Fluxo Projetado** — antecipa gargalos de caixa.
+3. **2.3 AV/AH no DRE** — análise gerencial profunda.
+4. **3.1 Cron** — quick win, fecha recorrência.
+5. **3.3 Notificações** — engajamento diário.
+6. **2.4 Conciliação** — fecha o ciclo financeiro.
 
-### 5. Melhorar cálculo do Dashboard para BI
-O Dashboard já tem KPIs básicos. Para torná-lo um verdadeiro BI:
-- Adicionar **margem de contribuição** (receitas - despesas variáveis) como KPI
-- Adicionar percentual de variação mês a mês nos cards
+---
 
-**Arquivo**: `src/hooks/useDashboard.ts` + `src/pages/Dashboard.tsx`
+## Pergunta para destravar
 
-## Resumo de Arquivos
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/Transactions.tsx` | Banner de transações sem categoria |
-| `src/hooks/useDashboard.ts` | Contagem de transações sem categoria/unidade, margem de contribuição |
-| `src/pages/Dashboard.tsx` | Exibir alertas e novo KPI de margem |
-| `src/components/transactions/TransactionFormDialog.tsx` | Validar passagem de allocations no save |
-| `src/components/reports/DreComparativo.tsx` | Destacar coluna "Sem unidade" |
+Quer que eu execute a **Onda 2 inteira** (4 entregas) ou prefere começar só por **2.1 Orçamento + 2.2 Fluxo Projetado**, que entregam ~80% do valor de gestão com menos superfície?
 
