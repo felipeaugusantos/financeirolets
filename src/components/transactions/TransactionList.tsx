@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { parseDateUTC } from '@/lib/utils';
 import { MoreHorizontal, CheckCircle, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -96,7 +97,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
                     <p className="text-sm font-medium truncate text-card-foreground">{tx.description}</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{format(new Date(tx.competence_date), 'dd/MM/yy')}</span>
+                    <span>{format(parseDateUTC(tx.competence_date), 'dd/MM/yy')}</span>
                     {tx.category && <span>• {tx.category.name}</span>}
                   </div>
                   {tx.installment_total && (
@@ -137,7 +138,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
           {data.map(tx => (
             <TableRow key={tx.id} className="hover:bg-muted/30">
               <TableCell className="text-xs text-muted-foreground">
-                {format(new Date(tx.competence_date), 'dd/MM/yy')}
+                {format(parseDateUTC(tx.competence_date), 'dd/MM/yy')}
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">

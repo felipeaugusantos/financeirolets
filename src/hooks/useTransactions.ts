@@ -150,9 +150,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
     };
 
     const rows = Array.from({ length: count }, (_, i) => {
-      const dueDate = input.due_date
-        ? new Date(new Date(input.due_date).setMonth(new Date(input.due_date).getMonth() + i)).toISOString().split('T')[0]
-        : null;
+      let dueDate: string | null = null;
+      if (input.due_date) {
+        const base = new Date(input.due_date + 'T12:00:00');
+        base.setMonth(base.getMonth() + i);
+        dueDate = base.toISOString().split('T')[0];
+      }
       return {
         ...baseRow,
         amount: perAmount,
@@ -178,14 +181,18 @@ export function useTransactions(filters: TransactionFilters = {}) {
       const allocs = inserted.flatMap(tx =>
         input.allocations!.map(a => ({
           transaction_id: tx.id,
-          unit_id: a.unit_id || null,
-          front_id: a.front_id || null,
-          allocation_type: a.allocation_type,
+          unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
+          front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
+          allocation_type: a.allocation_type as any,
           percentage: a.percentage ?? null,
           amount: a.amount ?? null,
         }))
       );
-      await supabase.from('transaction_allocations').insert(allocs);
+      const { error: allocErr } = await supabase.from('transaction_allocations').insert(allocs);
+      if (allocErr) {
+        console.error('Allocation insert error:', allocErr);
+        toast({ title: 'Erro ao salvar rateio', description: allocErr.message, variant: 'destructive' });
+      }
     }
 
     // File uploads
@@ -248,13 +255,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (input.allocations && input.allocations.length > 0) {
         const allocs = input.allocations.map(a => ({
           transaction_id: id,
-          unit_id: a.unit_id || null,
-          front_id: a.front_id || null,
-          allocation_type: a.allocation_type,
+          unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
+          front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
+          allocation_type: a.allocation_type as any,
           percentage: a.percentage ?? null,
           amount: a.amount ?? null,
         }));
-        await supabase.from('transaction_allocations').insert(allocs);
+        const { error: allocErr } = await supabase.from('transaction_allocations').insert(allocs);
+        if (allocErr) {
+          console.error('Allocation update error:', allocErr);
+          toast({ title: 'Erro ao salvar rateio', description: allocErr.message, variant: 'destructive' });
+        }
       }
     }
     toast({ title: 'Atualizado com sucesso' });
@@ -263,16 +274,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
   };
 
   const remove = async (id: string) => {
+    const backup = [...data];
     // Optimistic removal from UI
     setData(prev => prev.filter(t => t.id !== id));
-    const { error } = await supabase.from('transactions').delete().eq('id', id);
-    if (error) {
-      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
-      await fetchData(); // revert on error
+
+    // Delete attachments first (no CASCADE on FK)
+    await supabase.from('attachments').delete().eq('transaction_id', id);
+
+    // Delete transaction and verify it was actually removed
+    const { data: deleted, error } = await supabase.from('transactions').delete().eq('id', id).select();
+    if (error || !deleted || deleted.length === 0) {
+      toast({ title: 'Erro ao excluir', description: error?.message || 'Não foi possível excluir o lançamento. Verifique suas permissões.', variant: 'destructive' });
+      setData(backup); // revert
       return false;
     }
     toast({ title: 'Excluído com sucesso' });
-    // Recalculate totals
+    // Recalculate totals from current state
     setData(prev => {
       const receitas = prev.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
       const despesas = prev.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.net_amount), 0);
