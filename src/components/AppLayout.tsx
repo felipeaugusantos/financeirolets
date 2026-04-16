@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { BottomTabs } from '@/components/BottomTabs';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppLayoutProps {
@@ -23,6 +24,9 @@ export function AppLayout({ children }: AppLayoutProps) {
               <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
             )}
             <h2 className="font-heading text-base font-semibold text-card-foreground">Let's Finance</h2>
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
           </header>
 
           {/* Main content */}

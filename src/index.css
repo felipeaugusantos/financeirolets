@@ -63,6 +63,63 @@
     --chart-4: 16 24% 18%;             /* cookie brown */
     --chart-5: 122 52% 33%;            /* green */
   }
+
+  /* === PINK MODE — alternativa ao dark, com fundos rosados profundos === */
+  .pink {
+    --background: 340 35% 10%;          /* deep wine */
+    --foreground: 340 30% 96%;          /* near white pink */
+
+    --card: 340 30% 14%;                /* darker rose */
+    --card-foreground: 340 25% 95%;
+
+    --popover: 340 35% 12%;
+    --popover-foreground: 340 30% 96%;
+
+    --primary: 340 90% 65%;             /* vibrant pink */
+    --primary-foreground: 340 40% 10%;
+
+    --secondary: 184 70% 55%;           /* glowing teal */
+    --secondary-foreground: 340 40% 10%;
+
+    --muted: 340 25% 20%;
+    --muted-foreground: 340 20% 75%;
+
+    --accent: 40 85% 65%;               /* warm honey */
+    --accent-foreground: 340 40% 10%;
+
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 60% 55%;
+    --success-foreground: 340 40% 10%;
+
+    --warning: 45 95% 60%;
+    --warning-foreground: 340 40% 10%;
+
+    --info: 184 70% 55%;
+    --info-foreground: 340 40% 10%;
+
+    --border: 340 25% 25%;
+    --input: 340 30% 18%;
+    --ring: 340 90% 65%;
+
+    /* Sidebar */
+    --sidebar-background: 340 38% 8%;
+    --sidebar-foreground: 340 25% 92%;
+    --sidebar-primary: 340 90% 65%;
+    --sidebar-primary-foreground: 340 40% 10%;
+    --sidebar-accent: 340 30% 16%;
+    --sidebar-accent-foreground: 340 25% 95%;
+    --sidebar-border: 340 25% 22%;
+    --sidebar-ring: 340 90% 65%;
+
+    /* Chart colors — pink-mode tuned */
+    --chart-1: 340 90% 70%;
+    --chart-2: 184 75% 60%;
+    --chart-3: 40 90% 65%;
+    --chart-4: 320 60% 75%;
+    --chart-5: 142 60% 60%;
+  }
 }
 
 @layer base {
