@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History } from 'lucide-react';
+import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target } from 'lucide-react';
 import UnitsSettings from './settings/UnitsSettings';
 import FrontsSettings from './settings/FrontsSettings';
 import AccountsSettings from './settings/AccountsSettings';
@@ -11,6 +11,7 @@ import DreSettings from './settings/DreSettings';
 import ImportExportSettings from './settings/ImportExportSettings';
 import UsersSettings from './settings/UsersSettings';
 import AuditSettings from './settings/AuditSettings';
+import BudgetSettings from './settings/BudgetSettings';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 
 const baseSections = [
@@ -19,6 +20,7 @@ const baseSections = [
   { key: 'accounts', title: 'Contas', desc: 'Caixa, Banco, Cartão', icon: Wallet },
   { key: 'categories', title: 'Categorias', desc: 'Receitas, despesas e mapeamento DRE', icon: Tag },
   { key: 'dre', title: 'Linhas do DRE', desc: 'Estrutura customizável do DRE', icon: BarChart3 },
+  { key: 'budget', title: 'Orçamento', desc: 'Planejamento anual por linha do DRE', icon: Target },
   { key: 'partners', title: 'Parceiros', desc: 'Fornecedores, clientes e contatos', icon: Users },
   { key: 'export', title: 'Importar / Exportar', desc: 'CSV e backup de dados', icon: FileDown },
 ];
@@ -37,6 +39,7 @@ export default function SettingsPage() {
   if (active === 'accounts') return <AccountsSettings onBack={() => setActive(null)} />;
   if (active === 'categories') return <CategoriesSettings onBack={() => setActive(null)} />;
   if (active === 'dre') return <DreSettings onBack={() => setActive(null)} />;
+  if (active === 'budget') return <BudgetSettings onBack={() => setActive(null)} />;
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
   if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
   if (active === 'users') return <UsersSettings onBack={() => setActive(null)} />;
