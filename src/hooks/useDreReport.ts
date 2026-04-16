@@ -31,6 +31,164 @@ function shiftDateBackOneYear(d: string) {
   return dt.toISOString().split('T')[0];
 }
 
+// Compute totals per dre_line_id from a set of transactions, given allocations and filter
+function computeLineValues(
+  transactions: any[],
+  allocMap: Map<string, any[]>,
+  catToDre: Map<string, string>,
+  unitFilter: string | undefined
+) {
+  const lineValues = new Map<string, number>();
+  let unallocTotal = 0;
+  let unallocCount = 0;
+
+  transactions.forEach((tx: any) => {
+    if (!tx.category_id) return;
+    const dreLineId = catToDre.get(tx.category_id);
+    if (!dreLineId) return;
+    const totalVal = Number(tx.net_amount) || 0;
+    const allocs = allocMap.get(tx.id);
+
+    if (unitFilter === '__none__') {
+      if (!tx.unit_id && (!allocs || allocs.length === 0)) {
+        lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+      }
+    } else if (unitFilter) {
+      if (allocs && allocs.length > 0) {
+        const u = allocs.find(a => a.unit_id === unitFilter);
+        if (u) {
+          let v = 0;
+          if (u.allocation_type === 'percentual' && u.percentage) v = totalVal * (u.percentage / 100);
+          else if (u.amount) v = Number(u.amount);
+          lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + v);
+        }
+      } else if (tx.unit_id === unitFilter) {
+        lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+      } else if (!tx.unit_id) {
+        unallocTotal += totalVal;
+        unallocCount++;
+      }
+    } else {
+      lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+    }
+  });
+
+  return { lineValues, unallocTotal, unallocCount };
+}
+
+function buildSubtotals(allLines: any[], lineValues: Map<string, number>) {
+  const computed = new Map<string, number>();
+  const get = (line: any): number => {
+    if (computed.has(line.id)) return computed.get(line.id)!;
+    let val: number;
+    if (!line.is_subtotal) {
+      val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
+    } else {
+      const children = allLines.filter((c: any) => c.parent_id === line.id);
+      if (children.length > 0) {
+        val = children.reduce((s: number, c: any) => s + get(c), 0);
+      } else {
+        const code = line.code;
+        if (code === '3') {
+          const g1 = allLines.find((l: any) => l.code === '1');
+          const g2 = allLines.find((l: any) => l.code === '2');
+          val = (g1 ? get(g1) : 0) + (g2 ? get(g2) : 0);
+        } else if (code === '5') {
+          const g3 = allLines.find((l: any) => l.code === '3');
+          const g4 = allLines.find((l: any) => l.code === '4');
+          val = (g3 ? get(g3) : 0) + (g4 ? get(g4) : 0);
+        } else if (code === '8') {
+          const g5 = allLines.find((l: any) => l.code === '5');
+          const g6 = allLines.find((l: any) => l.code === '6');
+          const g7 = allLines.find((l: any) => l.code === '7');
+          val = (g5 ? get(g5) : 0) + (g6 ? get(g6) : 0) + (g7 ? get(g7) : 0);
+        } else {
+          val = 0;
+        }
+      }
+    }
+    computed.set(line.id, val);
+    return val;
+  };
+  allLines.forEach(l => get(l));
+  return computed;
+}
+
+async function fetchPeriodValues(
+  dateFrom: string,
+  dateTo: string,
+  filters: DreFilters,
+  catToDre: Map<string, string>
+) {
+  const dateField = filters.regime === 'caixa' ? 'payment_date' : 'competence_date';
+  let txQuery = supabase
+    .from('transactions')
+    .select('id, net_amount, category_id, status, unit_id')
+    .gte(dateField, dateFrom)
+    .lte(dateField, dateTo);
+  if (filters.regime === 'caixa') {
+    txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
+  }
+  const { data: transactions, error } = await txQuery;
+  if (error) throw error;
+
+  const txIds = (transactions ?? []).map((t: any) => t.id);
+  const allocMap = new Map<string, any[]>();
+  if (txIds.length > 0) {
+    const { data: allocs } = await supabase
+      .from('transaction_allocations')
+      .select('transaction_id, unit_id, allocation_type, percentage, amount')
+      .in('transaction_id', txIds);
+    (allocs ?? []).forEach((a: any) => {
+      const list = allocMap.get(a.transaction_id) || [];
+      list.push(a);
+      allocMap.set(a.transaction_id, list);
+    });
+  }
+
+  return computeLineValues(transactions ?? [], allocMap, catToDre, filters.unit_id);
+}
+
+async function fetchBudgetValues(
+  dateFrom: string,
+  dateTo: string,
+  unitId: string | undefined,
+  allLines: any[]
+): Promise<Map<string, number>> {
+  // Sum budget rows for months within [dateFrom..dateTo]
+  const start = new Date(dateFrom + 'T00:00:00');
+  const end = new Date(dateTo + 'T00:00:00');
+  const months: { year: number; month: number }[] = [];
+  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cur <= end) {
+    months.push({ year: cur.getFullYear(), month: cur.getMonth() + 1 });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  if (months.length === 0) return new Map();
+
+  const minYear = Math.min(...months.map(m => m.year));
+  const maxYear = Math.max(...months.map(m => m.year));
+
+  let q = supabase
+    .from('budgets')
+    .select('year, month, dre_line_id, planned_amount')
+    .gte('year', minYear)
+    .lte('year', maxYear);
+  if (unitId && unitId !== '__none__') q = q.eq('unit_id', unitId);
+  else q = q.is('unit_id', null);
+
+  const { data, error } = await q;
+  if (error) throw error;
+
+  const wanted = new Set(months.map(m => `${m.year}-${m.month}`));
+  const sums = new Map<string, number>();
+  (data ?? []).forEach((b: any) => {
+    if (!wanted.has(`${b.year}-${b.month}`)) return;
+    sums.set(b.dre_line_id, (sums.get(b.dre_line_id) || 0) + Number(b.planned_amount));
+  });
+  return sums;
+}
+
 export function useDreReport() {
   const [lines, setLines] = useState<DreLineResult[]>([]);
   const [unallocatedTotal, setUnallocatedTotal] = useState(0);
@@ -41,109 +199,28 @@ export function useDreReport() {
   const generate = useCallback(async (filters: DreFilters) => {
     setLoading(true);
     try {
-      // 1. Fetch DRE lines
       const { data: dreLines, error: dreErr } = await supabase
         .from('dre_lines')
         .select('*')
         .eq('active', true)
         .order('sort_order');
-
       if (dreErr) throw dreErr;
 
-      // 2. Fetch categories with dre_line_id
       const { data: categories, error: catErr } = await supabase
         .from('categories')
-        .select('id, dre_line_id, type')
+        .select('id, dre_line_id')
         .eq('active', true)
         .not('dre_line_id', 'is', null);
-
       if (catErr) throw catErr;
 
-      // 3. Fetch transactions for the period
-      const dateField = filters.regime === 'caixa' ? 'payment_date' : 'competence_date';
-
-      let txQuery = supabase
-        .from('transactions')
-        .select('id, amount, tax_amount, net_amount, category_id, type, status, unit_id')
-        .gte(dateField, filters.dateFrom)
-        .lte(dateField, filters.dateTo);
-
-      if (filters.regime === 'caixa') {
-        txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
-      }
-
-      const { data: transactions, error: txErr } = await txQuery;
-      if (txErr) throw txErr;
-
-      // 3b. Fetch allocations for these transactions (for rateio)
-      const txIds = (transactions ?? []).map((t: any) => t.id);
-      let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null; allocation_type: string }[]>();
-      
-      if (txIds.length > 0) {
-        const { data: allocs } = await supabase
-          .from('transaction_allocations')
-          .select('transaction_id, unit_id, allocation_type, percentage, amount')
-          .in('transaction_id', txIds);
-        
-        (allocs ?? []).forEach((a: any) => {
-          const list = allocMap.get(a.transaction_id) || [];
-          list.push(a);
-          allocMap.set(a.transaction_id, list);
-        });
-      }
-
-      // 4. Map category_id -> dre_line_id
       const catToDre = new Map<string, string>();
       (categories ?? []).forEach((c: any) => {
         if (c.dre_line_id) catToDre.set(c.id, c.dre_line_id);
       });
 
-      // 5. Sum by dre_line_id, considering allocations when filtering by unit
-      const lineValues = new Map<string, number>();
-      let _unallocTotal = 0;
-      let _unallocCount = 0;
-      (transactions ?? []).forEach((tx: any) => {
-        if (!tx.category_id) return;
-        const dreLineId = catToDre.get(tx.category_id);
-        if (!dreLineId) return;
-        const totalVal = Number(tx.net_amount) || 0;
-
-        const allocs = allocMap.get(tx.id);
-        
-        if (filters.unit_id === '__none__') {
-          // Show only transactions without unit and without allocations
-          if (!tx.unit_id && (!allocs || allocs.length === 0)) {
-            lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
-          }
-        } else if (filters.unit_id) {
-          if (allocs && allocs.length > 0) {
-            const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
-            if (unitAlloc) {
-              let allocVal = 0;
-              if (unitAlloc.allocation_type === 'percentual' && unitAlloc.percentage) {
-                allocVal = totalVal * (unitAlloc.percentage / 100);
-              } else if (unitAlloc.amount) {
-                allocVal = Number(unitAlloc.amount);
-              }
-              lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + allocVal);
-            }
-          } else {
-            if (tx.unit_id === filters.unit_id) {
-              lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
-            } else if (!tx.unit_id) {
-              _unallocTotal += totalVal;
-              _unallocCount++;
-            }
-          }
-        } else {
-          lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
-        }
-      });
-
-      // 6. Build tree and calculate subtotals
       const allLines = dreLines ?? [];
 
-      // Calculate depth
+      // Depth
       const depthMap = new Map<string, number>();
       const getDepth = (id: string): number => {
         if (depthMap.has(id)) return depthMap.get(id)!;
@@ -155,45 +232,26 @@ export function useDreReport() {
       };
       allLines.forEach((l: any) => getDepth(l.id));
 
-      // Calculate subtotals bottom-up
-      // Cache computed values
-      const computedValues = new Map<string, number>();
-      const getLineValue = (line: any): number => {
-        if (computedValues.has(line.id)) return computedValues.get(line.id)!;
-        let val: number;
-        if (!line.is_subtotal) {
-          val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
-        } else {
-          const children = allLines.filter((c: any) => c.parent_id === line.id);
-          if (children.length > 0) {
-            val = children.reduce((sum: number, child: any) => sum + getLineValue(child), 0);
-          } else {
-            // Top-level result lines (3, 5, 8) with no children — compute from prior groups
-            const code = line.code;
-            if (code === '3') {
-              // Resultado Bruto = Receitas + Despesas Variáveis
-              const g1 = allLines.find((l: any) => l.code === '1');
-              const g2 = allLines.find((l: any) => l.code === '2');
-              val = (g1 ? getLineValue(g1) : 0) + (g2 ? getLineValue(g2) : 0);
-            } else if (code === '5') {
-              // Superávit Operacional = Resultado Bruto + Despesas Fixas
-              const g3 = allLines.find((l: any) => l.code === '3');
-              const g4 = allLines.find((l: any) => l.code === '4');
-              val = (g3 ? getLineValue(g3) : 0) + (g4 ? getLineValue(g4) : 0);
-            } else if (code === '8') {
-              // Fluxo de Caixa Retido = Superávit + Entradas + Saídas
-              const g5 = allLines.find((l: any) => l.code === '5');
-              const g6 = allLines.find((l: any) => l.code === '6');
-              const g7 = allLines.find((l: any) => l.code === '7');
-              val = (g5 ? getLineValue(g5) : 0) + (g6 ? getLineValue(g6) : 0) + (g7 ? getLineValue(g7) : 0);
-            } else {
-              val = 0;
-            }
-          }
-        }
-        computedValues.set(line.id, val);
-        return val;
-      };
+      // Current period
+      const current = await fetchPeriodValues(filters.dateFrom, filters.dateTo, filters, catToDre);
+      const currentTotals = buildSubtotals(allLines, current.lineValues);
+
+      // Previous period (year-over-year)
+      let previousTotals: Map<string, number> | null = null;
+      if (filters.includePrevious) {
+        const prevFrom = shiftDateBackOneYear(filters.dateFrom);
+        const prevTo = shiftDateBackOneYear(filters.dateTo);
+        const prev = await fetchPeriodValues(prevFrom, prevTo, filters, catToDre);
+        previousTotals = buildSubtotals(allLines, prev.lineValues);
+      }
+
+      // Budget
+      let budgetTotals: Map<string, number> | null = null;
+      if (filters.includeBudget) {
+        const raw = await fetchBudgetValues(filters.dateFrom, filters.dateTo, filters.unit_id, allLines);
+        // Apply sign and roll-up subtotals
+        budgetTotals = buildSubtotals(allLines, raw);
+      }
 
       const result: DreLineResult[] = allLines.map((l: any) => ({
         id: l.id,
@@ -203,13 +261,15 @@ export function useDreReport() {
         is_subtotal: l.is_subtotal,
         sign: l.sign,
         parent_id: l.parent_id,
-        value: getLineValue(l),
+        value: currentTotals.get(l.id) ?? 0,
+        budgetValue: budgetTotals?.get(l.id),
+        previousValue: previousTotals?.get(l.id),
         depth: depthMap.get(l.id) || 0,
       }));
 
       setLines(result);
-      setUnallocatedTotal(_unallocTotal);
-      setUnallocatedCount(_unallocCount);
+      setUnallocatedTotal(current.unallocTotal);
+      setUnallocatedCount(current.unallocCount);
     } catch (err: any) {
       toast({ title: 'Erro ao gerar DRE', description: err.message, variant: 'destructive' });
       setLines([]);
