@@ -27,6 +27,10 @@ export interface TransactionRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  is_recurring?: boolean;
+  recurrence_frequency?: 'semanal' | 'mensal' | 'anual' | null;
+  recurrence_end_date?: string | null;
+  recurrence_parent_id?: string | null;
   // joined
   category?: { name: string; type: string } | null;
   account?: { name: string } | null;
@@ -76,6 +80,9 @@ export interface TransactionInput {
   installment_count?: number;
   allocations?: AllocationInput[];
   files?: File[];
+  is_recurring?: boolean;
+  recurrence_frequency?: 'semanal' | 'mensal' | 'anual';
+  recurrence_end_date?: string;
 }
 
 export function useTransactions(filters: TransactionFilters = {}) {
