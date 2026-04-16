@@ -1,48 +1,84 @@
 
 
-# Plan: Address Remaining Kaique Feedback Items
+# Diagnóstico Completo e Plano de Correções — Let's Finance
 
-## Already Done (No Action Needed)
-- Categories "Serviços Terceirizados" and "Taxa de Funcionamento" -- already in DB
-- All units created (7 total)
-- All bank accounts created, test ones deactivated
-- Bug fixes (delete, timezone, rateio) -- applied in previous session
+## Achados da Análise de Dados
 
-## Remaining Items to Address
+### Dados Atuais no Banco
+- **15 transações** (2 receitas, 13 despesas), todas com status "pago"
+- **0 allocations** (rateios) — tabela `transaction_allocations` vazia
+- **9 transações sem categoria** ou **sem unidade** — essas não aparecem no DRE
+- Unidades com dados: Let's Café (5 tx), Let's Boulevard (2 tx); demais 5 unidades sem lançamentos
 
-### 1. Inline Category Creation Error
-**Issue**: Kaique tried to add a category from within the transaction form and got an error.
-**Root cause**: The `SelectWithAdd` component's `onAdd` for categories passes `{ name, type, active }` to `createCategory`. The `categories` table requires `type` (enum: receita/despesa) -- this is correctly passed from the transaction type. However, `sort_order` defaults to 0, and there may be a missing field issue. Need to verify error handling and ensure the inline add dialog properly shows errors via toast.
-**Fix**: Improve error handling in SelectWithAdd `onAdd` callbacks to surface the actual error message. The `useSupabaseCrud.create()` already shows a toast on error, so likely the issue was transient or RLS-related (already confirmed user is admin).
+### Problemas Identificados
 
-### 2. CSV Import "Nothing Happens" on Click
-**Issue**: Clicking "Importar CSV" and "Banco de Dados" buttons does nothing.
-**Root cause**: The `ImportExportSettings` page is nested inside SettingsPage and requires clicking the "Importar / Exportar" card first. The user may have expected direct import buttons on the main settings page or elsewhere. Also, the file input uses a hidden `<input>` triggered by button click -- this should work, but may have issues on mobile Safari/iOS.
-**Fix**: 
-- Add `capture` attribute for mobile compatibility on file input
-- Ensure the file picker opens correctly on iOS/mobile browsers
-- Consider adding a direct import/export shortcut accessible from the transactions page
+#### 1. Transações sem categoria não aparecem no DRE
+5 transações (TESTE, Nutricionista x2, Pagamento Motoca, Royalties Monte Alto) não têm `category_id`. Sem categoria → sem vínculo com linha DRE → **invisível nos relatórios**. Isso é esperado pelo design, mas o usuário precisa de um alerta visual.
 
-### 3. "Frentes de Negócio" Clarification
-**Answer**: Frentes are optional. For Franqueadora, the user can leave it blank or create a generic "Institucional/Administrativo" front. No code change needed -- just confirmation.
+**Ação**: Adicionar banner de alerta na página de Lançamentos informando quantas transações estão "sem categoria" e não aparecerão nos relatórios.
 
-## Files to Edit
+#### 2. Transações sem unidade distorcem o DRE filtrado
+8 transações não têm `unit_id` (incluindo R$ 5.620 de Impostos e R$ 5.000 de Royalties). Ao gerar DRE por unidade, esses valores somem. No consolidado, aparecem.
 
-| File | Change |
-|------|--------|
-| `src/pages/settings/ImportExportSettings.tsx` | Fix mobile file input compatibility, add better feedback when file picker is cancelled |
-| `src/components/ui/select-with-add.tsx` | Improve error surfacing in onAdd callback |
+**Ação**: Já existe lógica para "Sem unidade" no DRE Comparativo. Verificar que funciona corretamente e que o alerta visual aparece.
 
-## Technical Details
+#### 3. Rateio continua com tabela vazia
+A correção anterior no código foi aplicada (tratamento de `__none__` → `null`), mas **nenhum rateio foi salvo** de fato. Pode ser que o usuário não tenha tentado novamente após o fix, ou há um problema adicional no formulário.
 
-```text
-1. File input mobile fix:
-   - Add accept=".csv,text/csv" explicitly
-   - Use onClick handler with setTimeout for iOS Safari compatibility
+**Ação**: Testar o fluxo de criação de rateio no formulário para garantir que os dados chegam à tabela.
 
-2. SelectWithAdd error handling:
-   - The onAdd already returns null on error
-   - useSupabaseCrud.create() already shows toast
-   - Verify no silent failures
-```
+#### 4. Dashboard: Saldo Total = receitas - despesas (all-time)
+O cálculo está correto: soma todos os pagos. Com os dados atuais: R$ 5.422,18 (receitas) - R$ 11.856,45 (despesas) = **R$ -6.434,27**. Nenhum saldo inicial nas contas bancárias.
+
+**Ação**: Sugerir ao usuário que configure saldos iniciais nas contas bancárias para refletir a realidade.
+
+#### 5. DRE: Sign de despesas inverte o sinal
+Grupos 2 (Despesas Variáveis) e 4 (Despesas Fixas) têm `sign: -1`, o que faz valores de despesas aparecerem como negativos no DRE. Isso é o **comportamento correto** para DRE contábil (receitas positivas, despesas negativas).
+
+**Sem ação necessária** — está correto.
+
+#### 6. Correlação DRE ↔ Transações
+- "Vendas Recebimento Loja" (código 1.1.01) = R$ 422,18 ← transação "Stone Master Debito" ✅
+- "Salários Fábrica" (código 4.5.01) = R$ 1.295,00 ← Barbara + Nutricionista ✅
+- "Energia Elétrica" (código 4.3.01) = R$ 1.740,70 ← CPFL + Cpfl Relogio 1 ✅
+- Transações sem categoria (R$ 7.470): **NÃO aparecem** no DRE
+
+## Plano de Implementação
+
+### 1. Alerta de transações incompletas na lista de Lançamentos
+Adicionar um banner no topo da lista avisando: "X lançamentos sem categoria — não aparecerão nos relatórios DRE".
+
+**Arquivo**: `src/pages/Transactions.tsx`
+
+### 2. Alerta de transações sem unidade no Dashboard
+Quando há transações sem unidade, mostrar indicador sutil no Dashboard.
+
+**Arquivo**: `src/hooks/useDashboard.ts` (adicionar contagem) + `src/pages/Dashboard.tsx` (exibir)
+
+### 3. Verificar e corrigir formulário de rateio
+Inspecionar `TransactionFormDialog.tsx` para garantir que os `allocations` são passados corretamente no `onSave`. Adicionar log temporário se necessário.
+
+**Arquivo**: `src/components/transactions/TransactionFormDialog.tsx`
+
+### 4. Melhorar feedback de dados no DRE Comparativo  
+Quando uma coluna "Sem unidade" aparece com valores significativos, destacá-la visualmente.
+
+**Arquivo**: `src/components/reports/DreComparativo.tsx`
+
+### 5. Melhorar cálculo do Dashboard para BI
+O Dashboard já tem KPIs básicos. Para torná-lo um verdadeiro BI:
+- Adicionar **margem de contribuição** (receitas - despesas variáveis) como KPI
+- Adicionar percentual de variação mês a mês nos cards
+
+**Arquivo**: `src/hooks/useDashboard.ts` + `src/pages/Dashboard.tsx`
+
+## Resumo de Arquivos
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/Transactions.tsx` | Banner de transações sem categoria |
+| `src/hooks/useDashboard.ts` | Contagem de transações sem categoria/unidade, margem de contribuição |
+| `src/pages/Dashboard.tsx` | Exibir alertas e novo KPI de margem |
+| `src/components/transactions/TransactionFormDialog.tsx` | Validar passagem de allocations no save |
+| `src/components/reports/DreComparativo.tsx` | Destacar coluna "Sem unidade" |
 
