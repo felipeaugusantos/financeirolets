@@ -140,6 +140,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setNotes('');
     setIsInstallment(false);
     setInstallmentCount('2');
+    setIsRecurring(false);
+    setRecurrenceFrequency('mensal');
+    setRecurrenceEndDate(undefined);
     setAllocations([]);
     setFiles([]);
     setAllocOpen(false);
