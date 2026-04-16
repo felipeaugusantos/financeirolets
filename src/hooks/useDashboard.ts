@@ -10,6 +10,13 @@ export interface OverdueBill {
   partner_name?: string;
 }
 
+export interface UnitRanking {
+  unitId: string;
+  unitName: string;
+  despesas: number;
+  receitas: number;
+}
+
 export interface DashboardData {
   saldoTotal: number;
   receitasMes: number;
@@ -21,12 +28,12 @@ export interface DashboardData {
   monthlyData: { label: string; receitas: number; despesas: number }[];
   categoryData: { name: string; value: number }[];
   loading: boolean;
-  // BI metrics
   semCategoria: number;
   semUnidade: number;
   margemContribuicao: number;
-  variacaoReceita: number | null; // % change month over month
+  variacaoReceita: number | null;
   variacaoDespesa: number | null;
+  unitRanking: UnitRanking[];
 }
 
 export interface DashboardFilters {
@@ -51,6 +58,7 @@ export function useDashboard(filters?: DashboardFilters) {
     margemContribuicao: 0,
     variacaoReceita: null,
     variacaoDespesa: null,
+    unitRanking: [],
   });
 
   useEffect(() => {
