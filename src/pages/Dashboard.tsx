@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { useNavigate } from 'react-router-dom';
@@ -41,17 +42,20 @@ export default function Dashboard() {
     frontId: frontId && frontId !== 'all' ? frontId : undefined,
   };
 
-  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading } = useDashboard(dashFilters);
+  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
   const activeUnits = (units as any[])?.filter((u: any) => u.active) ?? [];
   const activeFronts = (fronts as any[])?.filter((f: any) => f.active) ?? [];
 
+  const fmtPct = (v: number | null) => v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '';
+
   const cards = [
-    { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary' },
-    { title: 'Receitas do Mês', value: fmt(receitasMes), icon: TrendingUp, color: 'text-success' },
-    { title: 'Despesas do Mês', value: fmt(despesasMes), icon: TrendingDown, color: 'text-destructive' },
-    { title: 'Contas em Atraso', value: String(contasAtrasadas), icon: AlertTriangle, color: contasAtrasadas > 0 ? 'text-warning' : 'text-muted-foreground' },
+    { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary', sub: '' },
+    { title: 'Receitas do Mês', value: fmt(receitasMes), icon: TrendingUp, color: 'text-success', sub: variacaoReceita !== null ? fmtPct(variacaoReceita) + ' vs mês anterior' : '' },
+    { title: 'Despesas do Mês', value: fmt(despesasMes), icon: TrendingDown, color: 'text-destructive', sub: variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' vs mês anterior' : '' },
+    { title: 'Margem', value: fmt(margemContribuicao), icon: BarChart3, color: margemContribuicao >= 0 ? 'text-success' : 'text-destructive', sub: '' },
+    { title: 'Contas em Atraso', value: String(contasAtrasadas), icon: AlertTriangle, color: contasAtrasadas > 0 ? 'text-warning' : 'text-muted-foreground', sub: '' },
   ];
 
   if (loading) {
@@ -61,8 +65,8 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map(i => (
             <Card key={i} className="shadow-card rounded-2xl border-border">
               <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
               <CardContent><Skeleton className="h-8 w-32" /></CardContent>
@@ -111,7 +115,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {cards.map((card) => (
           <Card key={card.title} className="shadow-card rounded-2xl border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -122,10 +126,25 @@ export default function Dashboard() {
               <div className="text-lg md:text-2xl font-bold font-heading text-card-foreground">
                 {card.value}
               </div>
+              {card.sub && (
+                <p className="text-[10px] text-muted-foreground mt-1">{card.sub}</p>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Incomplete data alert */}
+      {(semCategoria > 0 || semUnidade > 0) && (
+        <Alert variant="default" className="border-warning/50 bg-warning/5">
+          <Info className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-xs text-warning">
+            {semCategoria > 0 && <span>{semCategoria} lançamento{semCategoria > 1 ? 's' : ''} sem categoria. </span>}
+            {semUnidade > 0 && <span>{semUnidade} sem unidade. </span>}
+            <span>Esses dados não aparecerão corretamente nos relatórios DRE.</span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Alerts */}
       {(overdueBills.length > 0 || dueTodayBills.length > 0) && (

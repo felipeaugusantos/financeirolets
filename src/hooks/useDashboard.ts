@@ -21,6 +21,12 @@ export interface DashboardData {
   monthlyData: { label: string; receitas: number; despesas: number }[];
   categoryData: { name: string; value: number }[];
   loading: boolean;
+  // BI metrics
+  semCategoria: number;
+  semUnidade: number;
+  margemContribuicao: number;
+  variacaoReceita: number | null; // % change month over month
+  variacaoDespesa: number | null;
 }
 
 export interface DashboardFilters {
@@ -40,6 +46,11 @@ export function useDashboard(filters?: DashboardFilters) {
     monthlyData: [],
     categoryData: [],
     loading: true,
+    semCategoria: 0,
+    semUnidade: 0,
+    margemContribuicao: 0,
+    variacaoReceita: null,
+    variacaoDespesa: null,
   });
 
   useEffect(() => {
@@ -65,7 +76,7 @@ export function useDashboard(filters?: DashboardFilters) {
       // Fetch transactions for last 6 months
       let txQuery = supabase
         .from('transactions')
-        .select('type, net_amount, payment_date, status, category_id, due_date, competence_date')
+        .select('type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id')
         .gte('competence_date', rangeStart)
         .lte('competence_date', rangeEnd);
       txQuery = applyFilters(txQuery);
@@ -76,6 +87,9 @@ export function useDashboard(filters?: DashboardFilters) {
       let receitasMes = 0;
       let despesasMes = 0;
       let contasAtrasadas = 0;
+      let semCategoria = 0;
+      let semUnidade = 0;
+      let despesasVariaveisMes = 0;
 
       const monthMap = new Map<string, { receitas: number; despesas: number }>();
       const catMap = new Map<string, number>();
@@ -83,6 +97,12 @@ export function useDashboard(filters?: DashboardFilters) {
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const competenceMonth = tx.competence_date?.substring(0, 7);
+
+        // Count incomplete data
+        if (tx.status !== 'cancelado') {
+          if (!tx.category_id) semCategoria++;
+          if (!tx.unit_id) semUnidade++;
+        }
 
         if (isPaid && tx.payment_date) {
           const payMonth = tx.payment_date.substring(0, 7);
@@ -183,9 +203,24 @@ export function useDashboard(filters?: DashboardFilters) {
         else overdueBills.push(bill);
       });
 
+      // Month-over-month variation
+      const prevMonthKey = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
+      const prevEntry = monthMap.get(prevMonthKey);
+      const curEntry = monthMap.get(currentMonth);
+      const variacaoReceita = prevEntry && prevEntry.receitas > 0 && curEntry
+        ? ((curEntry.receitas - prevEntry.receitas) / prevEntry.receitas) * 100
+        : null;
+      const variacaoDespesa = prevEntry && prevEntry.despesas > 0 && curEntry
+        ? ((curEntry.despesas - prevEntry.despesas) / prevEntry.despesas) * 100
+        : null;
+
+      // Margem de contribuição = receitas - despesas do mês
+      const margemContribuicao = receitasMes - despesasMes;
+
       setData({
         saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje,
         overdueBills, dueTodayBills, monthlyData, categoryData, loading: false,
+        semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa,
       });
     } catch {
       setData(prev => ({ ...prev, loading: false }));
