@@ -150,11 +150,13 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
               O CSV deve ter ao menos as colunas: <strong>Descrição</strong> e <strong>Valor</strong>. 
               Colunas opcionais: Tipo, Data, Status.
             </p>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+            <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={handleImportCSV} />
             <Button
               variant="outline"
               className="w-full gap-2 rounded-xl"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => {
+                setTimeout(() => fileRef.current?.click(), 100);
+              }}
               disabled={importing}
             >
               <FileSpreadsheet className="h-4 w-4" />

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -65,13 +66,18 @@ export default function SelectWithAdd({
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const newId = await onAdd({ name: name.trim(), ...extras });
-    setSaving(false);
-    if (newId) {
-      onValueChange(newId);
-      setDialogOpen(false);
-      setName('');
-      setExtras({});
+    try {
+      const newId = await onAdd({ name: name.trim(), ...extras });
+      if (newId) {
+        onValueChange(newId);
+        setDialogOpen(false);
+        setName('');
+        setExtras({});
+      }
+    } catch (err: any) {
+      toast.error('Erro ao adicionar', { description: err?.message || 'Tente novamente' });
+    } finally {
+      setSaving(false);
     }
   };
 
