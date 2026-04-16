@@ -327,5 +327,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return true;
   };
 
-  return { data, loading, totals, fetchData, create, update, remove, markAs };
+  const generateRecurring = async () => {
+    const { data, error } = await supabase.rpc('generate_recurring_transactions' as any);
+    if (error) {
+      toast({ title: 'Erro ao gerar recorrências', description: error.message, variant: 'destructive' });
+      return 0;
+    }
+    const count = (data as number) ?? 0;
+    toast({
+      title: count > 0 ? `${count} lançamento(s) gerados` : 'Tudo em dia',
+      description: count > 0 ? 'Próximas ocorrências de lançamentos recorrentes foram criadas.' : 'Nenhuma nova ocorrência a gerar.',
+    });
+    if (count > 0) await fetchData();
+    return count;
+  };
+
+  return { data, loading, totals, fetchData, create, update, remove, markAs, generateRecurring };
 }
