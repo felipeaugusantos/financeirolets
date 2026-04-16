@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,7 @@ export default function Dashboard() {
     frontId: frontId && frontId !== 'all' ? frontId : undefined,
   };
 
-  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa } = useDashboard(dashFilters);
+  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
   const activeUnits = (units as any[])?.filter((u: any) => u.active) ?? [];
@@ -275,6 +275,48 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Unit Ranking */}
+      {unitRanking.length > 0 && (
+        <Card className="shadow-card rounded-2xl border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-heading flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              Ranking de Despesas por Unidade (mês atual)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {unitRanking.map((u, i) => {
+                const maxDesp = unitRanking[0]?.despesas || 1;
+                const pct = (u.despesas / maxDesp) * 100;
+                return (
+                  <div key={u.unitId} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-card-foreground flex items-center gap-2">
+                        <span className="text-muted-foreground w-4 text-right">{i + 1}º</span>
+                        {u.unitName}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-destructive font-bold">{fmt(u.despesas)}</span>
+                        {u.receitas > 0 && (
+                          <span className="text-success text-[10px]">Rec: {fmt(u.receitas)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-destructive/70 rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
