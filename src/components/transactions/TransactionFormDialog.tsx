@@ -198,6 +198,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       installment_count: isInstallment ? parseInt(installmentCount) : undefined,
       allocations: allocations.length > 0 ? allocations : undefined,
       files: files.length > 0 ? files : undefined,
+      is_recurring: isRecurring && !isInstallment,
+      recurrence_frequency: isRecurring && !isInstallment ? recurrenceFrequency : undefined,
+      recurrence_end_date: isRecurring && !isInstallment && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : undefined,
     };
     const ok = await onSave(input);
     setSaving(false);
