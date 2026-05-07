@@ -14,9 +14,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const email = "teste@letscookies.com";
-    const password = "Teste@123456";
-    const fullName = "Usuário Teste";
+    let email = "teste@letscookies.com";
+    let password = "Teste@123456";
+    let fullName = "Usuário Teste";
+
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        if (body?.email) email = body.email;
+        if (body?.password) password = body.password;
+        if (body?.full_name) fullName = body.full_name;
+      } catch {}
+    }
 
     // Check existing
     const { data: existing } = await supabase.auth.admin.listUsers();
