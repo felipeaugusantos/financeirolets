@@ -39,7 +39,12 @@ describe("has_role — uso restrito a autorização via RLS", () => {
       const src = readFileSync(f, "utf8");
       // 'has_role' não deve aparecer como string em código de cliente
       // (exceto neste próprio arquivo de teste).
-      if (f.endsWith("has-role-usage.test.ts") || f.endsWith("rls.test.ts")) continue;
+      if (
+        f.endsWith("has-role-usage.test.ts") ||
+        f.endsWith("rls.test.ts") ||
+        f.includes("integrations/supabase/types") // tipos auto-gerados
+      )
+        continue;
       expect(src.includes("has_role"), `${f} referencia has_role`).toBe(false);
     }
   });
