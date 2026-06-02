@@ -578,6 +578,10 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
       )}
 
       {generated && data && (
+        <Checklist items={data.checklist} data={data} />
+      )}
+
+      {generated && data && (
         <div className="grid lg:grid-cols-2 gap-4">
           <RulesBreakdown title="Receitas" side={data.receitas} color="success" kind="receita" />
           <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" kind="despesa" />
