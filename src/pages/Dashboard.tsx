@@ -257,6 +257,7 @@ export default function Dashboard() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('current_month');
   const [customFrom, setCustomFrom] = useState<string | undefined>();
   const [customTo, setCustomTo] = useState<string | undefined>();
+  const [chartMode, setChartMode] = useState<ChartMode>('bars');
 
   const { data: units } = useSupabaseCrud<any>('units');
   const { data: fronts } = useSupabaseCrud<any>('business_fronts');
@@ -547,7 +548,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            <CategoryBars data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" />
+            <CategoryChart mode={chartMode} data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" />
           </CardContent>
         </Card>
 
@@ -556,7 +557,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            <CategoryBars data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" />
+            <CategoryChart mode={chartMode} data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" />
           </CardContent>
         </Card>
       </div>
