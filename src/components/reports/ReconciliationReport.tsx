@@ -492,6 +492,43 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
     setGenerated(true);
   };
 
+  // Injeta o contexto da Reconciliação no Kaikin para perguntas contextualizadas
+  useKaikinContext(
+    data
+      ? {
+          scope: 'reconciliacao',
+          period: { from: filters.dateFrom, to: filters.dateTo },
+          unit_id: filters.unit_id ?? null,
+          totals: {
+            receitas: {
+              dashboard: data.receitas.dashboard,
+              provisionado: data.receitas.provisionado,
+              dreCompetenciaFull: data.receitas.dreCompetenciaFull,
+              dreCaixa: data.receitas.dreCaixa,
+              pagoForaDaCompetencia: data.receitas.pagoForaDaCompetencia,
+              pagoDePeriodoAnterior: data.receitas.pagoDePeriodoAnterior,
+            },
+            despesas: {
+              dashboard: data.despesas.dashboard,
+              provisionado: data.despesas.provisionado,
+              dreCompetenciaFull: data.despesas.dreCompetenciaFull,
+              dreCaixa: data.despesas.dreCaixa,
+              pagoForaDaCompetencia: data.despesas.pagoForaDaCompetencia,
+              pagoDePeriodoAnterior: data.despesas.pagoDePeriodoAnterior,
+            },
+          },
+          checklist: data.checklist.map((c) => ({
+            id: c.id,
+            severity: c.severity,
+            title: c.title,
+            side: c.side,
+            count: c.count,
+            amount: c.amount,
+          })),
+        }
+      : null
+  );
+
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
