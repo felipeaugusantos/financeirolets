@@ -28,6 +28,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     regime: 'competencia',
     includeBudget: false,
     includePrevious: false,
+    onlyRealized: false,
   });
   const [showAV, setShowAV] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -182,6 +183,18 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
               <Switch id="av" checked={showAV} onCheckedChange={setShowAV} />
               <Label htmlFor="av" className="text-sm cursor-pointer">Análise Vertical (% receita)</Label>
             </div>
+            {filters.regime === 'competencia' && (
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="onlyRealized"
+                  checked={!!filters.onlyRealized}
+                  onCheckedChange={v => setFilters(f => ({ ...f, onlyRealized: v }))}
+                />
+                <Label htmlFor="onlyRealized" className="text-sm cursor-pointer" title="Considera apenas lançamentos pagos/recebidos no período de competência (igual ao Dashboard sem provisionados).">
+                  Somente realizado
+                </Label>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
