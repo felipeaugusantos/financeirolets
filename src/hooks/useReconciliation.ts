@@ -228,6 +228,17 @@ function buildChecklist(rec: SideData, des: SideData): ChecklistItem[] {
       flagKey: 'negativeOrZero',
     });
 
+    if (f.pagoSemData.count > 0) out.push({
+      id: `semdata-${key}`,
+      severity: 'warn',
+      title: `${label} marcadas como pagas sem data de pagamento`,
+      message: 'Esses lançamentos não entram no DRE Caixa e quebram a identidade. Preencha o payment_date.',
+      count: f.pagoSemData.count,
+      amount: f.pagoSemData.total,
+      side: key,
+      flagKey: 'pagoSemData',
+    });
+
     if (data.provisionado > data.dashboard && data.provisionado > 0) out.push({
       id: `provdom-${key}`,
       severity: 'info',
