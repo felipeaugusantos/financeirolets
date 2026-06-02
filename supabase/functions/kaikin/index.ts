@@ -232,9 +232,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Loop tool calling não-stream (até 4 hops), depois streaming da resposta final
+    // Loop tool calling (até 4 hops). Sempre não-stream — emulamos SSE no final.
+    let finalContent = '';
     let hops = 0;
-    while (hops < 4) {
+    while (hops < 5) {
       const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -267,15 +268,14 @@ Deno.serve(async (req) => {
       const msg = payload?.choices?.[0]?.message;
       const toolCalls = msg?.tool_calls;
       if (!toolCalls || toolCalls.length === 0) {
-        // resposta final — re-pede em streaming para devolver token-by-token
-        chatMessages.push({ role: 'assistant', content: msg?.content ?? '' });
+        finalContent = msg?.content ?? '';
         break;
       }
-      // Empurra a chamada de tool e seus resultados
       chatMessages.push({ role: 'assistant', content: msg.content ?? null, tool_calls: toolCalls });
       for (const tc of toolCalls) {
         let args: any = {};
         try { args = JSON.parse(tc.function?.arguments ?? '{}'); } catch { /* ignore */ }
+        console.log('[kaikin] tool', tc.function?.name, args);
         const result = await runTool(tc.function?.name, args, supabase);
         chatMessages.push({
           role: 'tool',
@@ -286,36 +286,28 @@ Deno.serve(async (req) => {
       hops++;
     }
 
-    // streaming da resposta final
-    const streamResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: chatMessages,
-        stream: true,
-      }),
-    });
-
-    if (!streamResp.ok || !streamResp.body) {
-      if (streamResp.status === 429 || streamResp.status === 402) {
-        return new Response(JSON.stringify({ error: streamResp.status === 429 ? 'Rate limit excedido' : 'Créditos esgotados' }), {
-          status: streamResp.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const t = await streamResp.text();
-      console.error('stream error', streamResp.status, t);
-      return new Response(JSON.stringify({ error: 'stream error' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!finalContent) {
+      finalContent = '_Não consegui formular uma resposta. Tente reformular sua pergunta._';
     }
 
-    return new Response(streamResp.body, {
+    // Emula SSE no formato OpenAI para o front consumir com o mesmo parser
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const chunks = finalContent.match(/[\s\S]{1,40}/g) ?? [finalContent];
+        for (const chunk of chunks) {
+          const evt = {
+            choices: [{ index: 0, delta: { content: chunk } }],
+          };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(evt)}\n\n`));
+          await new Promise((r) => setTimeout(r, 15));
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
       headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
     });
   } catch (e: any) {
