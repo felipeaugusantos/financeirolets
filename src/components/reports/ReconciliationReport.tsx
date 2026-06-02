@@ -447,23 +447,36 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
       )}
 
       {generated && data && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <RulesBreakdown title="Receitas" side={data.receitas} color="success" />
-          <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" />
-        </div>
+        <Card className="shadow-card rounded-2xl border-primary/30 bg-primary/5">
+          <CardHeader className="flex flex-row items-center gap-2 pb-3">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-heading">Resumo em uma frase</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm leading-relaxed text-foreground/85 space-y-2">
+            <p>
+              Neste período seu <B>Dashboard</B> mostra <span className="text-success font-semibold">{fmt(data.receitas.dashboard)}</span> em receitas
+              e <span className="text-destructive font-semibold">{fmt(data.despesas.dashboard)}</span> em despesas (já realizadas).
+            </p>
+            <p>
+              O <B>DRE por Competência</B> adiciona o provisionado: <span className="text-success font-semibold">+{fmt(data.receitas.provisionado)}</span> em receitas
+              e <span className="text-destructive font-semibold">+{fmt(data.despesas.provisionado)}</span> em despesas,
+              chegando a <B>{fmt(data.receitas.dreCompetenciaFull)}</B> / <B>{fmt(data.despesas.dreCompetenciaFull)}</B>.
+            </p>
+            <p>
+              O <B>DRE por Caixa</B> ajusta o Dashboard somando pagos de períodos anteriores
+              (<B>+{fmt(data.receitas.pagoDePeriodoAnterior)}</B> / <B>+{fmt(data.despesas.pagoDePeriodoAnterior)}</B>) e tirando os pagos fora
+              (<B>−{fmt(data.receitas.pagoForaDaCompetencia)}</B> / <B>−{fmt(data.despesas.pagoForaDaCompetencia)}</B>),
+              resultando em <B>{fmt(data.receitas.dreCaixa)}</B> / <B>{fmt(data.despesas.dreCaixa)}</B>.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {generated && data && (
-        <Card className="shadow-card rounded-2xl border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-heading">Como ler</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground space-y-1">
-            <p><strong>Dashboard</strong> e <strong>DRE Competência (somente realizado)</strong> devem coincidir — ambos contam o que foi pago/recebido com competência dentro do período.</p>
-            <p>A diferença para o <strong>DRE Competência (cheio)</strong> é o valor <strong>provisionado</strong> (pendente/agendado).</p>
-            <p>A diferença para o <strong>DRE Caixa</strong> vem de pagamentos cuja competência cai fora do período (entram no caixa) ou cuja competência está dentro mas o pagamento ficou fora (saem do caixa).</p>
-          </CardContent>
-        </Card>
+        <div className="grid lg:grid-cols-2 gap-4">
+          <RulesBreakdown title="Receitas" side={data.receitas} color="success" kind="receita" />
+          <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" kind="despesa" />
+        </div>
       )}
     </div>
   );
