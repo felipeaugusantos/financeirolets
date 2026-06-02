@@ -468,33 +468,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            {categoryData.length === 0 ? (
-              <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
-                Nenhuma despesa paga neste mês
-              </div>
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={70}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine={{ strokeWidth: 1 }}
-                    >
-                      {categoryData.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <CategoryPie data={categoryData} emptyLabel="Nenhuma despesa paga neste período" />
           </CardContent>
         </Card>
 
@@ -503,33 +477,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            {receitaCategoryData.length === 0 ? (
-              <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
-                Nenhuma receita recebida neste mês
-              </div>
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={receitaCategoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={70}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine={{ strokeWidth: 1 }}
-                    >
-                      {receitaCategoryData.map((_, i) => (
-                        <Cell key={`r-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <CategoryPie data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" />
           </CardContent>
         </Card>
       </div>
