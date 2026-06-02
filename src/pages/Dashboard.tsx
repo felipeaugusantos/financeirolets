@@ -245,7 +245,7 @@ export default function Dashboard() {
       )}
 
       {/* Charts */}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
             <CardTitle className="text-sm font-heading">Receitas vs Despesas (últimos 6 meses)</CardTitle>
@@ -301,6 +301,41 @@ export default function Dashboard() {
                     >
                       {categoryData.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card rounded-2xl border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-heading">Receitas por Categoria (mês atual)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {receitaCategoryData.length === 0 ? (
+              <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
+                Nenhuma receita recebida neste mês
+              </div>
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={receitaCategoryData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      labelLine={{ strokeWidth: 1 }}
+                    >
+                      {receitaCategoryData.map((_, i) => (
+                        <Cell key={`r-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     <Legend wrapperStyle={{ fontSize: 11 }} />
