@@ -265,7 +265,7 @@ export function useReconciliation() {
     setLoading(true);
     try {
       const { dateFrom, dateTo, unit_id } = filters;
-      const cols = 'id, type, status, description, net_amount, competence_date, payment_date, unit_id, category_id, front_id';
+      const cols = 'id, type, status, description, net_amount, competence_date, payment_date, due_date, unit_id, category_id, front_id';
 
       let qComp = supabase.from('transactions').select(cols)
         .gte('competence_date', dateFrom).lte('competence_date', dateTo);
