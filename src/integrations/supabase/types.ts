@@ -88,6 +88,7 @@ export type Database = {
       audit_logs: {
         Row: {
           action: string
+          context: string | null
           created_at: string
           id: string
           new_data: Json | null
@@ -98,6 +99,7 @@ export type Database = {
         }
         Insert: {
           action: string
+          context?: string | null
           created_at?: string
           id?: string
           new_data?: Json | null
@@ -108,6 +110,7 @@ export type Database = {
         }
         Update: {
           action?: string
+          context?: string | null
           created_at?: string
           id?: string
           new_data?: Json | null
@@ -697,6 +700,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      log_reconciliation_fix: {
+        Args: { _new_data: Json; _old_data: Json; _record_id: string }
+        Returns: string
       }
     }
     Enums: {

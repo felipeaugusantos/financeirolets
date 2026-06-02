@@ -426,12 +426,36 @@ export function useReconciliation() {
     patch: Record<string, unknown>,
   ): Promise<boolean> => {
     setFixing(id);
-    const { error } = await supabase.from('transactions').update(patch).eq('id', id);
+    // Capture "before" snapshot for audit
+    const { data: before } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    const { data: after, error } = await supabase
+      .from('transactions')
+      .update(patch)
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
     if (error) {
       toast({ title: 'Não foi possível corrigir', description: error.message, variant: 'destructive' });
       setFixing(null);
       return false;
     }
+
+    // Write audit log entry (non-blocking on failure)
+    try {
+      await supabase.rpc('log_reconciliation_fix' as any, {
+        _record_id: id,
+        _old_data: before ?? {},
+        _new_data: after ?? patch,
+      });
+    } catch (e) {
+      console.warn('[useReconciliation] audit log failed', e);
+    }
+
     if (lastFiltersRef.current) {
       await generate(lastFiltersRef.current);
     }
