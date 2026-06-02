@@ -6,12 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon, AlignLeft, Layers, LayoutGrid } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, Treemap } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -77,6 +78,111 @@ function CategoryBars({
       })}
     </div>
   );
+}
+
+type ChartMode = 'bars' | 'stacked' | 'treemap';
+
+function StackedBar({ data, total }: { data: Array<{ name: string; value: number }>; total: number }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex h-8 w-full overflow-hidden rounded-lg border border-border">
+        {data.map((d, i) => {
+          const pct = total > 0 ? (d.value / total) * 100 : 0;
+          if (pct <= 0) return null;
+          return (
+            <div
+              key={d.name}
+              className="h-full transition-all hover:opacity-80"
+              style={{ width: `${pct}%`, background: PIE_COLORS[i % PIE_COLORS.length] }}
+              title={`${d.name}: ${fmt(d.value)} (${pct.toFixed(1)}%)`}
+            />
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 max-h-64 overflow-y-auto pr-1">
+        {data.map((d, i) => {
+          const pct = total > 0 ? (d.value / total) * 100 : 0;
+          return (
+            <div key={d.name} className="flex items-center gap-2 text-[11px]">
+              <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+              <span className="truncate flex-1" title={d.name}>{d.name}</span>
+              <span className="text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TreemapChart({ data }: { data: Array<{ name: string; value: number }> }) {
+  const treeData = data.map((d, i) => ({ ...d, fill: PIE_COLORS[i % PIE_COLORS.length] }));
+  return (
+    <div className="h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <Treemap
+          data={treeData}
+          dataKey="value"
+          nameKey="name"
+          stroke="hsl(var(--background))"
+          content={<TreemapNode />}
+        >
+          <RTooltip
+            formatter={(value: number) => [fmt(value), '']}
+            contentStyle={{
+              background: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: 12,
+              fontSize: 12,
+            }}
+          />
+        </Treemap>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TreemapNode(props: any) {
+  const { x, y, width, height, name, value, fill } = props;
+  const showLabel = width > 60 && height > 28;
+  const showValue = width > 80 && height > 44;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill} stroke="hsl(var(--background))" strokeWidth={2} rx={4} />
+      {showLabel && (
+        <text x={x + 6} y={y + 16} fill="#fff" fontSize={11} fontWeight={600} style={{ pointerEvents: 'none' }}>
+          {name.length > Math.floor(width / 7) ? name.slice(0, Math.floor(width / 7) - 1) + '…' : name}
+        </text>
+      )}
+      {showValue && (
+        <text x={x + 6} y={y + 30} fill="#fff" fontSize={10} opacity={0.85} style={{ pointerEvents: 'none' }}>
+          {fmt(value)}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function CategoryChart({
+  data, emptyLabel, accent, mode,
+}: {
+  data: Array<{ name: string; value: number }>;
+  emptyLabel: string;
+  accent: string;
+  mode: ChartMode;
+}) {
+  if (data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
+        {emptyLabel}
+      </div>
+    );
+  }
+  const items = condenseBars(data);
+  const total = items.reduce((s, d) => s + d.value, 0);
+  if (mode === 'stacked') return <StackedBar data={items} total={total} />;
+  if (mode === 'treemap') return <TreemapChart data={items} />;
+  return <CategoryBars data={data} emptyLabel={emptyLabel} accent={accent} />;
 }
 
 type PeriodPreset = 'current_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'ytd' | 'last_year' | 'custom';
