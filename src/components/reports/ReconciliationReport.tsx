@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { useReconciliation, ReconciliationFilters, BucketKey, SideData } from '@/hooks/useReconciliation';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,13 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers } from 'lucide-react';
+import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers, MessageCircle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const fmtDate = (d: string | null) => d ? d.split('-').reverse().join('/') : '—';
+
+const B = ({ children }: { children: ReactNode }) => (
+  <strong className="font-semibold text-foreground">{children}</strong>
+);
 
 interface RuleSpec {
   key: BucketKey | 'dashboard' | 'dreCompetenciaFull' | 'dreCompetenciaRealizado' | 'dreCaixa';
@@ -23,6 +27,7 @@ interface RuleSpec {
   formula: string;
   getValue: (s: SideData) => number;
   getCount?: (s: SideData) => number | undefined;
+  plain: (s: SideData, kind: 'receita' | 'despesa') => ReactNode;
 }
 
 const RULES: RuleSpec[] = [
@@ -32,6 +37,12 @@ const RULES: RuleSpec[] = [
     rule: 'competence_date ∈ [início, fim]  E  status ∈ {pago, recebido}',
     formula: 'Σ net_amount onde competência cai no período e já foi liquidado',
     getValue: (s) => s.dashboard,
+    plain: (s, kind) => (
+      <>
+        Tudo que de fato {kind === 'receita' ? 'entrou' : 'saiu'} neste período <em>e</em> cuja data de competência também cai aqui.
+        São <B>{fmt(s.dashboard)}</B> — é exatamente o número que aparece no <B>Dashboard</B> para {kind === 'receita' ? 'receitas' : 'despesas'}.
+      </>
+    ),
   },
   {
     key: 'provisionado',
@@ -40,6 +51,13 @@ const RULES: RuleSpec[] = [
     formula: 'DRE Competência (cheio) − Dashboard',
     getValue: (s) => s.provisionado,
     getCount: (s) => s.details.provisionado.count,
+    plain: (s, kind) => (
+      <>
+        São <B>{s.details.provisionado.count}</B> {kind === 'receita' ? 'recebimentos' : 'pagamentos'} previstos para este período
+        somando <B>{fmt(s.provisionado)}</B> que ainda <em>não</em> foram {kind === 'receita' ? 'recebidos' : 'pagos'}.
+        O <B>Dashboard ignora</B> (só conta o realizado); o <B>DRE Competência cheio</B> inclui.
+      </>
+    ),
   },
   {
     key: 'dreCompetenciaFull',
@@ -47,6 +65,12 @@ const RULES: RuleSpec[] = [
     rule: 'competence_date ∈ [início, fim]  (qualquer status ≠ cancelado)',
     formula: 'Dashboard + Provisionado',
     getValue: (s) => s.dreCompetenciaFull,
+    plain: (s) => (
+      <>
+        Soma tudo que <em>pertence</em> ao período pela data de competência, esteja pago ou não.
+        Dá <B>{fmt(s.dreCompetenciaFull)}</B> = Dashboard (<B>{fmt(s.dashboard)}</B>) + Provisionado (<B>{fmt(s.provisionado)}</B>).
+      </>
+    ),
   },
   {
     key: 'dreCompetenciaRealizado',
@@ -54,6 +78,12 @@ const RULES: RuleSpec[] = [
     rule: 'competence_date ∈ [início, fim]  E  status ∈ {pago, recebido}',
     formula: 'Idêntico ao Dashboard',
     getValue: (s) => s.dreCompetenciaRealizado,
+    plain: (s) => (
+      <>
+        Mesma lógica do Dashboard: ignora o provisionado e só conta o que já entrou/saiu.
+        Por isso bate exatamente: <B>{fmt(s.dreCompetenciaRealizado)}</B>.
+      </>
+    ),
   },
   {
     key: 'pagoDePeriodoAnterior',
@@ -62,6 +92,13 @@ const RULES: RuleSpec[] = [
     formula: '+ no DRE Caixa',
     getValue: (s) => s.pagoDePeriodoAnterior,
     getCount: (s) => s.details.pagoDePeriodoAnterior.count,
+    plain: (s, kind) => (
+      <>
+        <B>{s.details.pagoDePeriodoAnterior.count}</B> {kind === 'receita' ? 'recebimentos' : 'pagamentos'} de <B>{fmt(s.pagoDePeriodoAnterior)}</B>{' '}
+        feitos agora, mas referentes a meses <em>anteriores</em>.
+        <B> Entram</B> no DRE Caixa deste período, mas <B>não</B> aparecem no DRE por competência.
+      </>
+    ),
   },
   {
     key: 'pagoForaDaCompetencia',
@@ -70,6 +107,13 @@ const RULES: RuleSpec[] = [
     formula: '− no DRE Caixa',
     getValue: (s) => s.pagoForaDaCompetencia,
     getCount: (s) => s.details.pagoForaDaCompetencia.count,
+    plain: (s) => (
+      <>
+        <B>{s.details.pagoForaDaCompetencia.count}</B> lançamentos de <B>{fmt(s.pagoForaDaCompetencia)}</B>{' '}
+        cuja competência é deste período, mas o pagamento caiu <em>antes ou depois</em>.
+        Aparecem no <B>DRE Competência</B>, mas <B>saem</B> do DRE Caixa deste período.
+      </>
+    ),
   },
   {
     key: 'dreCaixa',
@@ -77,10 +121,16 @@ const RULES: RuleSpec[] = [
     rule: 'payment_date ∈ [início, fim]  E  status ∈ {pago, recebido}',
     formula: 'Dashboard + Pagos de período anterior − Pagos fora da competência',
     getValue: (s) => s.dreCaixa,
+    plain: (s) => (
+      <>
+        Só olha a data de pagamento — quem movimentou conta dentro do período.
+        <B> {fmt(s.dreCaixa)}</B> = Dashboard (<B>{fmt(s.dashboard)}</B>) + pagos de antes (<B>{fmt(s.pagoDePeriodoAnterior)}</B>) − pagos fora (<B>{fmt(s.pagoForaDaCompetencia)}</B>).
+      </>
+    ),
   },
 ];
 
-function RulesBreakdown({ title, side, color }: { title: string; side: SideData; color: 'success' | 'destructive' }) {
+function RulesBreakdown({ title, side, color, kind }: { title: string; side: SideData; color: 'success' | 'destructive'; kind: 'receita' | 'despesa' }) {
   const identityCompetencia = side.dashboard + side.provisionado;
   const identityCaixa = side.dashboard + side.pagoDePeriodoAnterior - side.pagoForaDaCompetencia;
   const okComp = Math.abs(identityCompetencia - side.dreCompetenciaFull) < 0.01;
@@ -124,6 +174,14 @@ function RulesBreakdown({ title, side, color }: { title: string; side: SideData;
                       <div className="text-[11px] text-muted-foreground">
                         <span className="font-semibold text-foreground/70">Fórmula: </span>
                         {r.formula}
+                      </div>
+                    </div>
+                    <div className="mt-2 rounded-lg bg-primary/5 border border-primary/15 p-2.5">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary mb-1">
+                        <MessageCircle className="h-3 w-3" /> Em palavras
+                      </div>
+                      <div className="text-xs leading-relaxed text-foreground/80">
+                        {r.plain(side, kind)}
                       </div>
                     </div>
                   </div>
@@ -389,23 +447,36 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
       )}
 
       {generated && data && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <RulesBreakdown title="Receitas" side={data.receitas} color="success" />
-          <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" />
-        </div>
+        <Card className="shadow-card rounded-2xl border-primary/30 bg-primary/5">
+          <CardHeader className="flex flex-row items-center gap-2 pb-3">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-heading">Resumo em uma frase</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm leading-relaxed text-foreground/85 space-y-2">
+            <p>
+              Neste período seu <B>Dashboard</B> mostra <span className="text-success font-semibold">{fmt(data.receitas.dashboard)}</span> em receitas
+              e <span className="text-destructive font-semibold">{fmt(data.despesas.dashboard)}</span> em despesas (já realizadas).
+            </p>
+            <p>
+              O <B>DRE por Competência</B> adiciona o provisionado: <span className="text-success font-semibold">+{fmt(data.receitas.provisionado)}</span> em receitas
+              e <span className="text-destructive font-semibold">+{fmt(data.despesas.provisionado)}</span> em despesas,
+              chegando a <B>{fmt(data.receitas.dreCompetenciaFull)}</B> / <B>{fmt(data.despesas.dreCompetenciaFull)}</B>.
+            </p>
+            <p>
+              O <B>DRE por Caixa</B> ajusta o Dashboard somando pagos de períodos anteriores
+              (<B>+{fmt(data.receitas.pagoDePeriodoAnterior)}</B> / <B>+{fmt(data.despesas.pagoDePeriodoAnterior)}</B>) e tirando os pagos fora
+              (<B>−{fmt(data.receitas.pagoForaDaCompetencia)}</B> / <B>−{fmt(data.despesas.pagoForaDaCompetencia)}</B>),
+              resultando em <B>{fmt(data.receitas.dreCaixa)}</B> / <B>{fmt(data.despesas.dreCaixa)}</B>.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {generated && data && (
-        <Card className="shadow-card rounded-2xl border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-heading">Como ler</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground space-y-1">
-            <p><strong>Dashboard</strong> e <strong>DRE Competência (somente realizado)</strong> devem coincidir — ambos contam o que foi pago/recebido com competência dentro do período.</p>
-            <p>A diferença para o <strong>DRE Competência (cheio)</strong> é o valor <strong>provisionado</strong> (pendente/agendado).</p>
-            <p>A diferença para o <strong>DRE Caixa</strong> vem de pagamentos cuja competência cai fora do período (entram no caixa) ou cuja competência está dentro mas o pagamento ficou fora (saem do caixa).</p>
-          </CardContent>
-        </Card>
+        <div className="grid lg:grid-cols-2 gap-4">
+          <RulesBreakdown title="Receitas" side={data.receitas} color="success" kind="receita" />
+          <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" kind="despesa" />
+        </div>
       )}
     </div>
   );

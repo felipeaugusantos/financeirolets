@@ -1,66 +1,48 @@
-# Alinhar Dashboard ↔ DRE: tratar Provisionados
+# Explicações em linguagem simples na Reconciliação
 
-## Diagnóstico da diferença
+## Objetivo
+Tornar a tela de Reconciliação Dashboard ↔ DRE compreensível para usuários não-contábeis, traduzindo cada regra técnica (competência vs caixa, provisionados, pagos de período anterior, etc.) em frases simples conectadas aos valores reais calculados.
 
-Ao comparar o **Dashboard** com o **DRE em Competência**, os valores divergem porque cada tela usa critérios diferentes para considerar uma transação:
+## Onde
+Arquivo único: `src/components/reports/ReconciliationReport.tsx` (o cálculo em `useReconciliation.ts` já entrega tudo o que precisamos — não muda).
 
+## O que adicionar
 
-| Tela                                                    | O que entra hoje                                                                                                 |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Dashboard (Receitas/Despesas do Mês, gráficos, ranking) | Apenas transações com `status = pago / recebido` no mês de competência                                           |
-| DRE em Competência                                      | **Todas** as transações do período, inclusive `pendente`, `agendado` e vencidas — independentemente do pagamento |
-| DRE em Caixa                                            | Só pagas/recebidas, pela `payment_date`                                                                          |
-| Saldo Total                                             | Pagas + saldo inicial das contas                                                                                 |
+### 1. Campo `plain` em cada RULE
+Estender o array `RULES` com uma função `plain(side)` que retorna uma frase contextualizada com os valores reais formatados, por exemplo:
 
+- **Dashboard**: "Tudo que foi efetivamente pago/recebido neste período e cuja data de competência também cai aqui. Hoje são R$ X em N lançamentos — é o número que aparece no Dashboard."
+- **Provisionado**: "São R$ X em N contas com data deste período mas que ainda não foram pagas/recebidas. O Dashboard ignora; o DRE Competência inclui."
+- **DRE Competência (cheio)**: "Soma tudo que pertence ao mês pela data de competência, esteja pago ou não. Dá R$ X = Dashboard (R$ Y) + Provisionado (R$ Z)."
+- **DRE Competência (somente realizado)**: "Mesma lógica do Dashboard: só conta o que já entrou/saiu. Por isso bate exatamente: R$ X."
+- **Pagos de período anterior**: "N pagamentos de R$ X feitos agora, mas referentes a meses anteriores. Entram no caixa deste mês, mas não no DRE por competência."
+- **Pagos fora da competência**: "N lançamentos de R$ X cuja competência é deste mês, mas o pagamento caiu fora. Aparecem no DRE Competência, mas não no caixa deste período."
+- **DRE Caixa**: "Só olha a data de pagamento. R$ X = Dashboard (R$ Y) + pagos de antes (R$ Z) − pagos fora (R$ W)."
 
-Resultado: uma despesa de R$ 15.000 lançada em competência mas ainda **não paga** aparece no DRE Competência e **não aparece** no Dashboard, gerando a sensação de "sumiu". É comportamento contábil correto (competência ≠ caixa), mas falta uma chave que torne isso visível e controlável.
+### 2. UI dentro de `RulesBreakdown`
+Em cada card de regra, adicionar abaixo de "Regra" e "Fórmula" um terceiro bloco:
 
-## O que vai ser feito
+- Label: **"Em palavras"** com ícone `MessageCircle` (lucide).
+- Texto da frase com os valores reais em **negrito** (ex.: `<strong>R$ 15.000,00</strong>`).
+- Estilo: `text-xs leading-relaxed text-foreground/80` num bloco com fundo `bg-primary/5` arredondado.
 
-### 1. Toggle "Incluir provisionados" no Dashboard
+### 3. Banner de leitura rápida no topo
+Acima dos dois cards de `RulesBreakdown`, adicionar um único Card "Resumo em uma frase" que monta a história do período:
 
-Adicionar no header do Dashboard, ao lado dos filtros de Unidade/Frente, um switch **"Incluir provisionados"** (default: desligado).
+> "Neste período seu Dashboard mostra **R$ X em receitas** e **R$ Y em despesas** (já realizadas). O DRE pela competência adiciona **R$ Z provisionado**; o DRE pelo caixa ajusta em **+R$ A** (pagos de antes) e **−R$ B** (pagos fora), chegando a **R$ C**."
 
-- **Desligado** (padrão atual): KPIs/gráficos consideram só `pago / recebido` → reflete o caixa realizado.
-- **Ligado**: passa a somar também `pendente` e `agendado` pela `competence_date` → bate com o DRE Competência.
+Valores e cores semânticas (success/destructive) usando tokens do design system.
 
-Quando ligado:
+### 4. Remover/encolher o card "Como ler"
+O card genérico atual no fim da tela vira redundante — substituir por um pequeno rodapé linkando o novo conteúdo, ou removê-lo.
 
-- Cards "Receitas do Mês", "Despesas do Mês" e "Margem" mostram valor combinado, com sub-rótulo discreto separando `Realizado R$ X • Provisionado R$ Y`.
-- Gráfico "Receitas vs Despesas (6 meses)" ganha barras empilhadas (parte sólida = realizado, parte hachurada/clara = provisionado).
-- Pizza de "Despesas por Categoria" inclui pendentes.
-- Ranking de Unidades inclui pendentes.
-
-### 2. Toggle equivalente no DRE em Competência
-
-Adicionar no DRE um switch **"Somente realizado"** (default: desligado). Quando ligado, o regime de competência passa a considerar só `pago / recebido` — mesma lógica do Dashboard com toggle desligado. Assim os dois conversam.
-
-### 3. Transição automática provisionado → realizado
-
-Já acontece naturalmente: ao dar baixa numa conta (`status` vira `pago / recebido` + preencher `payment_date`), a transação sai do bucket "provisionado" e entra no "realizado" em todas as telas. Nenhuma mudança de dados; só garantimos que isso fica visível com o toggle.
-
-### 4. Banner explicativo
-
-Pequeno tooltip/ícone de info ao lado dos cards "Receitas/Despesas do Mês" e do regime do DRE explicando em uma frase: *"Realizado = pagamentos efetivados. Provisionado = lançamentos do mês ainda não pagos."*
-
-## Detalhes técnicos (para referência)
-
-- `src/hooks/useDashboard.ts`: aceitar `includeProvisioned?: boolean` no `DashboardFilters`. Onde hoje há `isPaid = status === 'pago' || status === 'recebido'`, passar a aceitar também `pendente`/`agendado` quando o flag estiver ativo. Manter `payment_date` para realizado e usar `competence_date` para provisionado dentro do `monthMap`. Retornar campos extras `receitasProvisionadas`, `despesasProvisionadas` para exibir o split nos cards.
-- `src/pages/Dashboard.tsx`: novo `Switch` (componente shadcn já disponível) no header; consumir os novos campos; ajustar `BarChart` para stacked com 4 séries (`receitasReal`, `receitasProv`, `despesasReal`, `despesasProv`) usando opacidade reduzida para as provisionadas.
-- `src/hooks/useDreReport.ts`: estender `DreFilters` com `onlyRealized?: boolean`. Quando ligado e regime = `competencia`, aplicar `.in('status', ['pago','recebido'])` na `fetchPeriodValues` igual ao já feito em caixa.
-- `src/components/reports/DreReport.tsx`: novo `Switch` "Somente realizado" visível apenas quando `regime === 'competencia'`.
-- Não há mudança de schema, RLS ou migrações.
+## Detalhes técnicos
+- Sem alteração no hook nem no banco — toda info necessária já está em `SideData`.
+- Frases geradas via template strings; helper `fmt()` já existe para moeda.
+- Manter responsivo (grid `lg:grid-cols-2`) e tokens semânticos (`bg-primary/5`, `text-success`, `text-destructive`).
+- Reutilizar `Card`, `Badge`, `cn` já importados.
 
 ## Fora de escopo
-
-- Não vamos mexer em saldo inicial / ajuste manual de caixa (estão corretos como aporte e já entram no Saldo Total).
-- Não vamos refatorar o cálculo do DRE em Caixa.
-- Sem alterações em rateio, anexos, comissões.
-- Não alterar informações já lançadas ou em processo de lançamento, mas apenas convergir as somas e diferenças para auferir os resultados corretos e corrigir as divergências.
-
-&nbsp;
-
-# Em caso de Dúvidas  
-
-
-- Faça perguntas chave para mim ou valide.
+- Mudanças em DRE, Dashboard ou hook `useReconciliation`.
+- Tradução para outros idiomas.
+- Exportação PDF do conteúdo novo (pode ser pedido depois).
