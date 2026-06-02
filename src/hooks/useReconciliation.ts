@@ -59,6 +59,7 @@ export interface SideData {
     missingFront: BucketDetail;
     provisionadoVencido: BucketDetail;
     negativeOrZero: BucketDetail;
+    pagoSemData: BucketDetail;
   };
 }
 
@@ -323,6 +324,7 @@ export function useReconciliation() {
           missingFront: emptyDetail(),
           provisionadoVencido: emptyDetail(),
           negativeOrZero: emptyDetail(),
+          pagoSemData: emptyDetail(),
         },
       });
       const rec = init();
@@ -369,9 +371,13 @@ export function useReconciliation() {
           bucket.pagoDePeriodoAnterior += val;
           pushDetail(bucket.details.pagoDePeriodoAnterior, detailItem);
         }
-        if (compInRange && isPaid && !payInRange) {
+        if (compInRange && isPaid && tx.payment_date && !payInRange) {
           bucket.pagoForaDaCompetencia += val;
           pushDetail(bucket.details.pagoForaDaCompetencia, detailItem);
+        }
+        // Lançamento marcado como pago mas sem payment_date → não cai em nenhum bucket de caixa
+        if (compInRange && isPaid && !tx.payment_date) {
+          pushDetail(bucket.flags.pagoSemData, detailItem);
         }
 
         // Flags considerando apenas transações que tocam o período
