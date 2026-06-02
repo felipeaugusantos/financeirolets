@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, TrendingUp, Columns3 } from 'lucide-react';
+import { FileText, TrendingUp, Columns3, GitCompare } from 'lucide-react';
 import DreReport from '@/components/reports/DreReport';
 import CashFlowReport from '@/components/reports/CashFlowReport';
 import DreComparativo from '@/components/reports/DreComparativo';
+import ReconciliationReport from '@/components/reports/ReconciliationReport';
 
-type View = 'menu' | 'dre' | 'cashflow' | 'dre-comparativo';
+type View = 'menu' | 'dre' | 'cashflow' | 'dre-comparativo' | 'reconciliacao';
 
 export default function Reports() {
   const [view, setView] = useState<View>('menu');
@@ -13,6 +14,7 @@ export default function Reports() {
   if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
   if (view === 'dre-comparativo') return <DreComparativo onBack={() => setView('menu')} />;
   if (view === 'cashflow') return <CashFlowReport onBack={() => setView('menu')} />;
+  if (view === 'reconciliacao') return <ReconciliationReport onBack={() => setView('menu')} />;
 
   return (
     <div className="space-y-6">
@@ -78,6 +80,26 @@ export default function Reports() {
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Visualize entradas, saídas e saldo acumulado por período e unidade.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
+          onClick={() => setView('reconciliacao')}
+        >
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10">
+              <GitCompare className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-heading">Reconciliação</CardTitle>
+              <p className="text-xs text-muted-foreground">Dashboard ↔ DRE</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Veja por que o Dashboard, o DRE Competência e o DRE Caixa divergem (provisionados, deslocamento entre competência e pagamento).
             </p>
           </CardContent>
         </Card>
