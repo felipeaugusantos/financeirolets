@@ -167,7 +167,47 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={periodPreset} onValueChange={(v) => setPeriodPreset(v as PeriodPreset)}>
+            <SelectTrigger className="w-[180px] h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current_month">Mês atual</SelectItem>
+              <SelectItem value="last_month">Mês anterior</SelectItem>
+              <SelectItem value="last_3_months">Últimos 3 meses</SelectItem>
+              <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
+              <SelectItem value="ytd">Ano atual (YTD)</SelectItem>
+              <SelectItem value="last_year">Ano anterior</SelectItem>
+              <SelectItem value="custom">Personalizado…</SelectItem>
+            </SelectContent>
+          </Select>
+          {periodPreset === 'custom' && (
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn('h-9 text-xs font-normal', !customFrom && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {customFrom ? format(new Date(customFrom + 'T00:00:00'), 'dd/MM/yy') : 'De'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customFrom ? new Date(customFrom + 'T00:00:00') : undefined} onSelect={(d) => setCustomFrom(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn('h-9 text-xs font-normal', !customTo && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {customTo ? format(new Date(customTo + 'T00:00:00'), 'dd/MM/yy') : 'Até'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customTo ? new Date(customTo + 'T00:00:00') : undefined} onSelect={(d) => setCustomTo(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
           <Select value={unitId} onValueChange={setUnitId}>
             <SelectTrigger className="w-[160px] h-9 text-xs">
               <SelectValue placeholder="Todas Unidades" />
@@ -311,7 +351,7 @@ export default function Dashboard() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-heading">Receitas vs Despesas (últimos 6 meses)</CardTitle>
+            <CardTitle className="text-sm font-heading">Receitas vs Despesas ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyData.every(m => m.receitas === 0 && m.despesas === 0) ? (
@@ -341,7 +381,7 @@ export default function Dashboard() {
 
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-heading">Despesas por Categoria (mês atual)</CardTitle>
+            <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
             {categoryData.length === 0 ? (
@@ -376,7 +416,7 @@ export default function Dashboard() {
 
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-heading">Receitas por Categoria (mês atual)</CardTitle>
+            <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
             {receitaCategoryData.length === 0 ? (
@@ -416,7 +456,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-sm font-heading flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              Ranking de Despesas por Unidade (mês atual)
+              Ranking de Despesas por Unidade ({period.label})
             </CardTitle>
           </CardHeader>
           <CardContent>
