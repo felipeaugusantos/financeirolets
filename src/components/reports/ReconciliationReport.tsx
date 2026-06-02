@@ -477,7 +477,7 @@ const SEV_STYLES: Record<Severity, { icon: typeof CheckCircle2; border: string; 
   error: { icon: XCircle,        border: 'border-destructive/50', bg: 'bg-destructive/5', text: 'text-destructive', label: 'Erro' },
 };
 
-function Checklist({ items, data }: { items: ChecklistItem[]; data: { receitas: SideData; despesas: SideData } }) {
+function Checklist({ items, data, lookups, api }: { items: ChecklistItem[]; data: { receitas: SideData; despesas: SideData }; lookups: Lookups; api: FixApi }) {
   const [onlyAlerts, setOnlyAlerts] = useState(true);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setOpen((s) => ({ ...s, [id]: !s[id] }));
@@ -559,7 +559,13 @@ function Checklist({ items, data }: { items: ChecklistItem[]; data: { receitas: 
               </div>
               {expandable && isOpen && detail && (
                 <div className="mt-2">
-                  <DetailPanel detail={detail} />
+                  <DetailPanel
+                    detail={detail}
+                    kind={(it.bucketKey || it.flagKey) as FixKind | undefined}
+                    side={it.side}
+                    lookups={lookups}
+                    api={api}
+                  />
                 </div>
               )}
             </div>
