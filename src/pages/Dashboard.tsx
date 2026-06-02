@@ -441,7 +441,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            <CategoryPie data={categoryData} emptyLabel="Nenhuma despesa paga neste período" />
+            <CategoryBars data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" />
           </CardContent>
         </Card>
 
@@ -450,7 +450,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            <CategoryPie data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" />
+            <CategoryBars data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" />
           </CardContent>
         </Card>
       </div>
