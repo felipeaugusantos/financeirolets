@@ -1,5 +1,5 @@
 import { Fragment, ReactNode, useEffect, useState } from 'react';
-import { useReconciliation, ReconciliationFilters, BucketKey, SideData, ChecklistItem, FlagKey, Severity } from '@/hooks/useReconciliation';
+import { useReconciliation, ReconciliationFilters, BucketKey, SideData, ChecklistItem, FlagKey, Severity, TxDetail, BucketDetail } from '@/hooks/useReconciliation';
 import { supabase } from '@/integrations/supabase/client';
 import { useKaikinContext } from '@/hooks/useKaikinContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers, MessageCircle, Sparkles, CheckCircle2, AlertTriangle, XCircle, ListChecks } from 'lucide-react';
+import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers, MessageCircle, Sparkles, CheckCircle2, AlertTriangle, XCircle, ListChecks, Wrench, CalendarCheck, CheckCheck } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { toast as sonner } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const fmt = (v: number) =>
