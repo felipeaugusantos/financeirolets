@@ -93,7 +93,7 @@ function makeBridge(b: SideData): BridgeRow[] {
     { label: 'Dashboard (realizado no período)', value: b.dashboard, emphasis: 'total', hint: 'Pago/recebido cuja competência cai no período.' },
     { key: 'provisionado', label: '+ Provisionado (pendente/agendado)', value: b.provisionado, emphasis: 'delta', hint: 'Lançamentos do período por competência ainda não pagos.' },
     { label: '= DRE Competência (cheio)', value: b.dreCompetenciaFull, emphasis: 'total', hint: 'Todas as transações do período por competence_date.' },
-    { key: 'provisionado', label: '− Provisionado', value: -b.provisionado, emphasis: 'delta' },
+    { label: '− Provisionado', value: -b.provisionado, emphasis: 'delta' },
     { label: '= DRE Competência (somente realizado)', value: b.dreCompetenciaRealizado, emphasis: 'total', hint: 'Igual ao Dashboard quando todos os pagos têm competência no período.' },
     { key: 'pagoDePeriodoAnterior', label: '+ Pagos no período mas de competência anterior', value: b.pagoDePeriodoAnterior, emphasis: 'delta', hint: 'Saem do período pela competência mas entram pelo caixa.' },
     { key: 'pagoForaDaCompetencia', label: '− Pagos fora do período (competência no período)', value: -b.pagoForaDaCompetencia, emphasis: 'delta', hint: 'Têm competência no período mas foram pagos antes/depois.' },
