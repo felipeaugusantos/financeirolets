@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppLayout } from "@/components/AppLayout";
+import { KaikinProvider } from "@/components/kaikin/KaikinProvider";
+import { KaikinFab } from "@/components/kaikin/KaikinFab";
+import { KaikinSheet } from "@/components/kaikin/KaikinSheet";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
@@ -38,16 +41,20 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
-            <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
-            <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <KaikinProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+              <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+              <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <KaikinFab />
+            <KaikinSheet />
+          </KaikinProvider>
         </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

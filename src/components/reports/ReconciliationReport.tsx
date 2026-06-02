@@ -1,6 +1,7 @@
 import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { useReconciliation, ReconciliationFilters, BucketKey, SideData, ChecklistItem, FlagKey, Severity } from '@/hooks/useReconciliation';
 import { supabase } from '@/integrations/supabase/client';
+import { useKaikinContext } from '@/hooks/useKaikinContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -490,6 +491,43 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
     await generate(filters);
     setGenerated(true);
   };
+
+  // Injeta o contexto da Reconciliação no Kaikin para perguntas contextualizadas
+  useKaikinContext(
+    data
+      ? {
+          scope: 'reconciliacao',
+          period: { from: filters.dateFrom, to: filters.dateTo },
+          unit_id: filters.unit_id ?? null,
+          totals: {
+            receitas: {
+              dashboard: data.receitas.dashboard,
+              provisionado: data.receitas.provisionado,
+              dreCompetenciaFull: data.receitas.dreCompetenciaFull,
+              dreCaixa: data.receitas.dreCaixa,
+              pagoForaDaCompetencia: data.receitas.pagoForaDaCompetencia,
+              pagoDePeriodoAnterior: data.receitas.pagoDePeriodoAnterior,
+            },
+            despesas: {
+              dashboard: data.despesas.dashboard,
+              provisionado: data.despesas.provisionado,
+              dreCompetenciaFull: data.despesas.dreCompetenciaFull,
+              dreCaixa: data.despesas.dreCaixa,
+              pagoForaDaCompetencia: data.despesas.pagoForaDaCompetencia,
+              pagoDePeriodoAnterior: data.despesas.pagoDePeriodoAnterior,
+            },
+          },
+          checklist: data.checklist.map((c) => ({
+            id: c.id,
+            severity: c.severity,
+            title: c.title,
+            side: c.side,
+            count: c.count,
+            amount: c.amount,
+          })),
+        }
+      : null
+  );
 
   return (
     <div className="space-y-4">
