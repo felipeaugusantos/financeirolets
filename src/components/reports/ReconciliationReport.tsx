@@ -576,7 +576,7 @@ function Checklist({ items, data, lookups, api }: { items: ChecklistItem[]; data
   );
 }
 
-function Bridge({ title, side, color }: { title: string; side: SideData; color: 'success' | 'destructive' }) {
+function Bridge({ title, side, color, kind, lookups, api }: { title: string; side: SideData; color: 'success' | 'destructive'; kind: 'receita' | 'despesa'; lookups: Lookups; api: FixApi }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (i: number) => setOpen((s) => ({ ...s, [i]: !s[i] }));
 
@@ -632,7 +632,13 @@ function Bridge({ title, side, color }: { title: string; side: SideData; color: 
                   {expandable && isOpen && (
                     <TableRow>
                       <TableCell colSpan={2} className="p-2">
-                        <DetailPanel detail={side.details[r.key!]} />
+                        <DetailPanel
+                          detail={side.details[r.key!]}
+                          kind={r.key}
+                          side={kind}
+                          lookups={lookups}
+                          api={api}
+                        />
                       </TableCell>
                     </TableRow>
                   )}
