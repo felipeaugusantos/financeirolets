@@ -21,11 +21,13 @@ export interface DashboardData {
   saldoTotal: number;
   receitasMes: number;
   despesasMes: number;
+  receitasProvisionadas: number;
+  despesasProvisionadas: number;
   contasAtrasadas: number;
   vencendoHoje: number;
   overdueBills: OverdueBill[];
   dueTodayBills: OverdueBill[];
-  monthlyData: { label: string; receitas: number; despesas: number }[];
+  monthlyData: { label: string; receitas: number; despesas: number; receitasProv: number; despesasProv: number }[];
   categoryData: { name: string; value: number }[];
   loading: boolean;
   semCategoria: number;
@@ -39,6 +41,7 @@ export interface DashboardData {
 export interface DashboardFilters {
   unitId?: string;
   frontId?: string;
+  includeProvisioned?: boolean;
 }
 
 export function useDashboard(filters?: DashboardFilters) {
@@ -46,6 +49,8 @@ export function useDashboard(filters?: DashboardFilters) {
     saldoTotal: 0,
     receitasMes: 0,
     despesasMes: 0,
+    receitasProvisionadas: 0,
+    despesasProvisionadas: 0,
     contasAtrasadas: 0,
     vencendoHoje: 0,
     overdueBills: [],
@@ -63,7 +68,7 @@ export function useDashboard(filters?: DashboardFilters) {
 
   useEffect(() => {
     fetchData();
-  }, [filters?.unitId, filters?.frontId]);
+  }, [filters?.unitId, filters?.frontId, filters?.includeProvisioned]);
 
   function applyFilters(query: any) {
     if (filters?.unitId) query = query.eq('unit_id', filters.unitId);
@@ -94,16 +99,20 @@ export function useDashboard(filters?: DashboardFilters) {
 
       let receitasMes = 0;
       let despesasMes = 0;
+      let receitasProvisionadas = 0;
+      let despesasProvisionadas = 0;
       let contasAtrasadas = 0;
       let semCategoria = 0;
       let semUnidade = 0;
       let despesasVariaveisMes = 0;
 
-      const monthMap = new Map<string, { receitas: number; despesas: number }>();
+      const monthMap = new Map<string, { receitas: number; despesas: number; receitasProv: number; despesasProv: number }>();
       const catMap = new Map<string, number>();
+      const catProvMap = new Map<string, number>();
 
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
+        const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
         const competenceMonth = tx.competence_date?.substring(0, 7);
 
         // Count incomplete data
@@ -114,17 +123,31 @@ export function useDashboard(filters?: DashboardFilters) {
 
         if (isPaid && tx.payment_date) {
           const payMonth = tx.payment_date.substring(0, 7);
-          const entry = monthMap.get(payMonth) || { receitas: 0, despesas: 0 };
+          const entry = monthMap.get(payMonth) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
           const val = Number(tx.net_amount) || 0;
           if (tx.type === 'receita') entry.receitas += val;
           else entry.despesas += val;
           monthMap.set(payMonth, entry);
         }
 
+        if (isProvisioned && competenceMonth) {
+          const entry = monthMap.get(competenceMonth) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
+          const val = Number(tx.net_amount) || 0;
+          if (tx.type === 'receita') entry.receitasProv += val;
+          else entry.despesasProv += val;
+          monthMap.set(competenceMonth, entry);
+        }
+
         if (competenceMonth === currentMonth && isPaid) {
           const val = Number(tx.net_amount) || 0;
           if (tx.type === 'receita') receitasMes += val;
           else despesasMes += val;
+        }
+
+        if (competenceMonth === currentMonth && isProvisioned) {
+          const val = Number(tx.net_amount) || 0;
+          if (tx.type === 'receita') receitasProvisionadas += val;
+          else despesasProvisionadas += val;
         }
 
         if (tx.status === 'pendente' && tx.due_date && tx.due_date < today) {
@@ -135,19 +158,30 @@ export function useDashboard(filters?: DashboardFilters) {
           const catId = tx.category_id || 'sem-categoria';
           catMap.set(catId, (catMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
         }
+        if (tx.type === 'despesa' && competenceMonth === currentMonth && isProvisioned) {
+          const catId = tx.category_id || 'sem-categoria';
+          catProvMap.set(catId, (catProvMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
+        }
       });
+
+      // If including provisioned, merge provisioned categories into catMap
+      if (filters?.includeProvisioned) {
+        catProvMap.forEach((v, k) => catMap.set(k, (catMap.get(k) || 0) + v));
+      }
 
       // Build monthly array
       const shortMonth = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const monthlyData: { label: string; receitas: number; despesas: number }[] = [];
+      const monthlyData: { label: string; receitas: number; despesas: number; receitasProv: number; despesasProv: number }[] = [];
       for (let i = 0; i < 6; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
         const key = d.toISOString().substring(0, 7);
-        const entry = monthMap.get(key) || { receitas: 0, despesas: 0 };
+        const entry = monthMap.get(key) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
         monthlyData.push({
           label: `${shortMonth[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`,
           receitas: entry.receitas,
           despesas: entry.despesas,
+          receitasProv: entry.receitasProv,
+          despesasProv: entry.despesasProv,
         });
       }
 
@@ -222,15 +256,20 @@ export function useDashboard(filters?: DashboardFilters) {
         ? ((curEntry.despesas - prevEntry.despesas) / prevEntry.despesas) * 100
         : null;
 
-      // Margem de contribuição = receitas - despesas do mês
-      const margemContribuicao = receitasMes - despesasMes;
+      // Margem (inclui provisionados se ativado)
+      const incluirProv = !!filters?.includeProvisioned;
+      const recTot = receitasMes + (incluirProv ? receitasProvisionadas : 0);
+      const despTot = despesasMes + (incluirProv ? despesasProvisionadas : 0);
+      const margemContribuicao = recTot - despTot;
 
       // Unit ranking - despesas por unidade no mês atual
       const unitDespMap = new Map<string, { despesas: number; receitas: number }>();
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
+        const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
+        const include = isPaid || (incluirProv && isProvisioned);
         const competenceMonth = tx.competence_date?.substring(0, 7);
-        if (isPaid && competenceMonth === currentMonth && tx.unit_id) {
+        if (include && competenceMonth === currentMonth && tx.unit_id) {
           const entry = unitDespMap.get(tx.unit_id) || { despesas: 0, receitas: 0 };
           const val = Number(tx.net_amount) || 0;
           if (tx.type === 'despesa') entry.despesas += val;
@@ -250,7 +289,8 @@ export function useDashboard(filters?: DashboardFilters) {
       }
 
       setData({
-        saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje,
+        saldoTotal, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas,
+        contasAtrasadas, vencendoHoje,
         overdueBills, dueTodayBills, monthlyData, categoryData, loading: false,
         semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa,
         unitRanking,

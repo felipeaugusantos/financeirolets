@@ -1,107 +1,66 @@
+# Alinhar Dashboard ↔ DRE: tratar Provisionados
+
+## Diagnóstico da diferença
+
+Ao comparar o **Dashboard** com o **DRE em Competência**, os valores divergem porque cada tela usa critérios diferentes para considerar uma transação:
 
 
-# Roadmap Completo — Próximas Evoluções do Let's Finance
+| Tela                                                    | O que entra hoje                                                                                                 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Dashboard (Receitas/Despesas do Mês, gráficos, ranking) | Apenas transações com `status = pago / recebido` no mês de competência                                           |
+| DRE em Competência                                      | **Todas** as transações do período, inclusive `pendente`, `agendado` e vencidas — independentemente do pagamento |
+| DRE em Caixa                                            | Só pagas/recebidas, pela `payment_date`                                                                          |
+| Saldo Total                                             | Pagas + saldo inicial das contas                                                                                 |
 
-Já entregue: Onda 1 (RBAC, Auditoria, Recorrência, Baixa em Lote) + segurança zerada.
-Abaixo, o caminho recomendado para evoluir de "ERP funcional" para "ERP de gestão inteligente".
 
----
+Resultado: uma despesa de R$ 15.000 lançada em competência mas ainda **não paga** aparece no DRE Competência e **não aparece** no Dashboard, gerando a sensação de "sumiu". É comportamento contábil correto (competência ≠ caixa), mas falta uma chave que torne isso visível e controlável.
 
-## Diagnóstico rápido por módulo
+## O que vai ser feito
 
-| Módulo | Estado | Maior lacuna |
-|---|---|---|
-| Dashboard | KPIs e gráficos básicos | Sem drill-down, sem comparativo MoM/YoY, sem projeção |
-| Lançamentos | CRUD + rateio + recorrência | Sem aprovação, sem conciliação, sem lançamento rápido |
-| Contas P/R | Vencimentos + baixa lote | Sem lembretes automáticos, sem agendamento bancário |
-| Relatórios | DRE, DRE Comparativo, Fluxo Caixa | Sem Orçado vs Realizado, sem AV/AH, sem Fluxo Projetado |
-| Comissões | Estrutura definida (memory) | Cálculo automático ainda não implementado |
-| Notificações | Inexistente | Sem sino, sem alertas de vencimento |
-| Auditoria | Tela com filtros e diff | Sem export CSV, sem paginação real |
+### 1. Toggle "Incluir provisionados" no Dashboard
 
----
+Adicionar no header do Dashboard, ao lado dos filtros de Unidade/Frente, um switch **"Incluir provisionados"** (default: desligado).
 
-## ONDA 2 — Inteligência Financeira (recomendada agora)
+- **Desligado** (padrão atual): KPIs/gráficos consideram só `pago / recebido` → reflete o caixa realizado.
+- **Ligado**: passa a somar também `pendente` e `agendado` pela `competence_date` → bate com o DRE Competência.
 
-### 2.1 Orçamento (Budget) vs Realizado
-- Tabela `budgets (year, month, dre_line_id, unit_id, planned_amount)`.
-- Tela `/configuracoes/orcamento`: grid editável linhas DRE × meses, botão "copiar ano anterior +X%".
-- DRE ganha colunas **Orçado | Realizado | Variação % | Status** (verde/vermelho).
-- **Correlação:** reutiliza `dre_lines` + `units` — zero impacto em rateios/exportações.
+Quando ligado:
 
-### 2.2 Fluxo de Caixa Projetado
-- Estende `useCashFlowReport` para incluir `pendente`/`agendado` além de `pago`.
-- Tabs no relatório: **Realizado | Projetado | Comparativo**.
-- Gráfico de linha de saldo futuro baseado em `due_date` + recorrências geradas.
+- Cards "Receitas do Mês", "Despesas do Mês" e "Margem" mostram valor combinado, com sub-rótulo discreto separando `Realizado R$ X • Provisionado R$ Y`.
+- Gráfico "Receitas vs Despesas (6 meses)" ganha barras empilhadas (parte sólida = realizado, parte hachurada/clara = provisionado).
+- Pizza de "Despesas por Categoria" inclui pendentes.
+- Ranking de Unidades inclui pendentes.
 
-### 2.3 Análise Vertical e Horizontal no DRE
-- **AV:** % de cada linha sobre receita líquida.
-- **AH:** variação % período-a-período.
-- Toggles `[ ] AV` `[ ] AH` no DRE; PDF/CSV incorporam colunas automaticamente.
+### 2. Toggle equivalente no DRE em Competência
 
-### 2.4 Conciliação Bancária
-- Coluna `reconciled` em `transactions` + tela de upload OFX/CSV de extrato.
-- Match automático (valor + data ±2 dias) e fila manual para o restante.
-- KPI "% conciliado por conta" no Dashboard.
+Adicionar no DRE um switch **"Somente realizado"** (default: desligado). Quando ligado, o regime de competência passa a considerar só `pago / recebido` — mesma lógica do Dashboard com toggle desligado. Assim os dois conversam.
 
----
+### 3. Transição automática provisionado → realizado
 
-## ONDA 3 — Automação e UX
+Já acontece naturalmente: ao dar baixa numa conta (`status` vira `pago / recebido` + preencher `payment_date`), a transação sai do bucket "provisionado" e entra no "realizado" em todas as telas. Nenhuma mudança de dados; só garantimos que isso fica visível com o toggle.
 
-- **3.1 Cron diário** para `generate_recurring_transactions()` (pg_cron) — elimina o botão manual.
-- **3.2 Workflow de Aprovação** — novo status `aguardando_aprovacao`, fila para Financeiro/Admin.
-- **3.3 Sino de Notificações** — tabela `notifications` + edge function diária (vencimentos, aprovações, recorrências) + realtime.
-- **3.4 Dashboard Drill-down** — KPIs/barras clicáveis abrem lista filtrada; toggles "vs mês anterior" e "vs mesmo mês ano anterior".
-- **3.5 Filtros Salvos** — visões pessoais por usuário em Lançamentos e Relatórios.
+### 4. Banner explicativo
 
----
+Pequeno tooltip/ícone de info ao lado dos cards "Receitas/Despesas do Mês" e do regime do DRE explicando em uma frase: *"Realizado = pagamentos efetivados. Provisionado = lançamentos do mês ainda não pagos."*
 
-## ONDA 4 — Estratégico
+## Detalhes técnicos (para referência)
 
-- Comissões automatizadas (cálculo no fechamento → despesa vinculada).
-- Balanço Patrimonial.
-- Builder visual de relatórios (já existe `report_templates`, falta UI).
-- PWA push + instalação no iPhone.
-- API/Webhooks para integração com PDV e contabilidade.
+- `src/hooks/useDashboard.ts`: aceitar `includeProvisioned?: boolean` no `DashboardFilters`. Onde hoje há `isPaid = status === 'pago' || status === 'recebido'`, passar a aceitar também `pendente`/`agendado` quando o flag estiver ativo. Manter `payment_date` para realizado e usar `competence_date` para provisionado dentro do `monthMap`. Retornar campos extras `receitasProvisionadas`, `despesasProvisionadas` para exibir o split nos cards.
+- `src/pages/Dashboard.tsx`: novo `Switch` (componente shadcn já disponível) no header; consumir os novos campos; ajustar `BarChart` para stacked com 4 séries (`receitasReal`, `receitasProv`, `despesasReal`, `despesasProv`) usando opacidade reduzida para as provisionadas.
+- `src/hooks/useDreReport.ts`: estender `DreFilters` com `onlyRealized?: boolean`. Quando ligado e regime = `competencia`, aplicar `.in('status', ['pago','recebido'])` na `fetchPeriodValues` igual ao já feito em caixa.
+- `src/components/reports/DreReport.tsx`: novo `Switch` "Somente realizado" visível apenas quando `regime === 'competencia'`.
+- Não há mudança de schema, RLS ou migrações.
 
----
+## Fora de escopo
 
-## Mapa de Correlações
+- Não vamos mexer em saldo inicial / ajuste manual de caixa (estão corretos como aporte e já entram no Saldo Total).
+- Não vamos refatorar o cálculo do DRE em Caixa.
+- Sem alterações em rateio, anexos, comissões.
+- Não alterar informações já lançadas ou em processo de lançamento, mas apenas convergir as somas e diferenças para auferir os resultados corretos e corrigir as divergências.
 
-````text
-                ┌─────────────────┐
-                │  transactions   │ ← núcleo
-                └────────┬────────┘
-     ┌──────────┬────────┼────────┬──────────────┐
-     ▼          ▼        ▼        ▼              ▼
-allocations category recurrence approval    reconciled
-     │          │        │        │              │
-     ▼          ▼        ▼        ▼              ▼
-DRE/Fluxo   dre_lines  cron   workflow      extrato
-por unidade    │
-               ▼
-           budgets ──► DRE Orçado vs Realizado
-               │
-               ▼
-       Análise Vertical/Horizontal
-````
+&nbsp;
 
-Toda nova feature reutiliza chaves existentes (`category_id`, `unit_id`, `dre_line_id`) — relatórios, exportações e rateios continuam íntegros.
+# Em caso de Dúvidas  
 
----
 
-## Sequência sugerida (maior valor primeiro)
-
-1. **2.1 Orçamento vs Realizado** — base para análise de gestão.
-2. **2.2 Fluxo Projetado** — antecipa gargalos de caixa.
-3. **2.3 AV/AH no DRE** — análise gerencial profunda.
-4. **3.1 Cron** — quick win, fecha recorrência.
-5. **3.3 Notificações** — engajamento diário.
-6. **2.4 Conciliação** — fecha o ciclo financeiro.
-
----
-
-## Pergunta para destravar
-
-Quer que eu execute a **Onda 2 inteira** (4 entregas) ou prefere começar só por **2.1 Orçamento + 2.2 Fluxo Projetado**, que entregam ~80% do valor de gestão com menos superfície?
-
+- Faça perguntas chave para mim ou valide.
