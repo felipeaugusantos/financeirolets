@@ -23,7 +23,7 @@ export default function Reports() {
         <p className="text-sm text-muted-foreground">DRE, fluxo de caixa e análises</p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card
           className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
           onClick={() => setView('dre')}
