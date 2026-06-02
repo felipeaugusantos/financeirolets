@@ -380,11 +380,20 @@ function RulesBreakdown({ title, side, color, kind }: { title: string; side: Sid
   );
 }
 
-function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCategory: any[]; byFront: any[] } }) {
+function DetailPanel({
+  detail, kind, side, lookups, api,
+}: {
+  detail: { count: number; items: TxDetail[]; byCategory: any[]; byFront: any[] };
+  kind?: FixKind;
+  side?: 'receita' | 'despesa';
+  lookups?: Lookups;
+  api?: FixApi;
+}) {
   const d = detail;
   if (!d || d.count === 0) {
     return <p className="text-xs text-muted-foreground p-3">Sem lançamentos nesta diferença.</p>;
   }
+  const showActions = !!(kind && side && lookups && api);
   return (
     <div className="space-y-3 p-3 bg-muted/20 rounded-xl">
       <div className="grid sm:grid-cols-2 gap-3">
@@ -428,6 +437,7 @@ function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCate
                 <th className="text-left p-2">Pgto.</th>
                 <th className="text-left p-2">Status</th>
                 <th className="text-right p-2">Valor</th>
+                {showActions && <th className="text-right p-2">Ações</th>}
               </tr>
             </thead>
             <tbody>
@@ -445,6 +455,11 @@ function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCate
                     <Badge variant="outline" className="text-[10px] capitalize">{it.status}</Badge>
                   </td>
                   <td className="p-2 text-right tabular-nums font-medium">{fmt(it.amount)}</td>
+                  {showActions && (
+                    <td className="p-2 text-right">
+                      <FixActions item={it} kind={kind!} side={side!} lookups={lookups!} api={api!} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
