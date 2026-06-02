@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,11 +31,14 @@ const PIE_COLORS = [
 const chartConfig = {
   receitas: { label: 'Receitas', color: 'hsl(122, 52%, 33%)' },
   despesas: { label: 'Despesas', color: 'hsl(0, 69%, 50%)' },
+  receitasProv: { label: 'Receitas provisionadas', color: 'hsl(122, 52%, 33%)' },
+  despesasProv: { label: 'Despesas provisionadas', color: 'hsl(0, 69%, 50%)' },
 };
 
 export default function Dashboard() {
   const [unitId, setUnitId] = useState<string>('');
   const [frontId, setFrontId] = useState<string>('');
+  const [includeProvisioned, setIncludeProvisioned] = useState(false);
 
   const { data: units } = useSupabaseCrud<any>('units');
   const { data: fronts } = useSupabaseCrud<any>('business_fronts');
@@ -40,9 +46,10 @@ export default function Dashboard() {
   const dashFilters = {
     unitId: unitId && unitId !== 'all' ? unitId : undefined,
     frontId: frontId && frontId !== 'all' ? frontId : undefined,
+    includeProvisioned,
   };
 
-  const { saldoTotal, receitasMes, despesasMes, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
+  const { saldoTotal, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
   const activeUnits = (units as any[])?.filter((u: any) => u.active) ?? [];
@@ -50,10 +57,19 @@ export default function Dashboard() {
 
   const fmtPct = (v: number | null) => v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '';
 
+  const receitasTotal = receitasMes + (includeProvisioned ? receitasProvisionadas : 0);
+  const despesasTotal = despesasMes + (includeProvisioned ? despesasProvisionadas : 0);
+  const receitasSub = includeProvisioned && receitasProvisionadas > 0
+    ? `Realizado ${fmt(receitasMes)} • Prov. ${fmt(receitasProvisionadas)}`
+    : (variacaoReceita !== null ? fmtPct(variacaoReceita) + ' vs mês anterior' : '');
+  const despesasSub = includeProvisioned && despesasProvisionadas > 0
+    ? `Realizado ${fmt(despesasMes)} • Prov. ${fmt(despesasProvisionadas)}`
+    : (variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' vs mês anterior' : '');
+
   const cards = [
     { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary', sub: '' },
-    { title: 'Receitas do Mês', value: fmt(receitasMes), icon: TrendingUp, color: 'text-success', sub: variacaoReceita !== null ? fmtPct(variacaoReceita) + ' vs mês anterior' : '' },
-    { title: 'Despesas do Mês', value: fmt(despesasMes), icon: TrendingDown, color: 'text-destructive', sub: variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' vs mês anterior' : '' },
+    { title: 'Receitas do Mês', value: fmt(receitasTotal), icon: TrendingUp, color: 'text-success', sub: receitasSub },
+    { title: 'Despesas do Mês', value: fmt(despesasTotal), icon: TrendingDown, color: 'text-destructive', sub: despesasSub },
     { title: 'Margem', value: fmt(margemContribuicao), icon: BarChart3, color: margemContribuicao >= 0 ? 'text-success' : 'text-destructive', sub: '' },
     { title: 'Contas em Atraso', value: String(contasAtrasadas), icon: AlertTriangle, color: contasAtrasadas > 0 ? 'text-warning' : 'text-muted-foreground', sub: '' },
   ];
@@ -111,6 +127,20 @@ export default function Dashboard() {
               ))}
             </SelectContent>
           </Select>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 h-9">
+                  <Switch id="prov" checked={includeProvisioned} onCheckedChange={setIncludeProvisioned} />
+                  <Label htmlFor="prov" className="text-xs cursor-pointer whitespace-nowrap">Incluir provisionados</Label>
+                  <Info className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[240px] text-xs">
+                Realizado = pagamentos efetivados. Provisionado = lançamentos do mês ainda não pagos (regime de competência).
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -232,8 +262,14 @@ export default function Dashboard() {
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                   <ChartTooltip content={<ChartTooltipContent formatter={(value) => fmt(Number(value))} />} />
-                  <Bar dataKey="receitas" fill="var(--color-receitas)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="despesas" fill="var(--color-despesas)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="receitas" stackId="r" fill="var(--color-receitas)" radius={includeProvisioned ? [0,0,0,0] : [4,4,0,0]} />
+                  {includeProvisioned && (
+                    <Bar dataKey="receitasProv" stackId="r" fill="var(--color-receitas)" fillOpacity={0.4} radius={[4,4,0,0]} />
+                  )}
+                  <Bar dataKey="despesas" stackId="d" fill="var(--color-despesas)" radius={includeProvisioned ? [0,0,0,0] : [4,4,0,0]} />
+                  {includeProvisioned && (
+                    <Bar dataKey="despesasProv" stackId="d" fill="var(--color-despesas)" fillOpacity={0.4} radius={[4,4,0,0]} />
+                  )}
                 </BarChart>
               </ChartContainer>
             )}
