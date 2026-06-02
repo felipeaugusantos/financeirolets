@@ -1,15 +1,15 @@
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { KaikinMessage as Msg } from './KaikinProvider';
-import { Sparkles } from 'lucide-react';
+import kaikinAvatar from '@/assets/kaikin-avatar.png.asset.json';
 
 export function KaikinMessage({ message }: { message: Msg }) {
   const isUser = message.role === 'user';
   return (
     <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && (
-        <div className="h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground">
-          <Sparkles className="h-3.5 w-3.5" />
+        <div className="h-7 w-7 shrink-0 rounded-full overflow-hidden ring-1 ring-border bg-muted">
+          <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
         </div>
       )}
       <div

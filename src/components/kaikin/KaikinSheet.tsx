@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Send, RotateCcw } from 'lucide-react';
+import { Send, RotateCcw } from 'lucide-react';
 import { useKaikin } from './KaikinProvider';
 import { useKaikinStream } from '@/hooks/useKaikinStream';
 import { KaikinMessage } from './KaikinMessage';
+import kaikinAvatar from '@/assets/kaikin-avatar.png.asset.json';
 
 const RECON_SUGGESTIONS = [
   'Por que o Dashboard e o DRE divergem neste período?',
@@ -56,8 +57,8 @@ export function KaikinSheet() {
       <SheetContent side="right" className="w-full sm:max-w-[440px] p-0 flex flex-col">
         <SheetHeader className="px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground">
-              <Sparkles className="h-4 w-4" />
+            <div className="h-9 w-9 rounded-full overflow-hidden ring-1 ring-border bg-muted shrink-0">
+              <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
             </div>
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-base font-heading">Kaikin</SheetTitle>
@@ -74,8 +75,8 @@ export function KaikinSheet() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center gap-4 py-8">
-              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground shadow-elevated">
-                <Sparkles className="h-7 w-7" />
+              <div className="h-20 w-20 rounded-full overflow-hidden ring-2 ring-primary/40 shadow-elevated bg-muted">
+                <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
               </div>
               <div>
                 <p className="font-heading font-semibold text-card-foreground">Oi, sou o Kaikin 👋</p>
