@@ -811,6 +811,7 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
     dateTo: lastOfMonth,
   });
   const [generated, setGenerated] = useState(false);
+  const [auditRefresh, setAuditRefresh] = useState(0);
 
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => setUnits(data ?? []));
@@ -840,6 +841,7 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
       if (ok) {
         const short = item.description.length > 40 ? item.description.slice(0, 40) + '…' : item.description;
         sonner.success('✓ Lançamento corrigido', { description: `${short} — ${message}` });
+        setAuditRefresh((n) => n + 1);
       }
     },
   };
@@ -973,6 +975,8 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
           <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" kind="despesa" />
         </div>
       )}
+
+      {generated && <AuditHistory refreshKey={auditRefresh} />}
     </div>
   );
 }
