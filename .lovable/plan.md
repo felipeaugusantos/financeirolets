@@ -1,73 +1,123 @@
-# Checkup Let's Finance — achados e plano de correção
 
-Auditei Dashboard, DRE, Reconciliação e os testes de segurança que construímos hoje. Abaixo o resumo dos problemas encontrados e o plano de correção.
+## Visão geral
 
-## Achados por severidade
+Criar **Kaikin**, um assistente em chat (FAB global) que aparece em todas as telas do Let's Finance. Foco principal: explicar divergências, regras contábeis e itens do checklist da Reconciliação em linguagem simples, com poder de consultar transações sob demanda via tools.
 
-### 🔴 Críticos (afetam números mostrados ao usuário)
+Sem ações destrutivas — só leitura e explicação. Aproveita Lovable AI (`google/gemini-3-flash-preview` por padrão) através de edge function.
 
-| # | Arquivo | Problema |
-|---|---------|----------|
-| C1 | `src/hooks/useDreReport.ts:130–134` | DRE Competência sem `onlyRealized` **inclui transações `cancelado`** — Dashboard e Reconciliação excluem. Bridge nunca fecha. |
-| C2 | `src/hooks/useReconciliation.ts:270–273` | Duas queries do `transactions` **sem `.limit()`** → truncam em 1000 linhas silenciosamente. Identidades quebram e Checklist marca falsos erros. |
-| C3 | `src/hooks/useDashboard.ts:90–95` e `203–208` | Idem no Dashboard: gráficos de 6 meses e `saldoTotal` all-time. |
-| C4 | `src/hooks/useDreReport.ts:125–135` | Idem no DRE (`fetchPeriodValues`, período atual + anterior + orçado). |
+## Arquitetura
 
-### 🟡 Médios (divergências entre telas / regras sutis)
+```text
+┌─────────── Front (React) ───────────┐    ┌──── Supabase Edge Function ─────┐
+│ KaikinFab (botão flutuante)         │    │ /functions/kaikin                │
+│  └ KaikinChat (drawer/sheet)        │───▶│  - Recebe messages + page ctx    │
+│      • Markdown + streaming         │    │  - Loop tool-calling (até 4 hops)│
+│      • KaikinContext (React)        │◀───│  - Tools de leitura no DB        │
+│        coleta contexto da página    │    │  - Stream SSE de volta           │
+└─────────────────────────────────────┘    └──────────────────────────────────┘
+```
 
-| # | Arquivo | Problema |
-|---|---------|----------|
-| M1 | `src/hooks/useReconciliation.ts:365` | Lançamento `pago` sem `payment_date` cai falsamente em `pagoForaDaCompetencia` (porque `inRange(null,…)=false`). |
-| M2 | `src/hooks/useDashboard.ts:125–131` | Gráfico mensal filtra por `competence_date` mas bucketa barras por `payment_date` — pagamentos de competência da janela mas data de pagamento fora desaparecem. |
-| M3 | `src/hooks/useDashboard.ts:153–155` | `contasAtrasadas` ignora `agendado` — Reconciliação inclui. |
-| M4 | `src/components/reports/ReconciliationReport.tsx:300–302` | `Bridge` chama `BridgeImpl({…})` como função, não como JSX → viola Rules of Hooks. |
-| M5 | `src/hooks/useReconciliation.ts:96` | Linha "− Provisionado" em `makeBridge` tem `key:'provisionado'` duplicado — abre o mesmo DetailPanel duas vezes. |
-| M6 | DRE × Reconciliação | Derivado de C1: tratamento divergente de `cancelado` quebra confiança da Bridge. |
-| M7 | `src/test/rls.test.ts:5` | Usa `VITE_SUPABASE_PUBLISHABLE_KEY`; sem fallback/validação, testes podem passar vacuamente se var não existir. |
+## Componentes front
 
-### ⚪ Cosméticos (não bloqueantes)
+1. **`KaikinProvider`** (`src/components/kaikin/KaikinProvider.tsx`)
+   - Context React. Mantém: `isOpen`, `messages[]`, `pageContext` (objeto livre setado por cada tela), `pushContext()`, `clearContext()`.
+   - Monta uma vez no `App.tsx`.
 
-- Co1 `useDashboard.ts:231–232` — lista `overdueBills` limitada a 20 enquanto KPI conta tudo.
-- Co2 `DreReport.tsx:186–198` — switch "Somente realizado" some ao trocar para Caixa sem feedback.
-- Co3 `useReconciliation.ts:108` — `todayISO()` helper externo, irrelevante.
-- Co4 `src/pages/Reports.tsx:26` — grid `md:grid-cols-3` com 4 cards.
+2. **`KaikinFab`** (`src/components/kaikin/KaikinFab.tsx`)
+   - Botão flutuante (`fixed bottom-4 right-4`), ícone `Sparkles`, cor primary, oculto em rotas `/login` e `/auth`.
+   - Abre `KaikinSheet`.
 
-## Plano de correção
+3. **`KaikinSheet`** (`src/components/kaikin/KaikinSheet.tsx`)
+   - Drawer lateral (`Sheet` do shadcn, side="right", largura `md:w-[420px]`).
+   - Header: avatar "K", nome "Kaikin", subtítulo dinâmico ("Vendo: Reconciliação Nov/2025").
+   - Lista de mensagens com `react-markdown` (já presente? checar — se não, adicionar).
+   - Input + botão enviar. Estado de "Kaikin pensando…" com spinner.
+   - Sugestões iniciais (chips) que mudam conforme `pageContext.scope`:
+     - Reconciliação: "Por que Dashboard e DRE divergem?", "O que são pagos fora da competência?", "Liste os itens vencidos".
+     - Genérico (outras telas): "O que é DRE Caixa vs Competência?".
 
-Vou tratar **todos os 🔴 críticos e 🟡 médios** em uma única passada. Cosméticos ficam para depois (ou junto, se sobrar espaço).
+4. **`useKaikinStream`** (`src/hooks/useKaikinStream.ts`)
+   - Faz POST para `/functions/v1/kaikin` com `{ messages, pageContext }`.
+   - Parser SSE token-by-token conforme padrão do `ai-gateway` (line-by-line, trata `[DONE]`, JSON parcial, CRLF, 429/402 com toast).
 
-### 1. Padronizar exclusão de `cancelado` e limites
+5. **Integração na Reconciliação**
+   - `ReconciliationReport.tsx` chama `useKaikinContext()` num `useEffect` e injeta:
+     ```ts
+     {
+       scope: 'reconciliacao',
+       period: { from, to },
+       unit_id,
+       totals: { receitas: rec, despesas: des }, // só campos numéricos da SideData (sem items/details)
+       checklist: data.checklist.map(c => ({ id, severity, title, count, amount, side })),
+     }
+     ```
+   - Limpa contexto no unmount.
 
-- `useDreReport.ts`: adicionar `.not('status','eq','cancelado')` em `fetchPeriodValues` ANTES dos branches de regime/onlyRealized.
-- `useDashboard.ts`, `useDreReport.ts`, `useReconciliation.ts`: adicionar `.limit(10000)` em todas as queries de `transactions` listadas em C2/C3/C4 e logar warning se `data.length === 10000` (provável overflow). Criar helper `fetchAllTransactions(query)` opcional se ficar limpo, mas o mínimo é o `.limit()`.
+## Edge function `supabase/functions/kaikin/index.ts`
 
-### 2. Reconciliação — regras finas
+- `verify_jwt = true` em `supabase/config.toml` (precisa de usuário logado — usa o token para autenticar consultas com RLS).
+- Aceita `{ messages: ChatMessage[], pageContext: object }`.
+- System prompt fixo no backend: define personalidade ("Você é Kaikin, contador-assistente do Let's Finance. Fale em português direto, evite jargão, use bullets curtos. Sempre cite IDs ou contagens quando estiverem no contexto. Nunca invente números — se faltar dado, use uma tool ou diga 'não tenho essa informação'."), explica as identidades-chave da reconciliação (Dashboard + Provisionado = DRE Competência; Dashboard + Δcaixa = DRE Caixa) e lista as regras de cada flag.
+- Anexa `pageContext` como mensagem `system` adicional logo após o prompt principal (JSON formatado).
+- Chama Lovable AI Gateway em modo `stream: true` com `tools` registradas (abaixo). Loop tool-calling: enquanto resposta tiver `tool_calls`, executa e re-chama o gateway com o resultado; máx 4 iterações.
+- Stream de volta apenas tokens `delta.content` (as chamadas de tool ficam silenciosas; opcionalmente envia eventos custom `event: tool` para o front exibir "Consultando transações vencidas…").
+- Erros 402/429 retornados como JSON com `error` e status apropriado, conforme padrão.
 
-- `useReconciliation.ts` (M1): mudar o bucket `pagoForaDaCompetencia` para exigir `tx.payment_date != null` antes de cair lá. Lançamentos `pago` sem `payment_date` viram um novo flag `pagoSemData` no checklist (severidade `warn`).
-- `useReconciliation.ts` (M5): remover `key:'provisionado'` da linha "− Provisionado" em `makeBridge` (continua visualmente como delta, mas não abre detalhe duplicado).
-- `ReconciliationReport.tsx` (M4): substituir `return BridgeImpl({…})` por inlinear o conteúdo direto em `Bridge` (remover wrapper) — corrige Rules of Hooks.
+### Tools registradas (todas read-only)
 
-### 3. Dashboard — alinhar com Reconciliação
+| Nome | Descrição | Parâmetros |
+|---|---|---|
+| `list_transactions` | Busca transações com filtros. | `date_from`, `date_to`, `status?`, `type?`, `unit_id?`, `missing_category?`, `missing_unit?`, `overdue_only?`, `limit?` (max 50) |
+| `get_transaction` | Detalhe completo de 1 transação por ID. | `id` |
+| `list_dre_lines` | Retorna a estrutura DRE (code, name, parent, sign) para explicar onde cada categoria entra. | `code?` |
+| `list_categories` | Categorias mapeadas a DRE lines. | `type?`, `dre_line_id?` |
+| `summarize_period` | Roda a mesma agregação do `useReconciliation` para um período/unidade e devolve os totais e contagens (sem listar items). | `date_from`, `date_to`, `unit_id?` |
 
-- `useDashboard.ts` (M2): trocar a query do gráfico para buscar transações por `competence_date OU payment_date` na janela de 6 meses (`.or('competence_date.gte.X,payment_date.gte.X')` + filtro `lte` simétrico), garantindo que toda barra do gráfico tenha as transações relevantes.
-- `useDashboard.ts` (M3): incluir `agendado` em `contasAtrasadas`, alinhando com a flag `provisionadoVencido` da Reconciliação.
+Implementação: cada handler usa o Supabase client criado com `Deno.env.get('SUPABASE_URL')` + token Authorization do usuário (RLS preservada). Limite forte: `list_transactions` força `.limit(50)`, devolve só colunas essenciais (id, description, net_amount, status, due_date, payment_date, competence_date, type) para caber no contexto.
 
-### 4. Testes
+## Mudanças no schema
 
-- `src/test/rls.test.ts` (M7): no topo, `if (!SUPABASE_ANON_KEY) throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY ausente — testes RLS exigem a env var')`. Garante que CI não passe vacuamente.
+Nenhuma. Sem nova tabela — conversas são efêmeras (apenas em memória do front). Persistência fica para um v2.
 
-### 5. Cosméticos (incluo se for rápido)
+## Detalhes técnicos
 
-- Co4: `md:grid-cols-2 lg:grid-cols-4` em `Reports.tsx`.
-- Co1: subir o limite de `overdueBills` para `.limit(100)` ou exibir "+N mais" quando excede.
+- **Streaming**: padrão SSE descrito em `connecting-to-ai-models`. Frontend usa `import.meta.env.VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- **Markdown**: usa `react-markdown` com `prose prose-sm` (Tailwind typography) — checar se já está instalado; se não, plano inclui `bun add react-markdown`.
+- **Modelo**: `google/gemini-3-flash-preview` (default, barato, suporta tool calling). Pode trocar para `google/gemini-2.5-pro` em casos mais complexos via env, mas v1 não expõe seletor.
+- **Limite de contexto**: trunca `messages` aos últimos 12 turnos no front antes de enviar, para evitar custo descontrolado.
+- **Telemetria mínima**: console.log no edge function do número de tool calls e tokens recebidos (sem persistir).
 
-## Fora de escopo
-- Refatorar `useDashboard` em camadas (saldo / KPIs / gráfico separados).
-- Paginação real (cursor) — apenas elevar o `.limit()` para evitar truncamento silencioso.
-- Persistência do estado dos filtros entre telas.
-- Mudanças visuais no Checklist/RulesBreakdown.
+## Design
 
-## Verificação pós-fix
-- Rodar `tsc --noEmit` e os testes existentes (`has-role-usage`, `rls`).
-- Gerar Reconciliação para o mês corrente e conferir se os blocos "Identidade Competência" e "Identidade Caixa" exibem ✓ em Receitas e Despesas.
-- Comparar manualmente Dashboard (com toggle "Incluir provisionados" OFF) com o DRE Competência (com "Somente realizado" ON) — devem coincidir centavo a centavo.
+- Avatar/nome **Kaikin** com gradiente Rosa→Turquesa (cores do brand já no design system).
+- FAB: 56×56, sombra `shadow-elevated`, hover anima escala 1.05.
+- Bolhas: assistente em `bg-muted`, usuário em `bg-primary text-primary-foreground`.
+- Empty state: avatar grande + "Oi, sou o Kaikin 👋 Como posso ajudar a fechar o mês?" + chips de sugestão.
+
+## Arquivos novos / alterados
+
+Novos:
+- `src/components/kaikin/KaikinProvider.tsx`
+- `src/components/kaikin/KaikinFab.tsx`
+- `src/components/kaikin/KaikinSheet.tsx`
+- `src/components/kaikin/KaikinMessage.tsx` (renderiza markdown + estados)
+- `src/hooks/useKaikinStream.ts`
+- `src/hooks/useKaikinContext.ts` (atalho `usePageContext`)
+- `supabase/functions/kaikin/index.ts`
+- `supabase/functions/kaikin/tools.ts` (handlers das tools)
+
+Alterados:
+- `src/App.tsx` — envolve com `KaikinProvider` e monta `KaikinFab` fora das rotas de auth.
+- `src/components/reports/ReconciliationReport.tsx` — injeta `pageContext` com checklist+totais.
+- `supabase/config.toml` — adiciona bloco para função `kaikin`.
+
+Dependências: possivelmente `react-markdown` (verificar antes).
+
+## Fora de escopo (v1)
+
+- Persistência de histórico de chat.
+- Ações executivas (classificar/baixar transações).
+- Tools de escrita.
+- Resumo executivo exportável (pode virar uma tool num v2).
+- Multi-conversa / threads.
+- Voz / anexos.
