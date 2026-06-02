@@ -82,6 +82,28 @@ function CategoryBars({
 
 type ChartMode = 'bars' | 'stacked' | 'treemap';
 
+function ChartModeToggle({ value, onChange }: { value: ChartMode; onChange: (v: ChartMode) => void }) {
+  return (
+    <ToggleGroup
+      type="single"
+      size="sm"
+      value={value}
+      onValueChange={(v) => v && onChange(v as ChartMode)}
+      className="h-7"
+    >
+      <ToggleGroupItem value="bars" aria-label="Barras horizontais" className="h-7 w-7 p-0" title="Barras horizontais">
+        <AlignLeft className="h-3.5 w-3.5" />
+      </ToggleGroupItem>
+      <ToggleGroupItem value="stacked" aria-label="Barra empilhada" className="h-7 w-7 p-0" title="Barra empilhada">
+        <Layers className="h-3.5 w-3.5" />
+      </ToggleGroupItem>
+      <ToggleGroupItem value="treemap" aria-label="Treemap" className="h-7 w-7 p-0" title="Treemap">
+        <LayoutGrid className="h-3.5 w-3.5" />
+      </ToggleGroupItem>
+    </ToggleGroup>
+  );
+}
+
 function StackedBar({ data, total }: { data: Array<{ name: string; value: number }>; total: number }) {
   return (
     <div className="space-y-3">
