@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { useReconciliation, ReconciliationFilters, BridgeRow, BucketKey, SideData } from '@/hooks/useReconciliation';
+import { useReconciliation, ReconciliationFilters, BucketKey, SideData } from '@/hooks/useReconciliation';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
