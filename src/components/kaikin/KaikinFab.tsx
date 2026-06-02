@@ -22,7 +22,12 @@ export function KaikinFab() {
         isOpen && 'opacity-0 pointer-events-none'
       )}
     >
-      <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
+      <img
+        src={kaikinAvatar.url}
+        alt="Kaikin"
+        className="h-full w-full object-cover scale-[1.6]"
+        style={{ objectPosition: '55% 22%' }}
+      />
     </button>
   );
 }
