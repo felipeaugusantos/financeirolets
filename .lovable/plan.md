@@ -1,65 +1,73 @@
-# Checklist de Conferência / Divergências na Reconciliação
+# Checkup Let's Finance — achados e plano de correção
 
-## Objetivo
-Transformar a tela de Reconciliação em algo acionável: além de mostrar "por que difere", listar **o que conferir** com status (ok / atenção / erro) e atalhos para investigar cada item.
+Auditei Dashboard, DRE, Reconciliação e os testes de segurança que construímos hoje. Abaixo o resumo dos problemas encontrados e o plano de correção.
 
-## Onde
-- `src/hooks/useReconciliation.ts` — adicionar derivação dos checks (sem nova query).
-- `src/components/reports/ReconciliationReport.tsx` — novo card "Checklist de conferência" entre o "Resumo em uma frase" e os cards de regras.
-- (Opcional) link de "Ver no Transações" usando filtros via querystring se a página já suportar.
+## Achados por severidade
 
-## Checks propostos
-Cada check vira um item com status, título, frase explicativa, valor agregado e — quando aplicável — botão "Ver lançamentos" que abre o `DetailPanel` reutilizado das pontes.
+### 🔴 Críticos (afetam números mostrados ao usuário)
 
-| # | Check | Severidade | Regra |
-|---|------|-----------|-------|
-| 1 | Identidade Competência fecha | error se quebra | `dashboard + provisionado == dreCompetenciaFull` (tolerância 0,01) |
-| 2 | Identidade Caixa fecha | error se quebra | `dashboard + pagoDePeriodoAnterior − pagoForaDaCompetencia == dreCaixa` |
-| 3 | Provisionado vencido | warn se há `pendente/agendado` com `due_date < hoje` no período | usa `details.provisionado.items` filtrando por `due_date` (precisa expor `due_date` no `TxDetail`) |
-| 4 | Pagos fora da competência | warn se `count > 0` | já calculado |
-| 5 | Pagos de período anterior entrando agora | info se `count > 0` | já calculado |
-| 6 | Lançamentos sem categoria | warn se houver | `category_name === 'Sem categoria'` em qualquer bucket + agregar nas pontes principais |
-| 7 | Lançamentos sem frente | info se houver | `front_name === 'Sem frente'` |
-| 8 | Lançamentos sem unidade | warn se houver | precisa expor `unit_id` no `TxDetail` ou contar no hook |
-| 9 | Valor líquido negativo / zero em receita ou despesa | warn | `amount <= 0` |
-| 10 | Provisionado > Realizado | info se `provisionado > dashboard` em receita ou despesa | comparação de totais |
+| # | Arquivo | Problema |
+|---|---------|----------|
+| C1 | `src/hooks/useDreReport.ts:130–134` | DRE Competência sem `onlyRealized` **inclui transações `cancelado`** — Dashboard e Reconciliação excluem. Bridge nunca fecha. |
+| C2 | `src/hooks/useReconciliation.ts:270–273` | Duas queries do `transactions` **sem `.limit()`** → truncam em 1000 linhas silenciosamente. Identidades quebram e Checklist marca falsos erros. |
+| C3 | `src/hooks/useDashboard.ts:90–95` e `203–208` | Idem no Dashboard: gráficos de 6 meses e `saldoTotal` all-time. |
+| C4 | `src/hooks/useDreReport.ts:125–135` | Idem no DRE (`fetchPeriodValues`, período atual + anterior + orçado). |
 
-## Mudanças técnicas
+### 🟡 Médios (divergências entre telas / regras sutis)
 
-### `useReconciliation.ts`
-- Incluir `due_date` e `unit_id` em `TxDetail` (selecionar campos extras no select já existente).
-- Adicionar struct `ChecklistItem`:
-  ```ts
-  type Severity = 'ok' | 'info' | 'warn' | 'error';
-  interface ChecklistItem {
-    id: string;
-    severity: Severity;
-    title: string;
-    message: string;
-    count?: number;
-    amount?: number;
-    bucketKey?: BucketKey;       // se quisermos abrir DetailPanel
-    side?: 'receita' | 'despesa';
-  }
-  ```
-- Função pura `buildChecklist(rec: SideData, des: SideData, today: string): ChecklistItem[]` chamada ao final do `generate`.
-- Expor `checklist: ChecklistItem[]` no `ReconciliationData`.
+| # | Arquivo | Problema |
+|---|---------|----------|
+| M1 | `src/hooks/useReconciliation.ts:365` | Lançamento `pago` sem `payment_date` cai falsamente em `pagoForaDaCompetencia` (porque `inRange(null,…)=false`). |
+| M2 | `src/hooks/useDashboard.ts:125–131` | Gráfico mensal filtra por `competence_date` mas bucketa barras por `payment_date` — pagamentos de competência da janela mas data de pagamento fora desaparecem. |
+| M3 | `src/hooks/useDashboard.ts:153–155` | `contasAtrasadas` ignora `agendado` — Reconciliação inclui. |
+| M4 | `src/components/reports/ReconciliationReport.tsx:300–302` | `Bridge` chama `BridgeImpl({…})` como função, não como JSX → viola Rules of Hooks. |
+| M5 | `src/hooks/useReconciliation.ts:96` | Linha "− Provisionado" em `makeBridge` tem `key:'provisionado'` duplicado — abre o mesmo DetailPanel duas vezes. |
+| M6 | DRE × Reconciliação | Derivado de C1: tratamento divergente de `cancelado` quebra confiança da Bridge. |
+| M7 | `src/test/rls.test.ts:5` | Usa `VITE_SUPABASE_PUBLISHABLE_KEY`; sem fallback/validação, testes podem passar vacuamente se var não existir. |
 
-### `ReconciliationReport.tsx`
-- Novo componente `Checklist({ items, data })`:
-  - Card com título "Checklist de conferência" + badge resumo (ex.: `2 atenção • 1 erro`).
-  - Lista de linhas com ícone (`CheckCircle2`, `Info`, `AlertTriangle`, `XCircle` do lucide), título, mensagem e valor formatado.
-  - Borda lateral colorida por severidade usando tokens (`border-success`, `border-primary`, `border-warning`/`border-amber-500`, `border-destructive`).
-  - Linha expansível quando há `bucketKey + side` → reaproveita `DetailPanel` existente.
-  - Filtro topo: "Mostrar só itens com atenção" (toggle).
-- Inserir card entre "Resumo em uma frase" e a grade de `RulesBreakdown`.
+### ⚪ Cosméticos (não bloqueantes)
 
-### Tokens / estilo
-- Reaproveitar tokens semânticos (`bg-success/5`, `bg-destructive/5`, `bg-amber-500/5` ou `bg-warning/5` se existir). Verificar `index.css` antes de introduzir cor nova.
-- Mobile-first: linhas em coluna no mobile, grid 2 colunas (status + conteúdo) no desktop.
+- Co1 `useDashboard.ts:231–232` — lista `overdueBills` limitada a 20 enquanto KPI conta tudo.
+- Co2 `DreReport.tsx:186–198` — switch "Somente realizado" some ao trocar para Caixa sem feedback.
+- Co3 `useReconciliation.ts:108` — `todayISO()` helper externo, irrelevante.
+- Co4 `src/pages/Reports.tsx:26` — grid `md:grid-cols-3` com 4 cards.
+
+## Plano de correção
+
+Vou tratar **todos os 🔴 críticos e 🟡 médios** em uma única passada. Cosméticos ficam para depois (ou junto, se sobrar espaço).
+
+### 1. Padronizar exclusão de `cancelado` e limites
+
+- `useDreReport.ts`: adicionar `.not('status','eq','cancelado')` em `fetchPeriodValues` ANTES dos branches de regime/onlyRealized.
+- `useDashboard.ts`, `useDreReport.ts`, `useReconciliation.ts`: adicionar `.limit(10000)` em todas as queries de `transactions` listadas em C2/C3/C4 e logar warning se `data.length === 10000` (provável overflow). Criar helper `fetchAllTransactions(query)` opcional se ficar limpo, mas o mínimo é o `.limit()`.
+
+### 2. Reconciliação — regras finas
+
+- `useReconciliation.ts` (M1): mudar o bucket `pagoForaDaCompetencia` para exigir `tx.payment_date != null` antes de cair lá. Lançamentos `pago` sem `payment_date` viram um novo flag `pagoSemData` no checklist (severidade `warn`).
+- `useReconciliation.ts` (M5): remover `key:'provisionado'` da linha "− Provisionado" em `makeBridge` (continua visualmente como delta, mas não abre detalhe duplicado).
+- `ReconciliationReport.tsx` (M4): substituir `return BridgeImpl({…})` por inlinear o conteúdo direto em `Bridge` (remover wrapper) — corrige Rules of Hooks.
+
+### 3. Dashboard — alinhar com Reconciliação
+
+- `useDashboard.ts` (M2): trocar a query do gráfico para buscar transações por `competence_date OU payment_date` na janela de 6 meses (`.or('competence_date.gte.X,payment_date.gte.X')` + filtro `lte` simétrico), garantindo que toda barra do gráfico tenha as transações relevantes.
+- `useDashboard.ts` (M3): incluir `agendado` em `contasAtrasadas`, alinhando com a flag `provisionadoVencido` da Reconciliação.
+
+### 4. Testes
+
+- `src/test/rls.test.ts` (M7): no topo, `if (!SUPABASE_ANON_KEY) throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY ausente — testes RLS exigem a env var')`. Garante que CI não passe vacuamente.
+
+### 5. Cosméticos (incluo se for rápido)
+
+- Co4: `md:grid-cols-2 lg:grid-cols-4` em `Reports.tsx`.
+- Co1: subir o limite de `overdueBills` para `.limit(100)` ou exibir "+N mais" quando excede.
 
 ## Fora de escopo
-- Persistir resolução dos itens ("marquei como verificado") — pode virar outro pedido.
-- Notificações ou tasks automáticas.
-- Alterações nos cálculos de DRE/Dashboard.
-- Exportação do checklist em PDF (fácil de adicionar depois, junto com o restante da reconciliação).
+- Refatorar `useDashboard` em camadas (saldo / KPIs / gráfico separados).
+- Paginação real (cursor) — apenas elevar o `.limit()` para evitar truncamento silencioso.
+- Persistência do estado dos filtros entre telas.
+- Mudanças visuais no Checklist/RulesBreakdown.
+
+## Verificação pós-fix
+- Rodar `tsc --noEmit` e os testes existentes (`has-role-usage`, `rls`).
+- Gerar Reconciliação para o mês corrente e conferir se os blocos "Identidade Competência" e "Identidade Caixa" exibem ✓ em Receitas e Despesas.
+- Comparar manualmente Dashboard (com toggle "Incluir provisionados" OFF) com o DRE Competência (com "Somente realizado" ON) — devem coincidir centavo a centavo.
