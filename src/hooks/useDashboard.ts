@@ -193,14 +193,15 @@ export function useDashboard(filters?: DashboardFilters) {
       let categoryData: { name: string; value: number }[] = [];
       if (catMap.size > 0) {
         const catIds = Array.from(catMap.keys()).filter(id => id !== 'sem-categoria');
+        let nameMap = new Map<string, string>();
         if (catIds.length > 0) {
           const { data: cats } = await supabase.from('categories').select('id, name').in('id', catIds);
-          const nameMap = new Map((cats ?? []).map((c: any) => [c.id, c.name]));
-          categoryData = Array.from(catMap.entries()).map(([id, value]) => ({
-            name: id === 'sem-categoria' ? 'Sem Categoria' : (nameMap.get(id) || 'Outro'),
-            value,
-          }));
+          nameMap = new Map((cats ?? []).map((c: any) => [c.id, c.name]));
         }
+        categoryData = Array.from(catMap.entries()).map(([id, value]) => ({
+          name: id === 'sem-categoria' ? 'Sem Categoria' : (nameMap.get(id) || 'Outro'),
+          value,
+        }));
       }
 
       // Saldo total (all-time paid transactions)
