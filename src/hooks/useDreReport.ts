@@ -23,6 +23,7 @@ export interface DreFilters {
   regime: 'competencia' | 'caixa';
   includeBudget?: boolean;
   includePrevious?: boolean;
+  onlyRealized?: boolean;
 }
 
 function shiftDateBackOneYear(d: string) {
@@ -127,6 +128,8 @@ async function fetchPeriodValues(
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo);
   if (filters.regime === 'caixa') {
+    txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
+  } else if (filters.onlyRealized) {
     txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
   }
   const { data: transactions, error } = await txQuery;
