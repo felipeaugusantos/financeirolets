@@ -22,23 +22,24 @@ import { useNavigate } from 'react-router-dom';
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const MAX_PIE_SLICES = 7;
+const MAX_BARS = 8;
 
-/** Groups small slices into "Outros" so the chart stays readable with many categories. */
-function condensePie(data: Array<{ name: string; value: number }>) {
-  if (data.length <= MAX_PIE_SLICES) return data;
+/** Groups small items into "Outros" so the chart stays readable with many categories. */
+function condenseBars(data: Array<{ name: string; value: number }>) {
   const sorted = [...data].sort((a, b) => b.value - a.value);
-  const top = sorted.slice(0, MAX_PIE_SLICES - 1);
-  const rest = sorted.slice(MAX_PIE_SLICES - 1);
+  if (sorted.length <= MAX_BARS) return sorted;
+  const top = sorted.slice(0, MAX_BARS - 1);
+  const rest = sorted.slice(MAX_BARS - 1);
   const restValue = rest.reduce((s, d) => s + d.value, 0);
   return [...top, { name: `Outros (${rest.length})`, value: restValue }];
 }
 
-function CategoryPie({
-  data, emptyLabel,
+function CategoryBars({
+  data, emptyLabel, accent,
 }: {
   data: Array<{ name: string; value: number }>;
   emptyLabel: string;
+  accent: string;
 }) {
   if (data.length === 0) {
     return (
@@ -47,61 +48,33 @@ function CategoryPie({
       </div>
     );
   }
-  const condensed = condensePie(data);
-  const total = condensed.reduce((s, d) => s + d.value, 0);
+  const items = condenseBars(data);
+  const total = items.reduce((s, d) => s + d.value, 0);
+  const max = Math.max(...items.map((d) => d.value), 1);
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[1fr_minmax(0,180px)] gap-3 items-center">
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={condensed}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={45}
-              outerRadius={85}
-              paddingAngle={2}
-              stroke="hsl(var(--background))"
-              strokeWidth={2}
-            >
-              {condensed.map((_, i) => (
-                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-              ))}
-            </Pie>
-            <RTooltip
-              formatter={(value: number) => [fmt(value), '']}
-              contentStyle={{
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: 12,
-                fontSize: 12,
-              }}
-              labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5">
-        {condensed.map((d, i) => {
-          const pct = total > 0 ? (d.value / total) * 100 : 0;
-          return (
-            <div key={d.name} className="flex items-center gap-2 text-xs">
-              <span
-                className="h-2.5 w-2.5 rounded-sm shrink-0"
-                style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate" title={d.name}>{d.name}</div>
-                <div className="text-muted-foreground tabular-nums">
-                  {fmt(d.value)} <span className="opacity-70">· {pct.toFixed(0)}%</span>
-                </div>
-              </div>
+    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+      {items.map((d) => {
+        const pct = total > 0 ? (d.value / total) * 100 : 0;
+        const width = (d.value / max) * 100;
+        return (
+          <div key={d.name} className="group">
+            <div className="flex items-baseline justify-between gap-2 mb-1">
+              <span className="text-xs font-medium text-card-foreground truncate" title={d.name}>
+                {d.name}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                {fmt(d.value)} <span className="opacity-60">· {pct.toFixed(0)}%</span>
+              </span>
             </div>
-          );
-        })}
-      </div>
+            <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${width}%`, background: accent }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
