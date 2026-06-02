@@ -268,9 +268,13 @@ export function useReconciliation() {
       const cols = 'id, type, status, description, net_amount, competence_date, payment_date, due_date, unit_id, category_id, front_id';
 
       let qComp = supabase.from('transactions').select(cols)
-        .gte('competence_date', dateFrom).lte('competence_date', dateTo);
+        .gte('competence_date', dateFrom).lte('competence_date', dateTo)
+        .not('status', 'eq', 'cancelado')
+        .limit(10000);
       let qPay = supabase.from('transactions').select(cols)
-        .gte('payment_date', dateFrom).lte('payment_date', dateTo);
+        .gte('payment_date', dateFrom).lte('payment_date', dateTo)
+        .not('status', 'eq', 'cancelado')
+        .limit(10000);
       if (unit_id) {
         qComp = qComp.eq('unit_id', unit_id);
         qPay = qPay.eq('unit_id', unit_id);
@@ -279,6 +283,9 @@ export function useReconciliation() {
       const [{ data: byComp, error: e1 }, { data: byPay, error: e2 }] = await Promise.all([qComp, qPay]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if ((byComp && byComp.length >= 10000) || (byPay && byPay.length >= 10000)) {
+        console.warn('[useReconciliation] Possível truncamento: 10.000 transações retornadas — números podem estar incompletos.');
+      }
 
       const mapTx = new Map<string, any>();
       (byComp ?? []).forEach((t: any) => mapTx.set(t.id, t));
