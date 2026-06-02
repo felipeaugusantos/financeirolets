@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -271,10 +271,13 @@ function summarize(detail: BucketDetail) {
 export function useReconciliation() {
   const [data, setData] = useState<ReconciliationData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fixing, setFixing] = useState<string | null>(null);
+  const lastFiltersRef = useRef<ReconciliationFilters | null>(null);
   const { toast } = useToast();
 
   const generate = useCallback(async (filters: ReconciliationFilters) => {
     setLoading(true);
+    lastFiltersRef.current = filters;
     try {
       const { dateFrom, dateTo, unit_id } = filters;
       const cols = 'id, type, status, description, net_amount, competence_date, payment_date, due_date, unit_id, category_id, front_id';
@@ -418,5 +421,23 @@ export function useReconciliation() {
     }
   }, [toast]);
 
-  return { data, loading, generate };
+  const fixTransaction = useCallback(async (
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<boolean> => {
+    setFixing(id);
+    const { error } = await supabase.from('transactions').update(patch).eq('id', id);
+    if (error) {
+      toast({ title: 'Não foi possível corrigir', description: error.message, variant: 'destructive' });
+      setFixing(null);
+      return false;
+    }
+    if (lastFiltersRef.current) {
+      await generate(lastFiltersRef.current);
+    }
+    setFixing(null);
+    return true;
+  }, [generate, toast]);
+
+  return { data, loading, generate, fixTransaction, fixing };
 }

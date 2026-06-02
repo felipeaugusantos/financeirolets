@@ -1,5 +1,5 @@
 import { Fragment, ReactNode, useEffect, useState } from 'react';
-import { useReconciliation, ReconciliationFilters, BucketKey, SideData, ChecklistItem, FlagKey, Severity } from '@/hooks/useReconciliation';
+import { useReconciliation, ReconciliationFilters, BucketKey, SideData, ChecklistItem, FlagKey, Severity, TxDetail, BucketDetail } from '@/hooks/useReconciliation';
 import { supabase } from '@/integrations/supabase/client';
 import { useKaikinContext } from '@/hooks/useKaikinContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,14 +9,171 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers, MessageCircle, Sparkles, CheckCircle2, AlertTriangle, XCircle, ListChecks } from 'lucide-react';
+import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, Layers, MessageCircle, Sparkles, CheckCircle2, AlertTriangle, XCircle, ListChecks, Wrench, CalendarCheck, CheckCheck } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { toast as sonner } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const fmtDate = (d: string | null) => d ? d.split('-').reverse().join('/') : '—';
+
+export type FixKind = BucketKey | FlagKey;
+
+interface Lookups {
+  categoriesByType: { receita: Array<{ id: string; name: string }>; despesa: Array<{ id: string; name: string }> };
+  units: Array<{ id: string; name: string }>;
+  fronts: Array<{ id: string; name: string }>;
+}
+
+interface FixApi {
+  fixing: string | null;
+  apply: (item: TxDetail, patch: Record<string, unknown>, message: string) => Promise<void>;
+}
+
+const todayISO = () => new Date().toISOString().split('T')[0];
+
+function FixActions({
+  item, kind, side, lookups, api,
+}: {
+  item: TxDetail;
+  kind: FixKind;
+  side: 'receita' | 'despesa';
+  lookups: Lookups;
+  api: FixApi;
+}) {
+  const isBusy = api.fixing === item.id;
+  const paidStatus = side === 'receita' ? 'recebido' : 'pago';
+
+  const onMarkPaid = () => {
+    const today = todayISO();
+    api.apply(item, { status: paidStatus, payment_date: today }, `marcado como ${paidStatus} em ${fmtDate(today)}`);
+  };
+
+  const onUseCompetenceAsPayment = () => {
+    if (!item.competence_date) return;
+    api.apply(item, { payment_date: item.competence_date }, `pagamento definido em ${fmtDate(item.competence_date)}`);
+  };
+
+  const onUseTodayAsPayment = () => {
+    const today = todayISO();
+    api.apply(item, { payment_date: today }, `pagamento definido em ${fmtDate(today)}`);
+  };
+
+  const onAlignCompetenceToPayment = () => {
+    if (!item.payment_date) return;
+    api.apply(item, { competence_date: item.payment_date }, `competência alinhada ao pagamento (${fmtDate(item.payment_date)})`);
+  };
+
+  const RescheduleButton = () => {
+    const [val, setVal] = useState(item.due_date || todayISO());
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" disabled={isBusy}>
+            <CalendarCheck className="h-3 w-3 mr-1" /> Reagendar
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2 space-y-2">
+          <Label className="text-xs">Novo vencimento</Label>
+          <Input type="date" value={val} onChange={(e) => setVal(e.target.value)} className="h-8 text-xs" />
+          <Button
+            size="sm"
+            className="w-full h-7 text-[11px]"
+            onClick={() => api.apply(item, { due_date: val }, `vencimento reagendado para ${fmtDate(val)}`)}
+          >
+            Aplicar
+          </Button>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  const InlineSelect = ({
+    options, field, label,
+  }: { options: Array<{ id: string; name: string }>; field: 'category_id' | 'unit_id' | 'front_id'; label: string }) => (
+    <Select
+      disabled={isBusy}
+      onValueChange={(v) => {
+        const name = options.find((o) => o.id === v)?.name || '';
+        api.apply(item, { [field]: v }, `${label}: ${name}`);
+      }}
+    >
+      <SelectTrigger className="h-7 text-[11px] w-[160px]">
+        <SelectValue placeholder={`Definir ${label}`} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.id} value={o.id} className="text-xs">{o.name}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  let content: ReactNode = null;
+  switch (kind) {
+    case 'provisionado':
+      content = (
+        <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" disabled={isBusy} onClick={onMarkPaid}>
+          <CheckCheck className="h-3 w-3 mr-1" /> Marcar como {paidStatus}
+        </Button>
+      );
+      break;
+    case 'provisionadoVencido':
+      content = (
+        <div className="flex items-center gap-1 flex-wrap justify-end">
+          <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" disabled={isBusy} onClick={onMarkPaid}>
+            <CheckCheck className="h-3 w-3 mr-1" /> {paidStatus}
+          </Button>
+          <RescheduleButton />
+        </div>
+      );
+      break;
+    case 'pagoSemData':
+      content = (
+        <div className="flex items-center gap-1 flex-wrap justify-end">
+          {item.competence_date && (
+            <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" disabled={isBusy} onClick={onUseCompetenceAsPayment}>
+              Usar competência
+            </Button>
+          )}
+          <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" disabled={isBusy} onClick={onUseTodayAsPayment}>
+            Usar hoje
+          </Button>
+        </div>
+      );
+      break;
+    case 'pagoForaDaCompetencia':
+    case 'pagoDePeriodoAnterior':
+      content = (
+        <Button size="sm" variant="outline" className="h-7 text-[11px] px-2" disabled={isBusy || !item.payment_date} onClick={onAlignCompetenceToPayment}>
+          Alinhar competência
+        </Button>
+      );
+      break;
+    case 'missingCategory':
+      content = <InlineSelect options={lookups.categoriesByType[side]} field="category_id" label="categoria" />;
+      break;
+    case 'missingUnit':
+      content = <InlineSelect options={lookups.units} field="unit_id" label="unidade" />;
+      break;
+    case 'missingFront':
+      content = <InlineSelect options={lookups.fronts} field="front_id" label="frente" />;
+      break;
+    case 'negativeOrZero':
+      content = <span className="text-[10px] text-muted-foreground italic">Edite em Lançamentos</span>;
+      break;
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {isBusy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+      {content}
+    </div>
+  );
+}
 
 const B = ({ children }: { children: ReactNode }) => (
   <strong className="font-semibold text-foreground">{children}</strong>
@@ -223,11 +380,20 @@ function RulesBreakdown({ title, side, color, kind }: { title: string; side: Sid
   );
 }
 
-function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCategory: any[]; byFront: any[] } }) {
+function DetailPanel({
+  detail, kind, side, lookups, api,
+}: {
+  detail: { count: number; items: TxDetail[]; byCategory: any[]; byFront: any[] };
+  kind?: FixKind;
+  side?: 'receita' | 'despesa';
+  lookups?: Lookups;
+  api?: FixApi;
+}) {
   const d = detail;
   if (!d || d.count === 0) {
     return <p className="text-xs text-muted-foreground p-3">Sem lançamentos nesta diferença.</p>;
   }
+  const showActions = !!(kind && side && lookups && api);
   return (
     <div className="space-y-3 p-3 bg-muted/20 rounded-xl">
       <div className="grid sm:grid-cols-2 gap-3">
@@ -271,6 +437,7 @@ function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCate
                 <th className="text-left p-2">Pgto.</th>
                 <th className="text-left p-2">Status</th>
                 <th className="text-right p-2">Valor</th>
+                {showActions && <th className="text-right p-2">Ações</th>}
               </tr>
             </thead>
             <tbody>
@@ -288,6 +455,11 @@ function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCate
                     <Badge variant="outline" className="text-[10px] capitalize">{it.status}</Badge>
                   </td>
                   <td className="p-2 text-right tabular-nums font-medium">{fmt(it.amount)}</td>
+                  {showActions && (
+                    <td className="p-2 text-right">
+                      <FixActions item={it} kind={kind!} side={side!} lookups={lookups!} api={api!} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -305,7 +477,7 @@ const SEV_STYLES: Record<Severity, { icon: typeof CheckCircle2; border: string; 
   error: { icon: XCircle,        border: 'border-destructive/50', bg: 'bg-destructive/5', text: 'text-destructive', label: 'Erro' },
 };
 
-function Checklist({ items, data }: { items: ChecklistItem[]; data: { receitas: SideData; despesas: SideData } }) {
+function Checklist({ items, data, lookups, api }: { items: ChecklistItem[]; data: { receitas: SideData; despesas: SideData }; lookups: Lookups; api: FixApi }) {
   const [onlyAlerts, setOnlyAlerts] = useState(true);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (id: string) => setOpen((s) => ({ ...s, [id]: !s[id] }));
@@ -387,7 +559,13 @@ function Checklist({ items, data }: { items: ChecklistItem[]; data: { receitas: 
               </div>
               {expandable && isOpen && detail && (
                 <div className="mt-2">
-                  <DetailPanel detail={detail} />
+                  <DetailPanel
+                    detail={detail}
+                    kind={(it.bucketKey || it.flagKey) as FixKind | undefined}
+                    side={it.side}
+                    lookups={lookups}
+                    api={api}
+                  />
                 </div>
               )}
             </div>
@@ -398,7 +576,7 @@ function Checklist({ items, data }: { items: ChecklistItem[]; data: { receitas: 
   );
 }
 
-function Bridge({ title, side, color }: { title: string; side: SideData; color: 'success' | 'destructive' }) {
+function Bridge({ title, side, color, kind, lookups, api }: { title: string; side: SideData; color: 'success' | 'destructive'; kind: 'receita' | 'despesa'; lookups: Lookups; api: FixApi }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (i: number) => setOpen((s) => ({ ...s, [i]: !s[i] }));
 
@@ -454,7 +632,13 @@ function Bridge({ title, side, color }: { title: string; side: SideData; color: 
                   {expandable && isOpen && (
                     <TableRow>
                       <TableCell colSpan={2} className="p-2">
-                        <DetailPanel detail={side.details[r.key!]} />
+                        <DetailPanel
+                          detail={side.details[r.key!]}
+                          kind={r.key}
+                          side={kind}
+                          lookups={lookups}
+                          api={api}
+                        />
                       </TableCell>
                     </TableRow>
                   )}
@@ -469,8 +653,11 @@ function Bridge({ title, side, color }: { title: string; side: SideData; color: 
 }
 
 export default function ReconciliationReport({ onBack }: { onBack: () => void }) {
-  const { data, loading, generate } = useReconciliation();
+  const { data, loading, generate, fixTransaction, fixing } = useReconciliation();
   const [units, setUnits] = useState<any[]>([]);
+  const [fronts, setFronts] = useState<any[]>([]);
+  const [catReceita, setCatReceita] = useState<any[]>([]);
+  const [catDespesa, setCatDespesa] = useState<any[]>([]);
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -482,14 +669,35 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
   const [generated, setGenerated] = useState(false);
 
   useEffect(() => {
-    supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
-      setUnits(data ?? []);
+    supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => setUnits(data ?? []));
+    supabase.from('business_fronts').select('id, name').eq('active', true).order('name').then(({ data }) => setFronts(data ?? []));
+    supabase.from('categories').select('id, name, type').eq('active', true).order('name').then(({ data }) => {
+      const rows = (data ?? []) as Array<{ id: string; name: string; type: string }>;
+      setCatReceita(rows.filter(r => r.type === 'receita').map(({ id, name }) => ({ id, name })));
+      setCatDespesa(rows.filter(r => r.type === 'despesa').map(({ id, name }) => ({ id, name })));
     });
   }, []);
 
   const handleGenerate = async () => {
     await generate(filters);
     setGenerated(true);
+  };
+
+  const lookups: Lookups = {
+    categoriesByType: { receita: catReceita, despesa: catDespesa },
+    units,
+    fronts,
+  };
+
+  const api: FixApi = {
+    fixing,
+    apply: async (item, patch, message) => {
+      const ok = await fixTransaction(item.id, patch);
+      if (ok) {
+        const short = item.description.length > 40 ? item.description.slice(0, 40) + '…' : item.description;
+        sonner.success('✓ Lançamento corrigido', { description: `${short} — ${message}` });
+      }
+    },
   };
 
   // Injeta o contexto da Reconciliação no Kaikin para perguntas contextualizadas
@@ -580,8 +788,8 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
 
       {generated && data && (
         <div className="grid lg:grid-cols-2 gap-4">
-          <Bridge title="Receitas" side={data.receitas} color="success" />
-          <Bridge title="Despesas" side={data.despesas} color="destructive" />
+          <Bridge title="Receitas" side={data.receitas} color="success" kind="receita" lookups={lookups} api={api} />
+          <Bridge title="Despesas" side={data.despesas} color="destructive" kind="despesa" lookups={lookups} api={api} />
         </div>
       )}
 
@@ -612,7 +820,7 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
       )}
 
       {generated && data && (
-        <Checklist items={data.checklist} data={data} />
+        <Checklist items={data.checklist} data={data} lookups={lookups} api={api} />
       )}
 
       {generated && data && (
