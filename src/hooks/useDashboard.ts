@@ -45,6 +45,21 @@ export interface DashboardFilters {
   unitId?: string;
   frontId?: string;
   includeProvisioned?: boolean;
+  period?: { from: string; to: string };
+}
+
+function ymd(d: Date) {
+  return d.toISOString().substring(0, 10);
+}
+
+function addMonths(d: Date, n: number) {
+  return new Date(d.getFullYear(), d.getMonth() + n, d.getDate());
+}
+
+function diffDays(fromIso: string, toIso: string) {
+  const a = new Date(fromIso + 'T00:00:00');
+  const b = new Date(toIso + 'T00:00:00');
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
 export function useDashboard(filters?: DashboardFilters) {
@@ -72,9 +87,13 @@ export function useDashboard(filters?: DashboardFilters) {
     unitRanking: [],
   });
 
+  const periodFrom = filters?.period?.from;
+  const periodTo = filters?.period?.to;
+
   useEffect(() => {
     fetchData();
-  }, [filters?.unitId, filters?.frontId, filters?.includeProvisioned]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters?.unitId, filters?.frontId, filters?.includeProvisioned, periodFrom, periodTo]);
 
   function applyFilters(query: any) {
     if (filters?.unitId) query = query.eq('unit_id', filters.unitId);
@@ -85,24 +104,37 @@ export function useDashboard(filters?: DashboardFilters) {
   async function fetchData() {
     try {
       const now = new Date();
-      const currentMonth = now.toISOString().substring(0, 7);
-      const today = now.toISOString().substring(0, 10);
+      const today = ymd(now);
 
-      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-      const rangeStart = sixMonthsAgo.toISOString().substring(0, 10);
-      const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().substring(0, 10);
+      // Resolve period (default = current month)
+      const defaultFrom = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+      const defaultTo = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+      const rangeStart = periodFrom || defaultFrom;
+      const rangeEnd = periodTo || defaultTo;
 
-      // Fetch transactions for last 6 months
+      // Previous period of same length (for variation)
+      const periodDays = diffDays(rangeStart, rangeEnd) + 1;
+      const prevStartDate = new Date(rangeStart + 'T00:00:00');
+      prevStartDate.setDate(prevStartDate.getDate() - periodDays);
+      const prevEndDate = new Date(rangeStart + 'T00:00:00');
+      prevEndDate.setDate(prevEndDate.getDate() - 1);
+      const prevStart = ymd(prevStartDate);
+      const prevEnd = ymd(prevEndDate);
+
+      // Fetch transactions in [prevStart..rangeEnd] so we can compute variation in one query
+      const queryStart = prevStart;
+      const queryEnd = rangeEnd;
+
       let txQuery = supabase
         .from('transactions')
         .select('type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id')
-        .or(`and(competence_date.gte.${rangeStart},competence_date.lte.${rangeEnd}),and(payment_date.gte.${rangeStart},payment_date.lte.${rangeEnd})`)
+        .or(`and(competence_date.gte.${queryStart},competence_date.lte.${queryEnd}),and(payment_date.gte.${queryStart},payment_date.lte.${queryEnd})`)
         .not('status', 'eq', 'cancelado')
         .limit(10000);
       txQuery = applyFilters(txQuery);
       const { data: txs } = await txQuery;
       if (txs && txs.length >= 10000) {
-        console.warn('[useDashboard] Possível truncamento: 10.000 transações retornadas em', { rangeStart, rangeEnd });
+        console.warn('[useDashboard] Possível truncamento: 10.000 transações retornadas');
       }
 
       const rows = txs ?? [];
@@ -116,7 +148,9 @@ export function useDashboard(filters?: DashboardFilters) {
       let semCategoriaReceita = 0;
       let semCategoriaDespesa = 0;
       let semUnidade = 0;
-      let despesasVariaveisMes = 0;
+
+      let prevReceitas = 0;
+      let prevDespesas = 0;
 
       const monthMap = new Map<string, { receitas: number; despesas: number; receitasProv: number; despesasProv: number }>();
       const catMap = new Map<string, number>();
@@ -124,13 +158,21 @@ export function useDashboard(filters?: DashboardFilters) {
       const recCatMap = new Map<string, number>();
       const recCatProvMap = new Map<string, number>();
 
+      const inRange = (d: string | null | undefined, s: string, e: string) =>
+        !!d && d >= s && d <= e;
+
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
-        const competenceMonth = tx.competence_date?.substring(0, 7);
+        const val = Number(tx.net_amount) || 0;
 
-        // Count incomplete data
-        if (tx.status !== 'cancelado') {
+        const paidInPeriod = isPaid && inRange(tx.payment_date, rangeStart, rangeEnd);
+        const provInPeriod = isProvisioned && inRange(tx.competence_date, rangeStart, rangeEnd);
+        const paidInPrev = isPaid && inRange(tx.payment_date, prevStart, prevEnd);
+        const provInPrev = isProvisioned && inRange(tx.competence_date, prevStart, prevEnd);
+
+        // Incomplete data: count only items relevant to current range
+        if (tx.status !== 'cancelado' && (paidInPeriod || provInPeriod)) {
           if (!tx.category_id) {
             semCategoria++;
             if (tx.type === 'receita') semCategoriaReceita++;
@@ -139,76 +181,86 @@ export function useDashboard(filters?: DashboardFilters) {
           if (!tx.unit_id) semUnidade++;
         }
 
-        if (isPaid && tx.payment_date) {
-          const payMonth = tx.payment_date.substring(0, 7);
-          const entry = monthMap.get(payMonth) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
-          const val = Number(tx.net_amount) || 0;
+        // Monthly buckets (paid by payment_date, prov by competence_date) within current range
+        if (paidInPeriod) {
+          const key = tx.payment_date.substring(0, 7);
+          const entry = monthMap.get(key) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
           if (tx.type === 'receita') entry.receitas += val;
           else entry.despesas += val;
-          monthMap.set(payMonth, entry);
+          monthMap.set(key, entry);
         }
-
-        if (isProvisioned && competenceMonth) {
-          const entry = monthMap.get(competenceMonth) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
-          const val = Number(tx.net_amount) || 0;
+        if (provInPeriod) {
+          const key = tx.competence_date.substring(0, 7);
+          const entry = monthMap.get(key) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
           if (tx.type === 'receita') entry.receitasProv += val;
           else entry.despesasProv += val;
-          monthMap.set(competenceMonth, entry);
+          monthMap.set(key, entry);
         }
 
-        if (competenceMonth === currentMonth && isPaid) {
-          const val = Number(tx.net_amount) || 0;
+        // KPIs do período
+        if (paidInPeriod) {
           if (tx.type === 'receita') receitasMes += val;
           else despesasMes += val;
         }
-
-        if (competenceMonth === currentMonth && isProvisioned) {
-          const val = Number(tx.net_amount) || 0;
+        if (provInPeriod) {
           if (tx.type === 'receita') receitasProvisionadas += val;
           else despesasProvisionadas += val;
         }
 
+        // Período anterior (variação)
+        if (paidInPrev) {
+          if (tx.type === 'receita') prevReceitas += val;
+          else prevDespesas += val;
+        }
+        if (provInPrev && filters?.includeProvisioned) {
+          if (tx.type === 'receita') prevReceitas += val;
+          else prevDespesas += val;
+        }
+
+        // Categorias (despesas e receitas) — período inteiro
+        if (tx.type === 'despesa' && paidInPeriod) {
+          const catId = tx.category_id || 'sem-categoria';
+          catMap.set(catId, (catMap.get(catId) || 0) + val);
+        }
+        if (tx.type === 'despesa' && provInPeriod) {
+          const catId = tx.category_id || 'sem-categoria';
+          catProvMap.set(catId, (catProvMap.get(catId) || 0) + val);
+        }
+        if (tx.type === 'receita' && paidInPeriod) {
+          const catId = tx.category_id || 'sem-categoria';
+          recCatMap.set(catId, (recCatMap.get(catId) || 0) + val);
+        }
+        if (tx.type === 'receita' && provInPeriod) {
+          const catId = tx.category_id || 'sem-categoria';
+          recCatProvMap.set(catId, (recCatProvMap.get(catId) || 0) + val);
+        }
+
+        // Atrasadas: snapshot global (não muda com período)
         if ((tx.status === 'pendente' || tx.status === 'agendado') && tx.due_date && tx.due_date < today) {
           contasAtrasadas++;
         }
-
-        if (tx.type === 'despesa' && competenceMonth === currentMonth && isPaid) {
-          const catId = tx.category_id || 'sem-categoria';
-          catMap.set(catId, (catMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
-        }
-        if (tx.type === 'despesa' && competenceMonth === currentMonth && isProvisioned) {
-          const catId = tx.category_id || 'sem-categoria';
-          catProvMap.set(catId, (catProvMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
-        }
-        if (tx.type === 'receita' && competenceMonth === currentMonth && isPaid) {
-          const catId = tx.category_id || 'sem-categoria';
-          recCatMap.set(catId, (recCatMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
-        }
-        if (tx.type === 'receita' && competenceMonth === currentMonth && isProvisioned) {
-          const catId = tx.category_id || 'sem-categoria';
-          recCatProvMap.set(catId, (recCatProvMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
-        }
       });
 
-      // If including provisioned, merge provisioned categories into catMap
       if (filters?.includeProvisioned) {
         catProvMap.forEach((v, k) => catMap.set(k, (catMap.get(k) || 0) + v));
         recCatProvMap.forEach((v, k) => recCatMap.set(k, (recCatMap.get(k) || 0) + v));
       }
 
-      // Build monthly array
+      // Build monthly array: iterate months from rangeStart→rangeEnd (cap 24)
       const shortMonth = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const monthlyData: { label: string; receitas: number; despesas: number; receitasProv: number; despesasProv: number }[] = [];
-      for (let i = 0; i < 6; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const startD = new Date(rangeStart + 'T00:00:00');
+      const endD = new Date(rangeEnd + 'T00:00:00');
+      const monthsCount =
+        (endD.getFullYear() - startD.getFullYear()) * 12 + (endD.getMonth() - startD.getMonth()) + 1;
+      const cappedMonths = Math.min(Math.max(monthsCount, 1), 24);
+      for (let i = 0; i < cappedMonths; i++) {
+        const d = new Date(startD.getFullYear(), startD.getMonth() + i, 1);
         const key = d.toISOString().substring(0, 7);
         const entry = monthMap.get(key) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
         monthlyData.push({
           label: `${shortMonth[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`,
-          receitas: entry.receitas,
-          despesas: entry.despesas,
-          receitasProv: entry.receitasProv,
-          despesasProv: entry.despesasProv,
+          ...entry,
         });
       }
 
@@ -216,9 +268,7 @@ export function useDashboard(filters?: DashboardFilters) {
       let categoryData: { name: string; value: number }[] = [];
       let receitaCategoryData: { name: string; value: number }[] = [];
       const allCatIds = Array.from(
-        new Set(
-          [...catMap.keys(), ...recCatMap.keys()].filter((id) => id !== 'sem-categoria')
-        )
+        new Set([...catMap.keys(), ...recCatMap.keys()].filter((id) => id !== 'sem-categoria'))
       );
       let nameMap = new Map<string, string>();
       if (allCatIds.length > 0) {
@@ -227,18 +277,18 @@ export function useDashboard(filters?: DashboardFilters) {
       }
       if (catMap.size > 0) {
         categoryData = Array.from(catMap.entries()).map(([id, value]) => ({
-          name: id === 'sem-categoria' ? 'Sem Categoria' : (nameMap.get(id) || 'Outro'),
+          name: id === 'sem-categoria' ? 'Sem Categoria' : nameMap.get(id) || 'Outro',
           value,
         }));
       }
       if (recCatMap.size > 0) {
         receitaCategoryData = Array.from(recCatMap.entries()).map(([id, value]) => ({
-          name: id === 'sem-categoria' ? 'Sem Categoria' : (nameMap.get(id) || 'Outro'),
+          name: id === 'sem-categoria' ? 'Sem Categoria' : nameMap.get(id) || 'Outro',
           value,
         }));
       }
 
-      // Saldo total (all-time paid transactions)
+      // Saldo total (snapshot, independente do período)
       let saldoQuery = supabase
         .from('transactions')
         .select('type, net_amount, status')
@@ -246,9 +296,6 @@ export function useDashboard(filters?: DashboardFilters) {
         .limit(10000);
       saldoQuery = applyFilters(saldoQuery);
       const { data: allTxs } = await saldoQuery;
-      if (allTxs && allTxs.length >= 10000) {
-        console.warn('[useDashboard] Possível truncamento no saldoTotal: 10.000 transações retornadas');
-      }
 
       let saldoTotal = 0;
       (allTxs ?? []).forEach((tx: any) => {
@@ -256,7 +303,6 @@ export function useDashboard(filters?: DashboardFilters) {
         saldoTotal += tx.type === 'receita' ? val : -val;
       });
 
-      // Add account initial balances (only when no unit/front filter)
       if (!filters?.unitId && !filters?.frontId) {
         const { data: accounts } = await supabase.from('accounts').select('initial_balance');
         (accounts ?? []).forEach((a: any) => {
@@ -264,7 +310,7 @@ export function useDashboard(filters?: DashboardFilters) {
         });
       }
 
-      // Overdue & due-today alerts
+      // Overdue / due-today (snapshot)
       let alertQuery = supabase
         .from('transactions')
         .select('id, description, net_amount, due_date, type, partner:partners(name)')
@@ -288,31 +334,28 @@ export function useDashboard(filters?: DashboardFilters) {
         else overdueBills.push(bill);
       });
 
-      // Month-over-month variation
-      const prevMonthKey = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
-      const prevEntry = monthMap.get(prevMonthKey);
-      const curEntry = monthMap.get(currentMonth);
-      const variacaoReceita = prevEntry && prevEntry.receitas > 0 && curEntry
-        ? ((curEntry.receitas - prevEntry.receitas) / prevEntry.receitas) * 100
-        : null;
-      const variacaoDespesa = prevEntry && prevEntry.despesas > 0 && curEntry
-        ? ((curEntry.despesas - prevEntry.despesas) / prevEntry.despesas) * 100
-        : null;
-
-      // Margem (inclui provisionados se ativado)
+      // Variation vs previous same-length period
       const incluirProv = !!filters?.includeProvisioned;
-      const recTot = receitasMes + (incluirProv ? receitasProvisionadas : 0);
-      const despTot = despesasMes + (incluirProv ? despesasProvisionadas : 0);
-      const margemContribuicao = recTot - despTot;
+      const curReceitasForVar = receitasMes + (incluirProv ? receitasProvisionadas : 0);
+      const curDespesasForVar = despesasMes + (incluirProv ? despesasProvisionadas : 0);
+      const variacaoReceita = prevReceitas > 0
+        ? ((curReceitasForVar - prevReceitas) / prevReceitas) * 100
+        : null;
+      const variacaoDespesa = prevDespesas > 0
+        ? ((curDespesasForVar - prevDespesas) / prevDespesas) * 100
+        : null;
 
-      // Unit ranking - despesas por unidade no mês atual
+      const margemContribuicao = curReceitasForVar - curDespesasForVar;
+
+      // Unit ranking — período
       const unitDespMap = new Map<string, { despesas: number; receitas: number }>();
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
-        const include = isPaid || (incluirProv && isProvisioned);
-        const competenceMonth = tx.competence_date?.substring(0, 7);
-        if (include && competenceMonth === currentMonth && tx.unit_id) {
+        const paidInPeriod = isPaid && inRange(tx.payment_date, rangeStart, rangeEnd);
+        const provInPeriod = isProvisioned && inRange(tx.competence_date, rangeStart, rangeEnd);
+        const include = paidInPeriod || (incluirProv && provInPeriod);
+        if (include && tx.unit_id) {
           const entry = unitDespMap.get(tx.unit_id) || { despesas: 0, receitas: 0 };
           const val = Number(tx.net_amount) || 0;
           if (tx.type === 'despesa') entry.despesas += val;
@@ -325,9 +368,9 @@ export function useDashboard(filters?: DashboardFilters) {
       if (unitDespMap.size > 0) {
         const unitIds = Array.from(unitDespMap.keys());
         const { data: unitRows } = await supabase.from('units').select('id, name').in('id', unitIds);
-        const nameMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.name]));
+        const uNameMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.name]));
         unitRanking = Array.from(unitDespMap.entries())
-          .map(([id, v]) => ({ unitId: id, unitName: nameMap.get(id) || 'Desconhecida', despesas: v.despesas, receitas: v.receitas }))
+          .map(([id, v]) => ({ unitId: id, unitName: uNameMap.get(id) || 'Desconhecida', despesas: v.despesas, receitas: v.receitas }))
           .sort((a, b) => b.despesas - a.despesas);
       }
 
