@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,6 +21,90 @@ import { useNavigate } from 'react-router-dom';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const MAX_PIE_SLICES = 7;
+
+/** Groups small slices into "Outros" so the chart stays readable with many categories. */
+function condensePie(data: Array<{ name: string; value: number }>) {
+  if (data.length <= MAX_PIE_SLICES) return data;
+  const sorted = [...data].sort((a, b) => b.value - a.value);
+  const top = sorted.slice(0, MAX_PIE_SLICES - 1);
+  const rest = sorted.slice(MAX_PIE_SLICES - 1);
+  const restValue = rest.reduce((s, d) => s + d.value, 0);
+  return [...top, { name: `Outros (${rest.length})`, value: restValue }];
+}
+
+function CategoryPie({
+  data, emptyLabel,
+}: {
+  data: Array<{ name: string; value: number }>;
+  emptyLabel: string;
+}) {
+  if (data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
+        {emptyLabel}
+      </div>
+    );
+  }
+  const condensed = condensePie(data);
+  const total = condensed.reduce((s, d) => s + d.value, 0);
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_minmax(0,180px)] gap-3 items-center">
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={condensed}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius={45}
+              outerRadius={85}
+              paddingAngle={2}
+              stroke="hsl(var(--background))"
+              strokeWidth={2}
+            >
+              {condensed.map((_, i) => (
+                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+              ))}
+            </Pie>
+            <RTooltip
+              formatter={(value: number) => [fmt(value), '']}
+              contentStyle={{
+                background: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: 12,
+                fontSize: 12,
+              }}
+              labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5">
+        {condensed.map((d, i) => {
+          const pct = total > 0 ? (d.value / total) * 100 : 0;
+          return (
+            <div key={d.name} className="flex items-center gap-2 text-xs">
+              <span
+                className="h-2.5 w-2.5 rounded-sm shrink-0"
+                style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate" title={d.name}>{d.name}</div>
+                <div className="text-muted-foreground tabular-nums">
+                  {fmt(d.value)} <span className="opacity-70">· {pct.toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 type PeriodPreset = 'current_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'ytd' | 'last_year' | 'custom';
 
@@ -384,33 +468,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            {categoryData.length === 0 ? (
-              <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
-                Nenhuma despesa paga neste mês
-              </div>
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={70}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine={{ strokeWidth: 1 }}
-                    >
-                      {categoryData.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <CategoryPie data={categoryData} emptyLabel="Nenhuma despesa paga neste período" />
           </CardContent>
         </Card>
 
@@ -419,33 +477,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
-            {receitaCategoryData.length === 0 ? (
-              <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">
-                Nenhuma receita recebida neste mês
-              </div>
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={receitaCategoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={70}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine={{ strokeWidth: 1 }}
-                    >
-                      {receitaCategoryData.map((_, i) => (
-                        <Cell key={`r-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <CategoryPie data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" />
           </CardContent>
         </Card>
       </div>
