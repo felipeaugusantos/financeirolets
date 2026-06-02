@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2 } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +21,53 @@ import { useNavigate } from 'react-router-dom';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+type PeriodPreset = 'current_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'ytd' | 'last_year' | 'custom';
+
+function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: string }): { from: string; to: string; label: string; isMonth: boolean } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const ymd = (d: Date) => d.toISOString().substring(0, 10);
+  switch (preset) {
+    case 'last_month': {
+      const from = new Date(y, m - 1, 1);
+      const to = new Date(y, m, 0);
+      return { from: ymd(from), to: ymd(to), label: 'Mês anterior', isMonth: true };
+    }
+    case 'last_3_months': {
+      const from = new Date(y, m - 2, 1);
+      const to = new Date(y, m + 1, 0);
+      return { from: ymd(from), to: ymd(to), label: 'Últimos 3 meses', isMonth: false };
+    }
+    case 'last_6_months': {
+      const from = new Date(y, m - 5, 1);
+      const to = new Date(y, m + 1, 0);
+      return { from: ymd(from), to: ymd(to), label: 'Últimos 6 meses', isMonth: false };
+    }
+    case 'ytd': {
+      const from = new Date(y, 0, 1);
+      const to = new Date(y, m + 1, 0);
+      return { from: ymd(from), to: ymd(to), label: `Ano atual (${y})`, isMonth: false };
+    }
+    case 'last_year': {
+      const from = new Date(y - 1, 0, 1);
+      const to = new Date(y - 1, 11, 31);
+      return { from: ymd(from), to: ymd(to), label: `Ano anterior (${y - 1})`, isMonth: false };
+    }
+    case 'custom': {
+      const from = custom.from || ymd(new Date(y, m, 1));
+      const to = custom.to || ymd(new Date(y, m + 1, 0));
+      return { from, to, label: 'Personalizado', isMonth: false };
+    }
+    case 'current_month':
+    default: {
+      const from = new Date(y, m, 1);
+      const to = new Date(y, m + 1, 0);
+      return { from: ymd(from), to: ymd(to), label: 'Mês atual', isMonth: true };
+    }
+  }
+}
 
 const PIE_COLORS = [
   'hsl(340, 82%, 52%)',
@@ -39,14 +91,23 @@ export default function Dashboard() {
   const [unitId, setUnitId] = useState<string>('');
   const [frontId, setFrontId] = useState<string>('');
   const [includeProvisioned, setIncludeProvisioned] = useState(false);
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('current_month');
+  const [customFrom, setCustomFrom] = useState<string | undefined>();
+  const [customTo, setCustomTo] = useState<string | undefined>();
 
   const { data: units } = useSupabaseCrud<any>('units');
   const { data: fronts } = useSupabaseCrud<any>('business_fronts');
+
+  const period = useMemo(
+    () => resolvePeriod(periodPreset, { from: customFrom, to: customTo }),
+    [periodPreset, customFrom, customTo]
+  );
 
   const dashFilters = {
     unitId: unitId && unitId !== 'all' ? unitId : undefined,
     frontId: frontId && frontId !== 'all' ? frontId : undefined,
     includeProvisioned,
+    period: { from: period.from, to: period.to },
   };
 
   const { saldoTotal, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
@@ -59,17 +120,19 @@ export default function Dashboard() {
 
   const receitasTotal = receitasMes + (includeProvisioned ? receitasProvisionadas : 0);
   const despesasTotal = despesasMes + (includeProvisioned ? despesasProvisionadas : 0);
+  const periodSuffix = period.isMonth ? 'mês' : 'período';
+  const variationLabel = period.isMonth ? 'vs mês anterior' : 'vs período anterior';
   const receitasSub = includeProvisioned && receitasProvisionadas > 0
     ? `Realizado ${fmt(receitasMes)} • Prov. ${fmt(receitasProvisionadas)}`
-    : (variacaoReceita !== null ? fmtPct(variacaoReceita) + ' vs mês anterior' : '');
+    : (variacaoReceita !== null ? fmtPct(variacaoReceita) + ' ' + variationLabel : '');
   const despesasSub = includeProvisioned && despesasProvisionadas > 0
     ? `Realizado ${fmt(despesasMes)} • Prov. ${fmt(despesasProvisionadas)}`
-    : (variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' vs mês anterior' : '');
+    : (variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' ' + variationLabel : '');
 
   const cards = [
     { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary', sub: '' },
-    { title: 'Receitas do Mês', value: fmt(receitasTotal), icon: TrendingUp, color: 'text-success', sub: receitasSub },
-    { title: 'Despesas do Mês', value: fmt(despesasTotal), icon: TrendingDown, color: 'text-destructive', sub: despesasSub },
+    { title: `Receitas do ${periodSuffix}`, value: fmt(receitasTotal), icon: TrendingUp, color: 'text-success', sub: receitasSub },
+    { title: `Despesas do ${periodSuffix}`, value: fmt(despesasTotal), icon: TrendingDown, color: 'text-destructive', sub: despesasSub },
     { title: 'Margem', value: fmt(margemContribuicao), icon: BarChart3, color: margemContribuicao >= 0 ? 'text-success' : 'text-destructive', sub: '' },
     { title: 'Contas em Atraso', value: String(contasAtrasadas), icon: AlertTriangle, color: contasAtrasadas > 0 ? 'text-warning' : 'text-muted-foreground', sub: '' },
   ];
@@ -104,7 +167,47 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={periodPreset} onValueChange={(v) => setPeriodPreset(v as PeriodPreset)}>
+            <SelectTrigger className="w-[180px] h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current_month">Mês atual</SelectItem>
+              <SelectItem value="last_month">Mês anterior</SelectItem>
+              <SelectItem value="last_3_months">Últimos 3 meses</SelectItem>
+              <SelectItem value="last_6_months">Últimos 6 meses</SelectItem>
+              <SelectItem value="ytd">Ano atual (YTD)</SelectItem>
+              <SelectItem value="last_year">Ano anterior</SelectItem>
+              <SelectItem value="custom">Personalizado…</SelectItem>
+            </SelectContent>
+          </Select>
+          {periodPreset === 'custom' && (
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn('h-9 text-xs font-normal', !customFrom && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {customFrom ? format(new Date(customFrom + 'T00:00:00'), 'dd/MM/yy') : 'De'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customFrom ? new Date(customFrom + 'T00:00:00') : undefined} onSelect={(d) => setCustomFrom(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn('h-9 text-xs font-normal', !customTo && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {customTo ? format(new Date(customTo + 'T00:00:00'), 'dd/MM/yy') : 'Até'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customTo ? new Date(customTo + 'T00:00:00') : undefined} onSelect={(d) => setCustomTo(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
           <Select value={unitId} onValueChange={setUnitId}>
             <SelectTrigger className="w-[160px] h-9 text-xs">
               <SelectValue placeholder="Todas Unidades" />
@@ -248,7 +351,7 @@ export default function Dashboard() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-heading">Receitas vs Despesas (últimos 6 meses)</CardTitle>
+            <CardTitle className="text-sm font-heading">Receitas vs Despesas ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyData.every(m => m.receitas === 0 && m.despesas === 0) ? (
@@ -278,7 +381,7 @@ export default function Dashboard() {
 
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-heading">Despesas por Categoria (mês atual)</CardTitle>
+            <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
             {categoryData.length === 0 ? (
@@ -313,7 +416,7 @@ export default function Dashboard() {
 
         <Card className="shadow-card rounded-2xl border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-heading">Receitas por Categoria (mês atual)</CardTitle>
+            <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
           </CardHeader>
           <CardContent>
             {receitaCategoryData.length === 0 ? (
@@ -353,7 +456,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-sm font-heading flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              Ranking de Despesas por Unidade (mês atual)
+              Ranking de Despesas por Unidade ({period.label})
             </CardTitle>
           </CardHeader>
           <CardContent>
