@@ -544,8 +544,9 @@ export default function Dashboard() {
         </Card>
 
         <Card className="shadow-card rounded-2xl border-border">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-sm font-heading">Despesas por Categoria ({period.label})</CardTitle>
+            <ChartModeToggle value={chartMode} onChange={setChartMode} />
           </CardHeader>
           <CardContent>
             <CategoryChart mode={chartMode} data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" />
@@ -553,8 +554,9 @@ export default function Dashboard() {
         </Card>
 
         <Card className="shadow-card rounded-2xl border-border">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-sm font-heading">Receitas por Categoria ({period.label})</CardTitle>
+            <ChartModeToggle value={chartMode} onChange={setChartMode} />
           </CardHeader>
           <CardContent>
             <CategoryChart mode={chartMode} data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" />
