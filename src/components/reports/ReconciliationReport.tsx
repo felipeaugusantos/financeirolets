@@ -222,8 +222,8 @@ function RulesBreakdown({ title, side, color, kind }: { title: string; side: Sid
   );
 }
 
-function DetailPanel({ side, bucketKey }: { side: SideData; bucketKey: BucketKey }) {
-  const d = side.details[bucketKey];
+function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCategory: any[]; byFront: any[] } }) {
+  const d = detail;
   if (!d || d.count === 0) {
     return <p className="text-xs text-muted-foreground p-3">Sem lançamentos nesta diferença.</p>;
   }
