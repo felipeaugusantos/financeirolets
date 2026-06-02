@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useReconciliation, ReconciliationFilters, BridgeRow, BucketKey, SideData } from '@/hooks/useReconciliation';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,9 +110,8 @@ function Bridge({ title, side, color }: { title: string; side: SideData; color: 
               const expandable = !!r.key && (side.details[r.key]?.count ?? 0) > 0;
               const isOpen = !!open[i];
               return (
-                <>
+                <Fragment key={i}>
                   <TableRow
-                    key={i}
                     className={cn(
                       r.emphasis === 'total' && 'bg-muted/40 font-semibold',
                       expandable && 'cursor-pointer hover:bg-muted/30',
@@ -147,13 +146,13 @@ function Bridge({ title, side, color }: { title: string; side: SideData; color: 
                     </TableCell>
                   </TableRow>
                   {expandable && isOpen && (
-                    <TableRow key={`${i}-d`}>
+                    <TableRow>
                       <TableCell colSpan={2} className="p-2">
                         <DetailPanel side={side} bucketKey={r.key!} />
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </TableBody>
