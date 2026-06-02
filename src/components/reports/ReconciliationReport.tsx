@@ -353,7 +353,7 @@ function Bridge({ title, side, color }: { title: string; side: SideData; color: 
                   {expandable && isOpen && (
                     <TableRow>
                       <TableCell colSpan={2} className="p-2">
-                        <DetailPanel side={side} bucketKey={r.key!} />
+                        <DetailPanel detail={side.details[r.key!]} />
                       </TableCell>
                     </TableRow>
                   )}
