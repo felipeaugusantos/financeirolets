@@ -90,10 +90,14 @@ export function useDashboard(filters?: DashboardFilters) {
       let txQuery = supabase
         .from('transactions')
         .select('type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id')
-        .gte('competence_date', rangeStart)
-        .lte('competence_date', rangeEnd);
+        .or(`and(competence_date.gte.${rangeStart},competence_date.lte.${rangeEnd}),and(payment_date.gte.${rangeStart},payment_date.lte.${rangeEnd})`)
+        .not('status', 'eq', 'cancelado')
+        .limit(10000);
       txQuery = applyFilters(txQuery);
       const { data: txs } = await txQuery;
+      if (txs && txs.length >= 10000) {
+        console.warn('[useDashboard] Possível truncamento: 10.000 transações retornadas em', { rangeStart, rangeEnd });
+      }
 
       const rows = txs ?? [];
 
@@ -150,7 +154,7 @@ export function useDashboard(filters?: DashboardFilters) {
           else despesasProvisionadas += val;
         }
 
-        if (tx.status === 'pendente' && tx.due_date && tx.due_date < today) {
+        if ((tx.status === 'pendente' || tx.status === 'agendado') && tx.due_date && tx.due_date < today) {
           contasAtrasadas++;
         }
 
@@ -203,9 +207,13 @@ export function useDashboard(filters?: DashboardFilters) {
       let saldoQuery = supabase
         .from('transactions')
         .select('type, net_amount, status')
-        .in('status', ['pago', 'recebido'] as any);
+        .in('status', ['pago', 'recebido'] as any)
+        .limit(10000);
       saldoQuery = applyFilters(saldoQuery);
       const { data: allTxs } = await saldoQuery;
+      if (allTxs && allTxs.length >= 10000) {
+        console.warn('[useDashboard] Possível truncamento no saldoTotal: 10.000 transações retornadas');
+      }
 
       let saldoTotal = 0;
       (allTxs ?? []).forEach((tx: any) => {
@@ -229,7 +237,7 @@ export function useDashboard(filters?: DashboardFilters) {
         .not('due_date', 'is', null)
         .lte('due_date', today)
         .order('due_date', { ascending: true })
-        .limit(20);
+        .limit(100);
       alertQuery = applyFilters(alertQuery);
       const { data: alertBills } = await alertQuery;
 

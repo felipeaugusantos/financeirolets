@@ -2,7 +2,15 @@ import { describe, it, expect } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  ?? import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY (ou VITE_SUPABASE_ANON_KEY) são obrigatórios para os testes de RLS. ' +
+    'Sem eles os testes passariam vacuamente.'
+  );
+}
 
 // Cliente anônimo (sem autenticação) para verificar que RLS bloqueia acesso
 const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

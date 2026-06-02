@@ -297,10 +297,6 @@ function DetailPanel({ detail }: { detail: { count: number; items: any[]; byCate
   );
 }
 
-function Bridge({ title, side, color }: { title: string; side: SideData; color: 'success' | 'destructive' }) {
-  return BridgeImpl({ title, side, color });
-}
-
 const SEV_STYLES: Record<Severity, { icon: typeof CheckCircle2; border: string; bg: string; text: string; label: string }> = {
   ok:    { icon: CheckCircle2,   border: 'border-success/40',     bg: 'bg-success/5',     text: 'text-success',     label: 'OK' },
   info:  { icon: Info,           border: 'border-primary/40',     bg: 'bg-primary/5',     text: 'text-primary',     label: 'Info' },
@@ -401,7 +397,7 @@ function Checklist({ items, data }: { items: ChecklistItem[]; data: { receitas: 
   );
 }
 
-function BridgeImpl({ title, side, color }: { title: string; side: SideData; color: 'success' | 'destructive' }) {
+function Bridge({ title, side, color }: { title: string; side: SideData; color: 'success' | 'destructive' }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (i: number) => setOpen((s) => ({ ...s, [i]: !s[i] }));
 

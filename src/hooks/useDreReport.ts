@@ -126,7 +126,9 @@ async function fetchPeriodValues(
     .from('transactions')
     .select('id, net_amount, category_id, status, unit_id')
     .gte(dateField, dateFrom)
-    .lte(dateField, dateTo);
+    .lte(dateField, dateTo)
+    .not('status', 'eq', 'cancelado')
+    .limit(10000);
   if (filters.regime === 'caixa') {
     txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
   } else if (filters.onlyRealized) {
@@ -134,6 +136,9 @@ async function fetchPeriodValues(
   }
   const { data: transactions, error } = await txQuery;
   if (error) throw error;
+  if (transactions && transactions.length >= 10000) {
+    console.warn('[useDreReport] Possível truncamento: 10.000 transações retornadas em', { dateFrom, dateTo, filters });
+  }
 
   const txIds = (transactions ?? []).map((t: any) => t.id);
   const allocMap = new Map<string, any[]>();

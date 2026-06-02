@@ -59,6 +59,7 @@ export interface SideData {
     missingFront: BucketDetail;
     provisionadoVencido: BucketDetail;
     negativeOrZero: BucketDetail;
+    pagoSemData: BucketDetail;
   };
 }
 
@@ -93,7 +94,7 @@ function makeBridge(b: SideData): BridgeRow[] {
     { label: 'Dashboard (realizado no período)', value: b.dashboard, emphasis: 'total', hint: 'Pago/recebido cuja competência cai no período.' },
     { key: 'provisionado', label: '+ Provisionado (pendente/agendado)', value: b.provisionado, emphasis: 'delta', hint: 'Lançamentos do período por competência ainda não pagos.' },
     { label: '= DRE Competência (cheio)', value: b.dreCompetenciaFull, emphasis: 'total', hint: 'Todas as transações do período por competence_date.' },
-    { key: 'provisionado', label: '− Provisionado', value: -b.provisionado, emphasis: 'delta' },
+    { label: '− Provisionado', value: -b.provisionado, emphasis: 'delta' },
     { label: '= DRE Competência (somente realizado)', value: b.dreCompetenciaRealizado, emphasis: 'total', hint: 'Igual ao Dashboard quando todos os pagos têm competência no período.' },
     { key: 'pagoDePeriodoAnterior', label: '+ Pagos no período mas de competência anterior', value: b.pagoDePeriodoAnterior, emphasis: 'delta', hint: 'Saem do período pela competência mas entram pelo caixa.' },
     { key: 'pagoForaDaCompetencia', label: '− Pagos fora do período (competência no período)', value: -b.pagoForaDaCompetencia, emphasis: 'delta', hint: 'Têm competência no período mas foram pagos antes/depois.' },
@@ -227,6 +228,17 @@ function buildChecklist(rec: SideData, des: SideData): ChecklistItem[] {
       flagKey: 'negativeOrZero',
     });
 
+    if (f.pagoSemData.count > 0) out.push({
+      id: `semdata-${key}`,
+      severity: 'warn',
+      title: `${label} marcadas como pagas sem data de pagamento`,
+      message: 'Esses lançamentos não entram no DRE Caixa e quebram a identidade. Preencha o payment_date.',
+      count: f.pagoSemData.count,
+      amount: f.pagoSemData.total,
+      side: key,
+      flagKey: 'pagoSemData',
+    });
+
     if (data.provisionado > data.dashboard && data.provisionado > 0) out.push({
       id: `provdom-${key}`,
       severity: 'info',
@@ -268,9 +280,13 @@ export function useReconciliation() {
       const cols = 'id, type, status, description, net_amount, competence_date, payment_date, due_date, unit_id, category_id, front_id';
 
       let qComp = supabase.from('transactions').select(cols)
-        .gte('competence_date', dateFrom).lte('competence_date', dateTo);
+        .gte('competence_date', dateFrom).lte('competence_date', dateTo)
+        .not('status', 'eq', 'cancelado')
+        .limit(10000);
       let qPay = supabase.from('transactions').select(cols)
-        .gte('payment_date', dateFrom).lte('payment_date', dateTo);
+        .gte('payment_date', dateFrom).lte('payment_date', dateTo)
+        .not('status', 'eq', 'cancelado')
+        .limit(10000);
       if (unit_id) {
         qComp = qComp.eq('unit_id', unit_id);
         qPay = qPay.eq('unit_id', unit_id);
@@ -279,6 +295,9 @@ export function useReconciliation() {
       const [{ data: byComp, error: e1 }, { data: byPay, error: e2 }] = await Promise.all([qComp, qPay]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if ((byComp && byComp.length >= 10000) || (byPay && byPay.length >= 10000)) {
+        console.warn('[useReconciliation] Possível truncamento: 10.000 transações retornadas — números podem estar incompletos.');
+      }
 
       const mapTx = new Map<string, any>();
       (byComp ?? []).forEach((t: any) => mapTx.set(t.id, t));
@@ -316,6 +335,7 @@ export function useReconciliation() {
           missingFront: emptyDetail(),
           provisionadoVencido: emptyDetail(),
           negativeOrZero: emptyDetail(),
+          pagoSemData: emptyDetail(),
         },
       });
       const rec = init();
@@ -362,9 +382,13 @@ export function useReconciliation() {
           bucket.pagoDePeriodoAnterior += val;
           pushDetail(bucket.details.pagoDePeriodoAnterior, detailItem);
         }
-        if (compInRange && isPaid && !payInRange) {
+        if (compInRange && isPaid && tx.payment_date && !payInRange) {
           bucket.pagoForaDaCompetencia += val;
           pushDetail(bucket.details.pagoForaDaCompetencia, detailItem);
+        }
+        // Lançamento marcado como pago mas sem payment_date → não cai em nenhum bucket de caixa
+        if (compInRange && isPaid && !tx.payment_date) {
+          pushDetail(bucket.flags.pagoSemData, detailItem);
         }
 
         // Flags considerando apenas transações que tocam o período
