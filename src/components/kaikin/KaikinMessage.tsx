@@ -9,7 +9,12 @@ export function KaikinMessage({ message }: { message: Msg }) {
     <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && (
         <div className="h-7 w-7 shrink-0 rounded-full overflow-hidden ring-1 ring-border bg-muted">
-          <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
+          <img
+            src={kaikinAvatar.url}
+            alt="Kaikin"
+            className="h-full w-full object-cover scale-[1.6]"
+            style={{ objectPosition: '55% 22%' }}
+          />
         </div>
       )}
       <div

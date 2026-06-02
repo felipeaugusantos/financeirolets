@@ -58,7 +58,12 @@ export function KaikinSheet() {
         <SheetHeader className="px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-full overflow-hidden ring-1 ring-border bg-muted shrink-0">
-              <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
+              <img
+                src={kaikinAvatar.url}
+                alt="Kaikin"
+                className="h-full w-full object-cover scale-[1.6]"
+                style={{ objectPosition: '55% 22%' }}
+              />
             </div>
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-base font-heading">Kaikin</SheetTitle>
@@ -76,7 +81,12 @@ export function KaikinSheet() {
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center gap-4 py-8">
               <div className="h-20 w-20 rounded-full overflow-hidden ring-2 ring-primary/40 shadow-elevated bg-muted">
-                <img src={kaikinAvatar.url} alt="Kaikin" className="h-full w-full object-cover object-top" />
+                <img
+                  src={kaikinAvatar.url}
+                  alt="Kaikin"
+                  className="h-full w-full object-cover scale-[1.5]"
+                  style={{ objectPosition: '55% 22%' }}
+                />
               </div>
               <div>
                 <p className="font-heading font-semibold text-card-foreground">Oi, sou o Kaikin 👋</p>
