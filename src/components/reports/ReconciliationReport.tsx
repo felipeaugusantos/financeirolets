@@ -653,8 +653,11 @@ function Bridge({ title, side, color, kind, lookups, api }: { title: string; sid
 }
 
 export default function ReconciliationReport({ onBack }: { onBack: () => void }) {
-  const { data, loading, generate } = useReconciliation();
+  const { data, loading, generate, fixTransaction, fixing } = useReconciliation();
   const [units, setUnits] = useState<any[]>([]);
+  const [fronts, setFronts] = useState<any[]>([]);
+  const [catReceita, setCatReceita] = useState<any[]>([]);
+  const [catDespesa, setCatDespesa] = useState<any[]>([]);
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -666,14 +669,35 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
   const [generated, setGenerated] = useState(false);
 
   useEffect(() => {
-    supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
-      setUnits(data ?? []);
+    supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => setUnits(data ?? []));
+    supabase.from('business_fronts').select('id, name').eq('active', true).order('name').then(({ data }) => setFronts(data ?? []));
+    supabase.from('categories').select('id, name, type').eq('active', true).order('name').then(({ data }) => {
+      const rows = (data ?? []) as Array<{ id: string; name: string; type: string }>;
+      setCatReceita(rows.filter(r => r.type === 'receita').map(({ id, name }) => ({ id, name })));
+      setCatDespesa(rows.filter(r => r.type === 'despesa').map(({ id, name }) => ({ id, name })));
     });
   }, []);
 
   const handleGenerate = async () => {
     await generate(filters);
     setGenerated(true);
+  };
+
+  const lookups: Lookups = {
+    categoriesByType: { receita: catReceita, despesa: catDespesa },
+    units,
+    fronts,
+  };
+
+  const api: FixApi = {
+    fixing,
+    apply: async (item, patch, message) => {
+      const ok = await fixTransaction(item.id, patch);
+      if (ok) {
+        const short = item.description.length > 40 ? item.description.slice(0, 40) + '…' : item.description;
+        sonner.success('✓ Lançamento corrigido', { description: `${short} — ${message}` });
+      }
+    },
   };
 
   // Injeta o contexto da Reconciliação no Kaikin para perguntas contextualizadas
@@ -764,8 +788,8 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
 
       {generated && data && (
         <div className="grid lg:grid-cols-2 gap-4">
-          <Bridge title="Receitas" side={data.receitas} color="success" />
-          <Bridge title="Despesas" side={data.despesas} color="destructive" />
+          <Bridge title="Receitas" side={data.receitas} color="success" kind="receita" lookups={lookups} api={api} />
+          <Bridge title="Despesas" side={data.despesas} color="destructive" kind="despesa" lookups={lookups} api={api} />
         </div>
       )}
 
@@ -796,7 +820,7 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
       )}
 
       {generated && data && (
-        <Checklist items={data.checklist} data={data} />
+        <Checklist items={data.checklist} data={data} lookups={lookups} api={api} />
       )}
 
       {generated && data && (
