@@ -29,8 +29,11 @@ export interface DashboardData {
   dueTodayBills: OverdueBill[];
   monthlyData: { label: string; receitas: number; despesas: number; receitasProv: number; despesasProv: number }[];
   categoryData: { name: string; value: number }[];
+  receitaCategoryData: { name: string; value: number }[];
   loading: boolean;
   semCategoria: number;
+  semCategoriaReceita: number;
+  semCategoriaDespesa: number;
   semUnidade: number;
   margemContribuicao: number;
   variacaoReceita: number | null;
@@ -57,8 +60,11 @@ export function useDashboard(filters?: DashboardFilters) {
     dueTodayBills: [],
     monthlyData: [],
     categoryData: [],
+    receitaCategoryData: [],
     loading: true,
     semCategoria: 0,
+    semCategoriaReceita: 0,
+    semCategoriaDespesa: 0,
     semUnidade: 0,
     margemContribuicao: 0,
     variacaoReceita: null,
@@ -107,12 +113,16 @@ export function useDashboard(filters?: DashboardFilters) {
       let despesasProvisionadas = 0;
       let contasAtrasadas = 0;
       let semCategoria = 0;
+      let semCategoriaReceita = 0;
+      let semCategoriaDespesa = 0;
       let semUnidade = 0;
       let despesasVariaveisMes = 0;
 
       const monthMap = new Map<string, { receitas: number; despesas: number; receitasProv: number; despesasProv: number }>();
       const catMap = new Map<string, number>();
       const catProvMap = new Map<string, number>();
+      const recCatMap = new Map<string, number>();
+      const recCatProvMap = new Map<string, number>();
 
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
@@ -121,7 +131,11 @@ export function useDashboard(filters?: DashboardFilters) {
 
         // Count incomplete data
         if (tx.status !== 'cancelado') {
-          if (!tx.category_id) semCategoria++;
+          if (!tx.category_id) {
+            semCategoria++;
+            if (tx.type === 'receita') semCategoriaReceita++;
+            else semCategoriaDespesa++;
+          }
           if (!tx.unit_id) semUnidade++;
         }
 
@@ -166,11 +180,20 @@ export function useDashboard(filters?: DashboardFilters) {
           const catId = tx.category_id || 'sem-categoria';
           catProvMap.set(catId, (catProvMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
         }
+        if (tx.type === 'receita' && competenceMonth === currentMonth && isPaid) {
+          const catId = tx.category_id || 'sem-categoria';
+          recCatMap.set(catId, (recCatMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
+        }
+        if (tx.type === 'receita' && competenceMonth === currentMonth && isProvisioned) {
+          const catId = tx.category_id || 'sem-categoria';
+          recCatProvMap.set(catId, (recCatProvMap.get(catId) || 0) + (Number(tx.net_amount) || 0));
+        }
       });
 
       // If including provisioned, merge provisioned categories into catMap
       if (filters?.includeProvisioned) {
         catProvMap.forEach((v, k) => catMap.set(k, (catMap.get(k) || 0) + v));
+        recCatProvMap.forEach((v, k) => recCatMap.set(k, (recCatMap.get(k) || 0) + v));
       }
 
       // Build monthly array
@@ -191,14 +214,25 @@ export function useDashboard(filters?: DashboardFilters) {
 
       // Category names
       let categoryData: { name: string; value: number }[] = [];
+      let receitaCategoryData: { name: string; value: number }[] = [];
+      const allCatIds = Array.from(
+        new Set(
+          [...catMap.keys(), ...recCatMap.keys()].filter((id) => id !== 'sem-categoria')
+        )
+      );
+      let nameMap = new Map<string, string>();
+      if (allCatIds.length > 0) {
+        const { data: cats } = await supabase.from('categories').select('id, name').in('id', allCatIds);
+        nameMap = new Map((cats ?? []).map((c: any) => [c.id, c.name]));
+      }
       if (catMap.size > 0) {
-        const catIds = Array.from(catMap.keys()).filter(id => id !== 'sem-categoria');
-        let nameMap = new Map<string, string>();
-        if (catIds.length > 0) {
-          const { data: cats } = await supabase.from('categories').select('id, name').in('id', catIds);
-          nameMap = new Map((cats ?? []).map((c: any) => [c.id, c.name]));
-        }
         categoryData = Array.from(catMap.entries()).map(([id, value]) => ({
+          name: id === 'sem-categoria' ? 'Sem Categoria' : (nameMap.get(id) || 'Outro'),
+          value,
+        }));
+      }
+      if (recCatMap.size > 0) {
+        receitaCategoryData = Array.from(recCatMap.entries()).map(([id, value]) => ({
           name: id === 'sem-categoria' ? 'Sem Categoria' : (nameMap.get(id) || 'Outro'),
           value,
         }));
@@ -300,8 +334,9 @@ export function useDashboard(filters?: DashboardFilters) {
       setData({
         saldoTotal, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas,
         contasAtrasadas, vencendoHoje,
-        overdueBills, dueTodayBills, monthlyData, categoryData, loading: false,
-        semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa,
+        overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading: false,
+        semCategoria, semCategoriaReceita, semCategoriaDespesa,
+        semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa,
         unitRanking,
       });
     } catch {
