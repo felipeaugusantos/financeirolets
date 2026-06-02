@@ -1,48 +1,65 @@
-# Explicações em linguagem simples na Reconciliação
+# Checklist de Conferência / Divergências na Reconciliação
 
 ## Objetivo
-Tornar a tela de Reconciliação Dashboard ↔ DRE compreensível para usuários não-contábeis, traduzindo cada regra técnica (competência vs caixa, provisionados, pagos de período anterior, etc.) em frases simples conectadas aos valores reais calculados.
+Transformar a tela de Reconciliação em algo acionável: além de mostrar "por que difere", listar **o que conferir** com status (ok / atenção / erro) e atalhos para investigar cada item.
 
 ## Onde
-Arquivo único: `src/components/reports/ReconciliationReport.tsx` (o cálculo em `useReconciliation.ts` já entrega tudo o que precisamos — não muda).
+- `src/hooks/useReconciliation.ts` — adicionar derivação dos checks (sem nova query).
+- `src/components/reports/ReconciliationReport.tsx` — novo card "Checklist de conferência" entre o "Resumo em uma frase" e os cards de regras.
+- (Opcional) link de "Ver no Transações" usando filtros via querystring se a página já suportar.
 
-## O que adicionar
+## Checks propostos
+Cada check vira um item com status, título, frase explicativa, valor agregado e — quando aplicável — botão "Ver lançamentos" que abre o `DetailPanel` reutilizado das pontes.
 
-### 1. Campo `plain` em cada RULE
-Estender o array `RULES` com uma função `plain(side)` que retorna uma frase contextualizada com os valores reais formatados, por exemplo:
+| # | Check | Severidade | Regra |
+|---|------|-----------|-------|
+| 1 | Identidade Competência fecha | error se quebra | `dashboard + provisionado == dreCompetenciaFull` (tolerância 0,01) |
+| 2 | Identidade Caixa fecha | error se quebra | `dashboard + pagoDePeriodoAnterior − pagoForaDaCompetencia == dreCaixa` |
+| 3 | Provisionado vencido | warn se há `pendente/agendado` com `due_date < hoje` no período | usa `details.provisionado.items` filtrando por `due_date` (precisa expor `due_date` no `TxDetail`) |
+| 4 | Pagos fora da competência | warn se `count > 0` | já calculado |
+| 5 | Pagos de período anterior entrando agora | info se `count > 0` | já calculado |
+| 6 | Lançamentos sem categoria | warn se houver | `category_name === 'Sem categoria'` em qualquer bucket + agregar nas pontes principais |
+| 7 | Lançamentos sem frente | info se houver | `front_name === 'Sem frente'` |
+| 8 | Lançamentos sem unidade | warn se houver | precisa expor `unit_id` no `TxDetail` ou contar no hook |
+| 9 | Valor líquido negativo / zero em receita ou despesa | warn | `amount <= 0` |
+| 10 | Provisionado > Realizado | info se `provisionado > dashboard` em receita ou despesa | comparação de totais |
 
-- **Dashboard**: "Tudo que foi efetivamente pago/recebido neste período e cuja data de competência também cai aqui. Hoje são R$ X em N lançamentos — é o número que aparece no Dashboard."
-- **Provisionado**: "São R$ X em N contas com data deste período mas que ainda não foram pagas/recebidas. O Dashboard ignora; o DRE Competência inclui."
-- **DRE Competência (cheio)**: "Soma tudo que pertence ao mês pela data de competência, esteja pago ou não. Dá R$ X = Dashboard (R$ Y) + Provisionado (R$ Z)."
-- **DRE Competência (somente realizado)**: "Mesma lógica do Dashboard: só conta o que já entrou/saiu. Por isso bate exatamente: R$ X."
-- **Pagos de período anterior**: "N pagamentos de R$ X feitos agora, mas referentes a meses anteriores. Entram no caixa deste mês, mas não no DRE por competência."
-- **Pagos fora da competência**: "N lançamentos de R$ X cuja competência é deste mês, mas o pagamento caiu fora. Aparecem no DRE Competência, mas não no caixa deste período."
-- **DRE Caixa**: "Só olha a data de pagamento. R$ X = Dashboard (R$ Y) + pagos de antes (R$ Z) − pagos fora (R$ W)."
+## Mudanças técnicas
 
-### 2. UI dentro de `RulesBreakdown`
-Em cada card de regra, adicionar abaixo de "Regra" e "Fórmula" um terceiro bloco:
+### `useReconciliation.ts`
+- Incluir `due_date` e `unit_id` em `TxDetail` (selecionar campos extras no select já existente).
+- Adicionar struct `ChecklistItem`:
+  ```ts
+  type Severity = 'ok' | 'info' | 'warn' | 'error';
+  interface ChecklistItem {
+    id: string;
+    severity: Severity;
+    title: string;
+    message: string;
+    count?: number;
+    amount?: number;
+    bucketKey?: BucketKey;       // se quisermos abrir DetailPanel
+    side?: 'receita' | 'despesa';
+  }
+  ```
+- Função pura `buildChecklist(rec: SideData, des: SideData, today: string): ChecklistItem[]` chamada ao final do `generate`.
+- Expor `checklist: ChecklistItem[]` no `ReconciliationData`.
 
-- Label: **"Em palavras"** com ícone `MessageCircle` (lucide).
-- Texto da frase com os valores reais em **negrito** (ex.: `<strong>R$ 15.000,00</strong>`).
-- Estilo: `text-xs leading-relaxed text-foreground/80` num bloco com fundo `bg-primary/5` arredondado.
+### `ReconciliationReport.tsx`
+- Novo componente `Checklist({ items, data })`:
+  - Card com título "Checklist de conferência" + badge resumo (ex.: `2 atenção • 1 erro`).
+  - Lista de linhas com ícone (`CheckCircle2`, `Info`, `AlertTriangle`, `XCircle` do lucide), título, mensagem e valor formatado.
+  - Borda lateral colorida por severidade usando tokens (`border-success`, `border-primary`, `border-warning`/`border-amber-500`, `border-destructive`).
+  - Linha expansível quando há `bucketKey + side` → reaproveita `DetailPanel` existente.
+  - Filtro topo: "Mostrar só itens com atenção" (toggle).
+- Inserir card entre "Resumo em uma frase" e a grade de `RulesBreakdown`.
 
-### 3. Banner de leitura rápida no topo
-Acima dos dois cards de `RulesBreakdown`, adicionar um único Card "Resumo em uma frase" que monta a história do período:
-
-> "Neste período seu Dashboard mostra **R$ X em receitas** e **R$ Y em despesas** (já realizadas). O DRE pela competência adiciona **R$ Z provisionado**; o DRE pelo caixa ajusta em **+R$ A** (pagos de antes) e **−R$ B** (pagos fora), chegando a **R$ C**."
-
-Valores e cores semânticas (success/destructive) usando tokens do design system.
-
-### 4. Remover/encolher o card "Como ler"
-O card genérico atual no fim da tela vira redundante — substituir por um pequeno rodapé linkando o novo conteúdo, ou removê-lo.
-
-## Detalhes técnicos
-- Sem alteração no hook nem no banco — toda info necessária já está em `SideData`.
-- Frases geradas via template strings; helper `fmt()` já existe para moeda.
-- Manter responsivo (grid `lg:grid-cols-2`) e tokens semânticos (`bg-primary/5`, `text-success`, `text-destructive`).
-- Reutilizar `Card`, `Badge`, `cn` já importados.
+### Tokens / estilo
+- Reaproveitar tokens semânticos (`bg-success/5`, `bg-destructive/5`, `bg-amber-500/5` ou `bg-warning/5` se existir). Verificar `index.css` antes de introduzir cor nova.
+- Mobile-first: linhas em coluna no mobile, grid 2 colunas (status + conteúdo) no desktop.
 
 ## Fora de escopo
-- Mudanças em DRE, Dashboard ou hook `useReconciliation`.
-- Tradução para outros idiomas.
-- Exportação PDF do conteúdo novo (pode ser pedido depois).
+- Persistir resolução dos itens ("marquei como verificado") — pode virar outro pedido.
+- Notificações ou tasks automáticas.
+- Alterações nos cálculos de DRE/Dashboard.
+- Exportação do checklist em PDF (fácil de adicionar depois, junto com o restante da reconciliação).
