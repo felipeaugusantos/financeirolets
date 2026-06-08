@@ -330,9 +330,9 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
           {[1, 2, 3, 4, 5].map(i => (
-            <Card key={i} className="shadow-card rounded-2xl border-border">
+            <Card key={i} className="shadow-card rounded-2xl border-border min-w-0">
               <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
               <CardContent><Skeleton className="h-8 w-32" /></CardContent>
             </Card>
@@ -434,19 +434,19 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         {cards.map((card) => (
-          <Card key={card.title} className="shadow-card rounded-2xl border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-medium text-muted-foreground">{card.title}</CardTitle>
-              <card.icon className={`h-4 w-4 ${card.color}`} />
+          <Card key={card.title} className="shadow-card rounded-2xl border-border min-w-0">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground truncate">{card.title}</CardTitle>
+              <card.icon className={`h-4 w-4 shrink-0 ${card.color}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-lg md:text-2xl font-bold font-heading text-card-foreground">
+            <CardContent className="min-w-0">
+              <div className="text-base sm:text-lg lg:text-2xl font-bold font-heading text-card-foreground break-words tabular-nums leading-tight">
                 {card.value}
               </div>
               {card.sub && (
-                <p className="text-[10px] text-muted-foreground mt-1">{card.sub}</p>
+                <p className="text-[10px] text-muted-foreground mt-1 break-words">{card.sub}</p>
               )}
             </CardContent>
           </Card>
