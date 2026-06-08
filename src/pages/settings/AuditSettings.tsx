@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, History, Filter, Eye } from 'lucide-react';
+import { ArrowLeft, History, Filter, Eye, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +29,25 @@ const ACTION_COLORS: Record<string, string> = {
   INSERT: 'bg-success/10 text-success border-success/30',
   UPDATE: 'bg-secondary/10 text-secondary border-secondary/30',
   DELETE: 'bg-destructive/10 text-destructive border-destructive/30',
+  RECONCILIATION_FIX: 'bg-accent/10 text-accent border-accent/30',
 };
+
+const ACTION_LABEL: Record<string, string> = {
+  INSERT: 'Criação',
+  UPDATE: 'Atualização',
+  DELETE: 'Exclusão',
+  RECONCILIATION_FIX: 'Reconciliação',
+};
+
+function todayIso(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+function startOfMonthIso() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -56,9 +74,11 @@ function valueDisplay(v: any) {
 export default function AuditSettings({ onBack }: Props) {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableFilter, setTableFilter] = useState<string>('__all__');
   const [actionFilter, setActionFilter] = useState<string>('__all__');
+  const [unitFilter, setUnitFilter] = useState<string>('__all__');
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -67,10 +87,23 @@ export default function AuditSettings({ onBack }: Props) {
 
   useEffect(() => {
     (async () => {
+      const { data } = await supabase.from('units').select('id, name').order('name');
+      setUnits((data ?? []) as any);
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
       setLoading(true);
       let q = supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
       if (tableFilter !== '__all__') q = q.eq('table_name', tableFilter);
       if (actionFilter !== '__all__') q = q.eq('action', actionFilter);
+      if (unitFilter !== '__all__') {
+        // unit_id está dentro de new_data/old_data (jsonb) — filtra em ambos
+        q = q.or(
+          `new_data->>unit_id.eq.${unitFilter},old_data->>unit_id.eq.${unitFilter}`,
+        );
+      }
       if (dateFrom) q = q.gte('created_at', dateFrom);
       if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59');
       const { data, error } = await q;
@@ -94,9 +127,10 @@ export default function AuditSettings({ onBack }: Props) {
       }
       setLoading(false);
     })();
-  }, [tableFilter, actionFilter, dateFrom, dateTo, toast]);
+  }, [tableFilter, actionFilter, unitFilter, dateFrom, dateTo, toast]);
 
   const tables = useMemo(() => Array.from(new Set(rows.map((r) => r.table_name))), [rows]);
+  const unitName = (id?: string | null) => (id ? units.find((u) => u.id === id)?.name : undefined);
   const filtered = useMemo(() => {
     if (!search) return rows;
     const s = search.toLowerCase();
@@ -128,7 +162,57 @@ export default function AuditSettings({ onBack }: Props) {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Filter className="h-4 w-4" /> Filtros
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl h-8 text-xs"
+              onClick={() => { setDateFrom(todayIso()); setDateTo(todayIso()); }}
+            >Hoje</Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl h-8 text-xs"
+              onClick={() => { setDateFrom(todayIso(7)); setDateTo(todayIso()); }}
+            >Últimos 7 dias</Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl h-8 text-xs"
+              onClick={() => { setDateFrom(todayIso(30)); setDateTo(todayIso()); }}
+            >Últimos 30 dias</Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl h-8 text-xs"
+              onClick={() => { setDateFrom(startOfMonthIso()); setDateTo(todayIso()); }}
+            >Este mês</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="rounded-xl h-8 text-xs"
+              onClick={() => {
+                setTableFilter('__all__'); setActionFilter('__all__'); setUnitFilter('__all__');
+                setDateFrom(''); setDateTo(''); setSearch('');
+              }}
+            >Limpar</Button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+            <div>
+              <Label className="text-xs">Unidade</Label>
+              <Select value={unitFilter} onValueChange={setUnitFilter}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {units.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label className="text-xs">Tabela</Label>
               <Select value={tableFilter} onValueChange={setTableFilter}>
@@ -148,6 +232,7 @@ export default function AuditSettings({ onBack }: Props) {
                   <SelectItem value="INSERT">Criação</SelectItem>
                   <SelectItem value="UPDATE">Atualização</SelectItem>
                   <SelectItem value="DELETE">Exclusão</SelectItem>
+                  <SelectItem value="RECONCILIATION_FIX">Reconciliação</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -164,6 +249,9 @@ export default function AuditSettings({ onBack }: Props) {
               <Input className="rounded-xl" placeholder="Tabela, ID, usuário..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            {filtered.length} registro(s) — máx. 500 mais recentes
+          </p>
         </CardContent>
       </Card>
 
@@ -181,10 +269,19 @@ export default function AuditSettings({ onBack }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className={`text-[10px] border ${ACTION_COLORS[r.action] || ''}`}>
-                      {r.action}
+                      {ACTION_LABEL[r.action] || r.action}
                     </Badge>
                     <span className="text-sm font-medium">{r.table_name}</span>
                     <span className="text-xs text-muted-foreground font-mono truncate">{r.record_id.slice(0, 8)}…</span>
+                    {(() => {
+                      const uid = r.new_data?.unit_id || r.old_data?.unit_id;
+                      const name = unitName(uid);
+                      return name ? (
+                        <Badge variant="outline" className="text-[10px] border-accent/30 text-accent gap-1">
+                          <Building2 className="h-3 w-3" />{name}
+                        </Badge>
+                      ) : null;
+                    })()}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {fmtDate(r.created_at)} · {r.user_id ? (profiles[r.user_id] || 'Usuário') : 'Sistema'}
@@ -204,7 +301,7 @@ export default function AuditSettings({ onBack }: Props) {
           <DialogHeader>
             <DialogTitle className="font-heading flex items-center gap-2">
               <Badge variant="outline" className={`text-xs border ${ACTION_COLORS[detail?.action || ''] || ''}`}>
-                {detail?.action}
+                {ACTION_LABEL[detail?.action || ''] || detail?.action}
               </Badge>
               {detail?.table_name}
             </DialogTitle>
@@ -216,6 +313,11 @@ export default function AuditSettings({ onBack }: Props) {
                   ID: <code className="font-mono">{detail.record_id}</code> ·{' '}
                   {fmtDate(detail.created_at)} ·{' '}
                   {detail.user_id ? (profiles[detail.user_id] || detail.user_id.slice(0, 8)) : 'Sistema'}
+                  {(() => {
+                    const uid = detail.new_data?.unit_id || detail.old_data?.unit_id;
+                    const name = unitName(uid);
+                    return name ? <> · Unidade: <strong>{name}</strong></> : null;
+                  })()}
                 </div>
                 <div className="border rounded-xl overflow-hidden">
                   <table className="w-full text-xs">
