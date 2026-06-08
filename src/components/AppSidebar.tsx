@@ -5,10 +5,12 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  History,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import {
   Sidebar,
   SidebarContent,
@@ -31,11 +33,17 @@ const navItems = [
   { title: 'Configurações', url: '/configuracoes', icon: Settings },
 ];
 
+const adminNavItems = [
+  { title: 'Auditoria', url: '/auditoria', icon: History },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const { signOut, user } = useAuth();
+  const { isAdmin } = useCurrentUserRoles();
+  const items = isAdmin ? [...navItems, ...adminNavItems] : navItems;
 
   return (
     <Sidebar collapsible="icon">
@@ -55,7 +63,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url}>
                     <NavLink
