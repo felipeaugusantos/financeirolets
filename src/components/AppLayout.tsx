@@ -13,10 +13,10 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden">
         {!isMobile && <AppSidebar />}
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 w-0">
           {/* Header */}
           <header className="h-14 flex items-center gap-3 border-b border-border px-4 bg-background sticky top-0 z-40">
             {!isMobile && <SidebarTrigger />}
@@ -30,8 +30,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           </header>
 
           {/* Main content */}
-          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-auto">
-            {children}
+          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-auto min-w-0">
+            <div className="min-w-0 max-w-full">{children}</div>
           </main>
 
           {/* Mobile bottom tabs */}
