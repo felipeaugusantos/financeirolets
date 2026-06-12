@@ -128,6 +128,7 @@ async function fetchPeriodValues(
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo)
     .not('status', 'eq', 'cancelado')
+    .eq('affects_dre', true)
     .limit(10000);
   if (filters.regime === 'caixa') {
     txQuery = txQuery.in('status', ['pago', 'recebido'] as any);

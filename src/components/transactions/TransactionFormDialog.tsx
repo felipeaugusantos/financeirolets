@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import SelectWithAdd from '@/components/ui/select-with-add';
@@ -77,6 +78,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [allocOpen, setAllocOpen] = useState(false);
+  const [affectsDre, setAffectsDre] = useState(true);
+  const [affectsCashflow, setAffectsCashflow] = useState(true);
 
   const isEditing = !!initialData?.id;
 
@@ -97,6 +100,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       setUnitId(initialData.unit_id || '');
       setFrontId(initialData.front_id || '');
       setNotes(initialData.notes || '');
+      setAffectsDre(initialData.affects_dre ?? true);
+      setAffectsCashflow(initialData.affects_cashflow ?? true);
       // Load existing allocations for editing
       if (initialData.id) {
         supabase.from('transaction_allocations')
@@ -146,6 +151,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setAllocations([]);
     setFiles([]);
     setAllocOpen(false);
+    setAffectsDre(true);
+    setAffectsCashflow(true);
   };
 
   const netAmount = (parseFloat(amount) || 0) - (parseFloat(taxAmount) || 0);
@@ -201,6 +208,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       is_recurring: isRecurring && !isInstallment,
       recurrence_frequency: isRecurring && !isInstallment ? recurrenceFrequency : undefined,
       recurrence_end_date: isRecurring && !isInstallment && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : undefined,
+      affects_dre: affectsDre,
+      affects_cashflow: affectsCashflow,
     };
     const ok = await onSave(input);
     setSaving(false);
@@ -262,6 +271,61 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 <Label className="text-xs text-muted-foreground">Valor Líquido</Label>
                 <Input value={netAmount.toFixed(2)} readOnly className="rounded-xl bg-muted border-border font-semibold" />
               </div>
+            </div>
+
+            {/* Visibilidade DRE x Caixa */}
+            <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-semibold text-card-foreground">Onde este lançamento aparece?</Label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  variant={affectsDre && affectsCashflow ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs h-7 rounded-lg"
+                  onClick={() => { setAffectsDre(true); setAffectsCashflow(true); }}
+                >
+                  Normal
+                </Button>
+                <Button
+                  type="button"
+                  variant={affectsDre && !affectsCashflow ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs h-7 rounded-lg"
+                  onClick={() => { setAffectsDre(true); setAffectsCashflow(false); }}
+                >
+                  Taxa / Ajuste (só DRE)
+                </Button>
+                <Button
+                  type="button"
+                  variant={!affectsDre && affectsCashflow ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs h-7 rounded-lg"
+                  onClick={() => { setAffectsDre(false); setAffectsCashflow(true); }}
+                >
+                  Transferência (só Caixa)
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+                  <Label htmlFor="aff-dre" className="text-xs cursor-pointer">📊 Aparece no DRE</Label>
+                  <Switch id="aff-dre" checked={affectsDre} onCheckedChange={setAffectsDre} />
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+                  <Label htmlFor="aff-cash" className="text-xs cursor-pointer">🏦 Aparece no Caixa</Label>
+                  <Switch id="aff-cash" checked={affectsCashflow} onCheckedChange={setAffectsCashflow} />
+                </div>
+              </div>
+              <p className={cn(
+                'text-xs px-2',
+                !affectsDre && !affectsCashflow ? 'text-destructive font-medium' : 'text-muted-foreground'
+              )}>
+                {affectsDre && affectsCashflow && 'Lançamento normal: entra no resultado e movimenta o saldo.'}
+                {affectsDre && !affectsCashflow && 'Ex.: taxa de cartão, depreciação. Entra no resultado, não mexe no saldo.'}
+                {!affectsDre && affectsCashflow && 'Ex.: transferência, empréstimo, recebimento líquido de cartão. Movimenta o saldo, não entra no resultado.'}
+                {!affectsDre && !affectsCashflow && '⚠️ Esse lançamento não aparece em lugar nenhum. Tem certeza?'}
+              </p>
             </div>
 
             {/* Dates */}

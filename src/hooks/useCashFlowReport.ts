@@ -30,6 +30,7 @@ export function useCashFlowReport() {
         .select('id, type, net_amount, payment_date, status, unit_id')
         .not('payment_date', 'is', null)
         .in('status', ['pago', 'recebido'] as any)
+        .eq('affects_cashflow', true)
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo);
 

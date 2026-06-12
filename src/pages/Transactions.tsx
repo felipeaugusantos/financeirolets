@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle } from 'lucide-react';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle, CreditCard } from 'lucide-react';
 import { useTransactions, TransactionFilters as TFilters, TransactionRow } from '@/hooks/useTransactions';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
+import CardSaleDialog from '@/components/transactions/CardSaleDialog';
 import TransactionFilters from '@/components/transactions/TransactionFilters';
 import TransactionList from '@/components/transactions/TransactionList';
 
@@ -17,10 +18,11 @@ export default function Transactions() {
   const [filters, setFilters] = useState<TFilters>({});
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cardSaleOpen, setCardSaleOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
 
   const appliedFilters = { ...filters, search: search || undefined };
-  const { data, loading, totals, create, update, remove, markAs } = useTransactions(appliedFilters);
+  const { data, loading, totals, create, update, remove, markAs, fetchData } = useTransactions(appliedFilters);
 
   const incompleteStats = useMemo(() => {
     const noCategory = data.filter(t => !t.category_id && t.status !== 'cancelado').length;
@@ -59,10 +61,16 @@ export default function Transactions() {
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Lançamentos</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas</p>
         </div>
-        <Button className="rounded-xl gap-2" onClick={handleNew}>
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Novo</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCardSaleOpen(true)}>
+            <CreditCard className="h-4 w-4" />
+            <span className="hidden sm:inline">Venda no cartão</span>
+          </Button>
+          <Button className="rounded-xl gap-2" onClick={handleNew}>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Novo</span>
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -140,8 +148,12 @@ export default function Transactions() {
           unit_id: editingTx.unit_id || undefined,
           front_id: editingTx.front_id || undefined,
           notes: editingTx.notes || undefined,
+          affects_dre: (editingTx as any).affects_dre,
+          affects_cashflow: (editingTx as any).affects_cashflow,
         } : undefined}
       />
+
+      <CardSaleDialog open={cardSaleOpen} onOpenChange={setCardSaleOpen} onCreated={fetchData} />
     </div>
   );
 }

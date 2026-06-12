@@ -23,6 +23,7 @@ Updated: now
 - [Transações: Anexos](mem://features/transacoes/anexos) — Suporte a múltiplos anexos em JPG/PNG/PDF via Supabase Storage.
 - [Transações: Rateio UX](mem://features/transacoes/ux-rateio-proporcional) — Rateio em % ou R$ com validação visual do total alocado.
 - [Transações: Import/Export CSV](mem://features/transacoes/import-export-csv) — Importação de CSV com mapeamento de colunas e backup total.
+- [Transações: Visibilidade DRE x Caixa](mem://features/transacoes/visibilidade-dre-caixa) — Flags affects_dre/affects_cashflow + atalho Venda no cartão (bruto/líquido vinculados).
 - [Contas a Pagar/Receber: Vencimentos](mem://features/contas-pagar-receber/gestao-vencimentos) — Cards de resumo e badges cronológicos.
 - [Contas a Pagar/Receber: Baixa](mem://features/contas-pagar-receber/baixa-assistida) — Exibição de PIX/banco e envio de comprovante na baixa.
 - [Contas a Pagar/Receber: Criação](mem://features/contas-pagar-receber/criacao-direta) — Pré-configuração automática de tipo e status pendente.

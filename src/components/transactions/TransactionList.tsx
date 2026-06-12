@@ -3,6 +3,7 @@ import { ptBR } from 'date-fns/locale';
 import { parseDateUTC } from '@/lib/utils';
 import { MoreHorizontal, CheckCircle, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -37,6 +38,34 @@ const STATUS_LABELS: Record<string, string> = {
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+}
+
+function VisibilityBadges({ tx }: { tx: TransactionRow }) {
+  const dre = tx.affects_dre !== false;
+  const cash = tx.affects_cashflow !== false;
+  if (dre && cash) return null;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className="inline-flex gap-1 items-center">
+        {!dre && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">só caixa</span>
+            </TooltipTrigger>
+            <TooltipContent>Não aparece no DRE</TooltipContent>
+          </Tooltip>
+        )}
+        {!cash && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">só DRE</span>
+            </TooltipTrigger>
+            <TooltipContent>Não movimenta o saldo bancário</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
+  );
 }
 
 export default function TransactionList({ data, loading, onEdit, onDelete, onMarkAs }: Props) {
@@ -95,6 +124,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
                       {tx.type === 'receita' ? '▲' : '▼'}
                     </span>
                     <p className="text-sm font-medium truncate text-card-foreground">{tx.description}</p>
+                    <VisibilityBadges tx={tx} />
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{format(parseDateUTC(tx.competence_date), 'dd/MM/yy')}</span>
@@ -149,6 +179,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
                   {tx.installment_total && (
                     <span className="text-[10px] text-muted-foreground">{tx.installment_number}/{tx.installment_total}</span>
                   )}
+                  <VisibilityBadges tx={tx} />
                 </div>
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">{tx.category?.name || '—'}</TableCell>

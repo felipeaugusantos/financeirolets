@@ -1,49 +1,97 @@
 ## Objetivo
 
-Transformar a Reconciliação Dashboard ↔ DRE em uma tela **acionável**: ao identificar uma divergência, o usuário corrige o lançamento direto na lista, vê um toast confirmando ("✓ Lançamento *X* corrigido") e os números/checklist se atualizam em tempo real, sem sair da tela.
+Permitir registrar lançamentos que **aparecem no DRE mas não no Caixa** (e vice-versa), para refletir corretamente situações como taxas de cartão, antecipações, transferências internas e ajustes — sem distorcer o saldo bancário nem o resultado.
 
-## O que fica acionável
+Também criar um atalho específico para **vendas no cartão**, capturando valor **bruto** e **taxa**, com cálculo automático do valor líquido que entra no banco.
 
-Cada item exibido no painel de detalhes (`DetailPanel`, usado tanto no Bridge quanto no Checklist) ganha uma coluna **Ações** com o(s) botão(ões) de correção apropriado(s) ao tipo de divergência:
+---
 
-| Divergência | Ação inline | Resultado no banco |
-|---|---|---|
-| **Provisionado** (pendente/agendado no período) | "Marcar como pago/recebido" | `status` → pago/recebido, `payment_date` = hoje |
-| **Provisionado vencido** | "Marcar como pago/recebido" + "Reagendar vencimento…" (popover com date input) | mesmo acima / atualiza `due_date` |
-| **Pago sem data de pagamento** | "Usar data de competência" / "Usar hoje" | preenche `payment_date` |
-| **Pago fora da competência** | "Alinhar competência ao pagamento" | `competence_date` = `payment_date` |
-| **Pago de período anterior** | "Alinhar competência ao pagamento" (move a competência para o período do caixa) | idem |
-| **Sem categoria** | Select inline de categorias (filtrado por tipo receita/despesa) | atualiza `category_id` |
-| **Sem unidade** | Select inline de unidades ativas | atualiza `unit_id` |
-| **Sem frente** | Select inline de frentes ativas | atualiza `front_id` |
-| **Valor líquido ≤ 0** | Botão "Abrir lançamento" (abre `TransactionFormDialog` em modo edição) | edição completa |
+## 1. Modelo de dados (migração)
 
-Cada ação dispara um único `UPDATE` em `transactions` (RLS já permite a admin/financeiro), depois:
-1. `toast.success("Lançamento corrigido", { description: "<descrição truncada>" })`
-2. Re-executa `generate(filters)` para recalcular Bridge, Checklist e Resumo.
+Adicionar 2 colunas booleanas em `transactions`:
+
+- `affects_dre` (default `true`) — entra na DRE/competência.
+- `affects_cashflow` (default `true`) — entra no Fluxo de Caixa e soma no saldo da conta.
+
+Não muda nada do que já existe (todos os lançamentos antigos ficam `true/true`).
+
+Backfill imediato: `UPDATE transactions SET affects_dre = true, affects_cashflow = true WHERE ...IS NULL`.
+
+Index parcial em `(affects_cashflow) WHERE affects_cashflow = false` para filtros rápidos.
+
+---
+
+## 2. UX do seletor (no formulário de lançamento)
+
+Logo abaixo da seção de valores, um bloco discreto chamado **"Onde este lançamento aparece?"** com 2 switches lado a lado:
+
+- ✅ **Aparece no DRE** (resultado/competência) — *default ligado*
+- ✅ **Aparece no Caixa** (saldo bancário/fluxo) — *default ligado*
+
+Abaixo, um texto-resumo dinâmico em tom amigável:
+
+```text
+Ambos ligados   → "Lançamento normal: entra no resultado e movimenta o saldo."
+Só DRE          → "Ex.: taxa de cartão, depreciação. Entra no resultado, não mexe no saldo."
+Só Caixa        → "Ex.: transferência, empréstimo. Movimenta o saldo, não entra no resultado."
+Ambos desligados → aviso vermelho "Esse lançamento não aparece em lugar nenhum. Tem certeza?"
+```
+
+Botões de atalho rápidos (chips clicáveis acima dos switches) para os 3 casos mais comuns:
+
+- **Normal** (DRE + Caixa)
+- **Taxa / Ajuste** (só DRE)
+- **Transferência** (só Caixa)
+
+---
+
+## 3. Atalho "Venda no cartão" (automação opcional)
+
+Novo botão no menu de Lançamentos: **"+ Venda no cartão"** (além do Novo lançamento normal). Abre um dialog específico com:
+
+- Data, Unidade, Categoria, Conta (banco que recebe o líquido), Bandeira (Visa/Master/Elo/Pix etc.), Modalidade (Débito / Crédito à vista / Antecipação).
+- **Valor bruto da venda** (R$).
+- **Taxa** — entrada em **% ou R$** (toggle), com cálculo ao vivo do valor líquido.
+- Campo opcional **"Taxa esperada (%)"** para alerta quando a real ficou acima do contratado (ex.: "Stone prometeu 5%, vieram 6,2%").
+
+Ao salvar, o sistema cria **2 lançamentos vinculados**:
+
+1. **Receita bruta** — valor cheio, `affects_dre=true`, `affects_cashflow=false` (não infla o caixa).
+2. **Receita líquida (entrada no banco)** — valor líquido, `affects_dre=false`, `affects_cashflow=true`, categoria padrão "Recebimento de cartão".
+
+Alternativa interna que pode ser configurada depois: bruto + despesa de taxa. Vamos com bruto/líquido por ser mais fiel ao extrato bancário (o que o usuário vê no banco é exatamente o líquido). Os dois lançamentos compartilham um `card_sale_group_id` (UUID) para rastreio e edição/exclusão em conjunto.
+
+---
+
+## 4. Impacto nos relatórios e telas existentes
+
+- **DRE (`useDreReport`)**: filtrar `affects_dre = true`.
+- **Fluxo de Caixa Realizado/Projetado (`useCashFlowReport`, `useCashFlowProjected`)**: filtrar `affects_cashflow = true`.
+- **Dashboard KPIs (Saldo, Receitas, Despesas do mês)**: respeitar `affects_cashflow` para saldo bancário; receitas/despesas do mês respeitam `affects_dre`.
+- **Contas a Pagar/Receber**: continuam mostrando tudo (operacional), mas badges visuais quando `!affects_cashflow` ou `!affects_dre`.
+- **Lista de Lançamentos**: ícones pequenos ao lado do valor — 📊 (DRE) e 🏦 (Caixa) acesos/apagados, com tooltip.
+- **Importação CSV**: aceitar as 2 colunas novas (opcionais, default true).
+
+---
+
+## 5. Permissões / auditoria
+
+- Alterar `affects_dre`/`affects_cashflow` em lançamento já pago: somente Admin/Financeiro (registra em `audit_logs` automaticamente via trigger existente).
+- Demais perfis veem o estado mas não editam pós-baixa.
+
+---
 
 ## Detalhes técnicos
 
-**`src/hooks/useReconciliation.ts`**
-- Expor uma função `fixTransaction(id, patch, opts?)` que faz `supabase.from('transactions').update(patch).eq('id', id)` e, em sucesso, chama `await generate(lastFilters)` (guardar o último `filters` em `ref`).
-- Retornar `{ data, loading, generate, fixTransaction, fixing }` (estado `fixing: string | null` p/ o id em processamento).
-- Para o painel saber qual contexto disparou o item, propagar o tipo do bucket/flag ao montar `BucketDetail` (adicionar `kind: BucketKey | FlagKey` em `BucketDetail` *opcional*) ou passar isso como prop do `DetailPanel`.
+**Arquivos a tocar:**
+- Migration: `add_visibility_flags_to_transactions.sql` (2 colunas + index + backfill).
+- `src/hooks/useTransactions.ts`: incluir flags no insert/update.
+- `src/components/transactions/TransactionFormDialog.tsx`: bloco "Onde aparece" + chips.
+- `src/components/transactions/CardSaleDialog.tsx` (**novo**): atalho cartão com bruto/taxa/líquido.
+- `src/pages/Transactions.tsx`: botão "+ Venda no cartão" ao lado do Novo.
+- `src/hooks/useDreReport.ts`, `useCashFlowReport.ts`, `useCashFlowProjected.ts`, `useDashboard.ts`: aplicar filtros de visibilidade.
+- `src/components/transactions/TransactionList.tsx`: badges 📊/🏦.
+- `src/pages/settings/ImportExportSettings.tsx`: mapear colunas extras no CSV.
+- Memory: novo arquivo `mem://features/transacoes/visibilidade-dre-caixa.md`.
 
-**`src/components/reports/ReconciliationReport.tsx`**
-- Novo componente `FixActions({ item, context, side, onFix })` que renderiza os botões/selects de acordo com `context` (bucket/flag).
-- `DetailPanel` recebe `context` e `side` (receita/despesa) e injeta `<FixActions>` em cada linha de `items`.
-- Para os selects inline, carregar **uma única vez** no `ReconciliationReport` as listas de `categories` (separadas por tipo), `units` e `business_fronts` ativos e passar via props/contexto local.
-- `TransactionFormDialog` reaproveitado para o caso "Valor líquido ≤ 0" (já existe e aceita `editing`).
-- Loading por linha: spinner pequeno no botão enquanto `fixing === item.id`.
-- Após sucesso, mantém o painel aberto para o usuário ver que o item saiu da lista (o `generate` recalcula tudo).
-
-**Aviso ao usuário**
-- Usar `sonner` (`toast.success`) para confirmação rápida no canto.
-- Mensagem padrão: `"✓ Corrigido"` + `description` com a descrição curta do lançamento e a mudança aplicada (ex.: `"Aluguel — marcado como pago em 02/06/2026"`).
-
-## Fora do escopo
-
-- Correções em massa (selecionar várias linhas e aplicar a mesma ação) — pode ser uma evolução futura.
-- Edição de valor/imposto/parcelamento inline — continua via `TransactionFormDialog`.
-- Sincronização realtime via canal Supabase — o refresh manual após cada fix já mantém tudo coerente para o usuário atual.
-- Alterar regras/lógica de cálculo do hook — só adicionamos a função de update.
+**Sem mudanças** em: estrutura DRE, orçamento, rateio, anexos.

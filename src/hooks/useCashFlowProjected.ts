@@ -35,6 +35,7 @@ export function useCashFlowProjected() {
         .select('id, type, net_amount, payment_date, unit_id')
         .not('payment_date', 'is', null)
         .in('status', ['pago', 'recebido'] as any)
+        .eq('affects_cashflow', true)
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo);
 
@@ -44,6 +45,7 @@ export function useCashFlowProjected() {
         .select('id, type, net_amount, due_date, unit_id')
         .not('due_date', 'is', null)
         .in('status', ['pendente', 'agendado'] as any)
+        .eq('affects_cashflow', true)
         .gte('due_date', filters.dateFrom)
         .lte('due_date', filters.dateTo);
 
