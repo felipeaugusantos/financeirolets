@@ -127,7 +127,7 @@ export function useDashboard(filters?: DashboardFilters) {
 
       let txQuery = supabase
         .from('transactions')
-        .select('type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id')
+        .select('type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id, affects_dre, affects_cashflow')
         .or(`and(competence_date.gte.${queryStart},competence_date.lte.${queryEnd}),and(payment_date.gte.${queryStart},payment_date.lte.${queryEnd})`)
         .not('status', 'eq', 'cancelado')
         .limit(10000);
@@ -165,11 +165,13 @@ export function useDashboard(filters?: DashboardFilters) {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
         const val = Number(tx.net_amount) || 0;
+        const affectsCash = tx.affects_cashflow !== false;
+        const affectsDre = tx.affects_dre !== false;
 
-        const paidInPeriod = isPaid && inRange(tx.payment_date, rangeStart, rangeEnd);
-        const provInPeriod = isProvisioned && inRange(tx.competence_date, rangeStart, rangeEnd);
-        const paidInPrev = isPaid && inRange(tx.payment_date, prevStart, prevEnd);
-        const provInPrev = isProvisioned && inRange(tx.competence_date, prevStart, prevEnd);
+        const paidInPeriod = isPaid && affectsCash && inRange(tx.payment_date, rangeStart, rangeEnd);
+        const provInPeriod = isProvisioned && affectsDre && inRange(tx.competence_date, rangeStart, rangeEnd);
+        const paidInPrev = isPaid && affectsCash && inRange(tx.payment_date, prevStart, prevEnd);
+        const provInPrev = isProvisioned && affectsDre && inRange(tx.competence_date, prevStart, prevEnd);
 
         // Incomplete data: count only items relevant to current range
         if (tx.status !== 'cancelado' && (paidInPeriod || provInPeriod)) {
@@ -293,6 +295,7 @@ export function useDashboard(filters?: DashboardFilters) {
         .from('transactions')
         .select('type, net_amount, status')
         .in('status', ['pago', 'recebido'] as any)
+        .eq('affects_cashflow', true)
         .limit(10000);
       saldoQuery = applyFilters(saldoQuery);
       const { data: allTxs } = await saldoQuery;

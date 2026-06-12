@@ -31,6 +31,9 @@ export interface TransactionRow {
   recurrence_frequency?: 'semanal' | 'mensal' | 'anual' | null;
   recurrence_end_date?: string | null;
   recurrence_parent_id?: string | null;
+  affects_dre?: boolean;
+  affects_cashflow?: boolean;
+  card_sale_group_id?: string | null;
   // joined
   category?: { name: string; type: string } | null;
   account?: { name: string } | null;
@@ -83,6 +86,9 @@ export interface TransactionInput {
   is_recurring?: boolean;
   recurrence_frequency?: 'semanal' | 'mensal' | 'anual';
   recurrence_end_date?: string;
+  affects_dre?: boolean;
+  affects_cashflow?: boolean;
+  card_sale_group_id?: string | null;
 }
 
 export function useTransactions(filters: TransactionFilters = {}) {
@@ -154,6 +160,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
       front_id: input.front_id || null,
       notes: input.notes || null,
       created_by: user.id,
+      affects_dre: input.affects_dre ?? true,
+      affects_cashflow: input.affects_cashflow ?? true,
+      card_sale_group_id: input.card_sale_group_id ?? null,
       // Recorrência só é aplicada à 1ª linha (matriz). Veja loop abaixo.
     };
 
@@ -258,6 +267,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (input.is_recurring !== undefined) updateData.is_recurring = input.is_recurring;
     if (input.recurrence_frequency !== undefined) updateData.recurrence_frequency = input.recurrence_frequency || null;
     if (input.recurrence_end_date !== undefined) updateData.recurrence_end_date = input.recurrence_end_date || null;
+    if (input.affects_dre !== undefined) updateData.affects_dre = input.affects_dre;
+    if (input.affects_cashflow !== undefined) updateData.affects_cashflow = input.affects_cashflow;
 
     const { error } = await supabase.from('transactions').update(updateData).eq('id', id);
     if (error) {
