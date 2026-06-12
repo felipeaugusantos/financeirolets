@@ -273,6 +273,61 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
               </div>
             </div>
 
+            {/* Visibilidade DRE x Caixa */}
+            <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-semibold text-card-foreground">Onde este lançamento aparece?</Label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  variant={affectsDre && affectsCashflow ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs h-7 rounded-lg"
+                  onClick={() => { setAffectsDre(true); setAffectsCashflow(true); }}
+                >
+                  Normal
+                </Button>
+                <Button
+                  type="button"
+                  variant={affectsDre && !affectsCashflow ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs h-7 rounded-lg"
+                  onClick={() => { setAffectsDre(true); setAffectsCashflow(false); }}
+                >
+                  Taxa / Ajuste (só DRE)
+                </Button>
+                <Button
+                  type="button"
+                  variant={!affectsDre && affectsCashflow ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs h-7 rounded-lg"
+                  onClick={() => { setAffectsDre(false); setAffectsCashflow(true); }}
+                >
+                  Transferência (só Caixa)
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+                  <Label htmlFor="aff-dre" className="text-xs cursor-pointer">📊 Aparece no DRE</Label>
+                  <Switch id="aff-dre" checked={affectsDre} onCheckedChange={setAffectsDre} />
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+                  <Label htmlFor="aff-cash" className="text-xs cursor-pointer">🏦 Aparece no Caixa</Label>
+                  <Switch id="aff-cash" checked={affectsCashflow} onCheckedChange={setAffectsCashflow} />
+                </div>
+              </div>
+              <p className={cn(
+                'text-xs px-2',
+                !affectsDre && !affectsCashflow ? 'text-destructive font-medium' : 'text-muted-foreground'
+              )}>
+                {affectsDre && affectsCashflow && 'Lançamento normal: entra no resultado e movimenta o saldo.'}
+                {affectsDre && !affectsCashflow && 'Ex.: taxa de cartão, depreciação. Entra no resultado, não mexe no saldo.'}
+                {!affectsDre && affectsCashflow && 'Ex.: transferência, empréstimo, recebimento líquido de cartão. Movimenta o saldo, não entra no resultado.'}
+                {!affectsDre && !affectsCashflow && '⚠️ Esse lançamento não aparece em lugar nenhum. Tem certeza?'}
+              </p>
+            </div>
+
             {/* Dates */}
             <div className="grid grid-cols-3 gap-3">
               <DatePickerField label="Competência *" value={competenceDate} onChange={(d) => d && setCompetenceDate(d)} />
