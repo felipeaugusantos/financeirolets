@@ -121,7 +121,21 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (filters.partner_id) query = query.eq('partner_id', filters.partner_id);
     if (filters.dateFrom) query = query.gte('competence_date', filters.dateFrom);
     if (filters.dateTo) query = query.lte('competence_date', filters.dateTo);
-    if (filters.search) query = query.ilike('description', `%${filters.search}%`);
+    if (filters.search) {
+      const raw = filters.search.trim();
+      // Tenta interpretar como valor numérico (pt-BR: "1.234,56" ou "100,50" ou "100.50" ou "100")
+      const normalized = raw.replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+      const asNumber = Number(normalized);
+      const isNumeric = normalized !== '' && !isNaN(asNumber) && /^[\d.,]+$/.test(raw);
+      if (isNumeric) {
+        const safe = raw.replace(/[%,()]/g, ' ');
+        query = query.or(
+          `description.ilike.%${safe}%,amount.eq.${asNumber},net_amount.eq.${asNumber}`
+        );
+      } else {
+        query = query.ilike('description', `%${raw}%`);
+      }
+    }
 
     const { data: rows, error } = await query;
     if (error) {
