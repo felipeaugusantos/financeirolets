@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import SelectWithAdd from '@/components/ui/select-with-add';
@@ -77,6 +78,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [allocOpen, setAllocOpen] = useState(false);
+  const [affectsDre, setAffectsDre] = useState(true);
+  const [affectsCashflow, setAffectsCashflow] = useState(true);
 
   const isEditing = !!initialData?.id;
 
@@ -97,6 +100,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       setUnitId(initialData.unit_id || '');
       setFrontId(initialData.front_id || '');
       setNotes(initialData.notes || '');
+      setAffectsDre(initialData.affects_dre ?? true);
+      setAffectsCashflow(initialData.affects_cashflow ?? true);
       // Load existing allocations for editing
       if (initialData.id) {
         supabase.from('transaction_allocations')
@@ -146,6 +151,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setAllocations([]);
     setFiles([]);
     setAllocOpen(false);
+    setAffectsDre(true);
+    setAffectsCashflow(true);
   };
 
   const netAmount = (parseFloat(amount) || 0) - (parseFloat(taxAmount) || 0);
@@ -201,6 +208,8 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       is_recurring: isRecurring && !isInstallment,
       recurrence_frequency: isRecurring && !isInstallment ? recurrenceFrequency : undefined,
       recurrence_end_date: isRecurring && !isInstallment && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : undefined,
+      affects_dre: affectsDre,
+      affects_cashflow: affectsCashflow,
     };
     const ok = await onSave(input);
     setSaving(false);
