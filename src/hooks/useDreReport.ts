@@ -20,6 +20,7 @@ export interface DreFilters {
   dateFrom: string;
   dateTo: string;
   unit_id?: string;
+  category_id?: string;
   regime: 'competencia' | 'caixa';
   includeBudget?: boolean;
   includePrevious?: boolean;
@@ -130,6 +131,11 @@ async function fetchPeriodValues(
     .not('status', 'eq', 'cancelado')
     .eq('affects_dre', true)
     .limit(10000);
+  if (filters.category_id) {
+    txQuery = (filters.category_id === '__none__' || filters.category_id === '__null__')
+      ? txQuery.is('category_id', null)
+      : txQuery.eq('category_id', filters.category_id);
+  }
   if (filters.regime === 'caixa') {
     txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
   } else if (filters.onlyRealized) {

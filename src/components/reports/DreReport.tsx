@@ -22,6 +22,7 @@ const fmtPct = (v: number) =>
 export default function DreReport({ onBack }: { onBack: () => void }) {
   const { lines, loading, generate, unallocatedTotal, unallocatedCount } = useDreReport();
   const [units, setUnits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
     dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
     dateTo: new Date().toISOString().split('T')[0],
@@ -38,6 +39,9 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
       setUnits(data ?? []);
+    });
+    supabase.from('categories').select('id, name').eq('active', true).order('name').then(({ data }) => {
+      setCategories(data ?? []);
     });
   }, []);
 
@@ -113,7 +117,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Data Início</Label>
               <Input type="date" value={filters.dateFrom}
@@ -132,6 +136,17 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                   <SelectItem value="__all__">Todas</SelectItem>
                   <SelectItem value="__none__">Sem unidade</SelectItem>
                   {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Categoria</Label>
+              <Select value={filters.category_id || '__all__'} onValueChange={v => setFilters(f => ({ ...f, category_id: v === '__all__' ? undefined : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__none__">Sem categoria</SelectItem>
+                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

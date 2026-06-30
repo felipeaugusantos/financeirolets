@@ -30,6 +30,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   const { data: projectedData, loading: loadingProj, generate: genProjected } = useCashFlowProjected();
   const [mode, setMode] = useState<Mode>('realizado');
   const [units, setUnits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<CashFlowFilters>({
     dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
     dateTo: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
@@ -41,6 +42,9 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
       setUnits(data ?? []);
+    });
+    supabase.from('categories').select('id, name').eq('active', true).order('name').then(({ data }) => {
+      setCategories(data ?? []);
     });
   }, []);
 
@@ -169,7 +173,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
             </TabsList>
           </Tabs>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Data Início</Label>
               <Input type="date" value={filters.dateFrom}
@@ -186,7 +190,19 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__none__">Sem unidade</SelectItem>
                   {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Categoria</Label>
+              <Select value={filters.category_id || '__all__'} onValueChange={v => setFilters(f => ({ ...f, category_id: v === '__all__' ? undefined : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__none__">Sem categoria</SelectItem>
+                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

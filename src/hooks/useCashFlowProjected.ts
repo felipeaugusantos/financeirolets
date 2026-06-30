@@ -19,6 +19,7 @@ export interface ProjectedFilters {
   dateFrom: string;
   dateTo: string;
   unit_id?: string;
+  category_id?: string;
 }
 
 export function useCashFlowProjected() {
@@ -30,9 +31,9 @@ export function useCashFlowProjected() {
     setLoading(true);
     try {
       // Realizado: paid by payment_date
-      const realizedQ = supabase
+      let realizedQ = supabase
         .from('transactions')
-        .select('id, type, net_amount, payment_date, unit_id')
+        .select('id, type, net_amount, payment_date, unit_id, category_id')
         .not('payment_date', 'is', null)
         .in('status', ['pago', 'recebido'] as any)
         .eq('affects_cashflow', true)
@@ -40,14 +41,28 @@ export function useCashFlowProjected() {
         .lte('payment_date', filters.dateTo);
 
       // Projetado: pending/scheduled by due_date
-      const projectedQ = supabase
+      let projectedQ = supabase
         .from('transactions')
-        .select('id, type, net_amount, due_date, unit_id')
+        .select('id, type, net_amount, due_date, unit_id, category_id')
         .not('due_date', 'is', null)
         .in('status', ['pendente', 'agendado'] as any)
         .eq('affects_cashflow', true)
         .gte('due_date', filters.dateFrom)
         .lte('due_date', filters.dateTo);
+
+      if (filters.category_id) {
+        if (filters.category_id === '__none__' || filters.category_id === '__null__') {
+          realizedQ = realizedQ.is('category_id', null);
+          projectedQ = projectedQ.is('category_id', null);
+        } else {
+          realizedQ = realizedQ.eq('category_id', filters.category_id);
+          projectedQ = projectedQ.eq('category_id', filters.category_id);
+        }
+      }
+      if (filters.unit_id === '__none__') {
+        realizedQ = realizedQ.is('unit_id', null);
+        projectedQ = projectedQ.is('unit_id', null);
+      }
 
       const [{ data: realized, error: e1 }, { data: projected, error: e2 }] = await Promise.all([
         realizedQ,
@@ -74,6 +89,11 @@ export function useCashFlowProjected() {
       const valueForUnit = (tx: any): number => {
         const total = Number(tx.net_amount) || 0;
         if (!filters.unit_id) return total;
+        if (filters.unit_id === '__none__') {
+          // Already filtered to unit_id IS NULL; exclude tx with allocations to any unit
+          const allocs = allocMap.get(tx.id);
+          return allocs && allocs.length > 0 ? 0 : total;
+        }
         const allocs = allocMap.get(tx.id);
         if (allocs && allocs.length > 0) {
           const u = allocs.find(a => a.unit_id === filters.unit_id);
