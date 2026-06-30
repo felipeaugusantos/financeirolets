@@ -314,7 +314,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return true;
   };
 
-  const remove = async (id: string): Promise<{ row: any; allocations: any[] } | null> => {
+  const remove = async (id: string, opts?: { action?: 'DELETE' | 'REDO_DELETE' }): Promise<{ row: any; allocations: any[] } | null> => {
     const backup = [...data];
     // Capture row + allocations BEFORE deleting so we can undo
     const { data: rowFull } = await supabase.from('transactions').select('*').eq('id', id).maybeSingle();
@@ -337,13 +337,13 @@ export function useTransactions(filters: TransactionFilters = {}) {
     try {
       await supabase.rpc('log_transaction_action' as any, {
         _record_id: id,
-        _action: 'DELETE',
+        _action: opts?.action ?? 'DELETE',
         _old_data: { row: rowFull, allocations: allocs ?? [] } as any,
         _new_data: null as any,
         _context: 'transactions',
       });
     } catch (e) {
-      console.warn('Audit log (DELETE) failed', e);
+      console.warn('Audit log failed', e);
     }
     // Recalculate totals from current state
     setData(prev => {
