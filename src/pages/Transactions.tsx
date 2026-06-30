@@ -76,7 +76,7 @@ export default function Transactions() {
   };
 
   const handleRedoEntry = async (entry: DeletedCapture) => {
-    const recaptured = await remove(entry.row.id);
+    const recaptured = await remove(entry.row.id, { action: 'REDO_DELETE' });
     if (recaptured) {
       // Consume from redo stack and re-push to undo (persisted)
       history.popRedo();

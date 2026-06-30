@@ -714,6 +714,16 @@ export type Database = {
         Args: { _new_data: Json; _old_data: Json; _record_id: string }
         Returns: string
       }
+      log_transaction_action: {
+        Args: {
+          _action: string
+          _context?: string
+          _new_data: Json
+          _old_data: Json
+          _record_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       allocation_type: "percentual" | "valor"
