@@ -12,6 +12,7 @@ import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle,
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
+import { FilterPresets } from './FilterPresets';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -193,6 +194,12 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
               )}
             </div>
           </div>
+
+          <FilterPresets<DreFilters>
+            storageKey="dre.filterPresets.v1"
+            currentFilters={filters}
+            onApply={(p) => setFilters(p)}
+          />
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
             <div className="flex items-center gap-2">
