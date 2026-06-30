@@ -94,6 +94,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
+                <SelectItem value="__null__">Sem categoria</SelectItem>
                 {categories.filter((c: any) => c.active).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -104,6 +105,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
+                <SelectItem value="__null__">Sem conta</SelectItem>
                 {accounts.filter((a: any) => a.active).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -114,6 +116,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
+                <SelectItem value="__null__">Sem unidade</SelectItem>
                 {units.filter((u: any) => u.active).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -124,6 +127,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
+                <SelectItem value="__null__">Sem frente</SelectItem>
                 {fronts.filter((f: any) => f.active).map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -134,6 +138,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Todos</SelectItem>
+                <SelectItem value="__null__">Sem parceiro</SelectItem>
                 {partners.filter((p: any) => p.active).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
