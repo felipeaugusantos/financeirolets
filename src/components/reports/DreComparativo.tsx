@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useToast } from '@/hooks/use-toast';
+import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -45,6 +46,38 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
   });
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  type DcSecKey = 'showConsolidated' | 'showSemUnidade' | 'hideZero' | 'onlySubtotals' | 'compact';
+  const dcGroups: SectionGroup<DcSecKey>[] = [
+    {
+      label: 'Colunas fixas',
+      items: [
+        { key: 'showConsolidated', label: 'Coluna Consolidado' },
+        { key: 'showSemUnidade', label: 'Coluna "Sem unidade"', hint: 'Só aparece se houver lançamentos sem unidade no período.' },
+      ],
+    },
+    {
+      label: 'Linhas',
+      items: [
+        { key: 'hideZero', label: 'Ocultar linhas zeradas em todas as colunas visíveis' },
+        { key: 'onlySubtotals', label: 'Somente subtotais' },
+        { key: 'compact', label: 'Densidade compacta' },
+      ],
+    },
+  ];
+  const dcSec = useReportSections<DcSecKey>('dre-comparativo.sections.v1', {
+    showConsolidated: true, showSemUnidade: true, hideZero: false, onlySubtotals: false, compact: false,
+  });
+
+  // Per-unit visibility (built dynamically after generating)
+  const [hiddenUnits, setHiddenUnits] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('dre-comparativo.hiddenUnits.v1') || '{}'); } catch { return {}; }
+  });
+  const toggleUnit = (id: string) => setHiddenUnits((h) => {
+    const next = { ...h, [id]: !h[id] };
+    try { localStorage.setItem('dre-comparativo.hiddenUnits.v1', JSON.stringify(next)); } catch { /* */ }
+    return next;
+  });
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -224,6 +257,18 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const visibleCols = unitCols.filter((c) => {
+    if (c.id === '__all__') return dcSec.isOn('showConsolidated');
+    if (c.id === '__none__') return dcSec.isOn('showSemUnidade');
+    return !hiddenUnits[c.id];
+  });
+  const visibleLines = lines
+    .filter((l) => !dcSec.isOn('onlySubtotals') || l.is_subtotal)
+    .filter((l) => {
+      if (!dcSec.isOn('hideZero')) return true;
+      return visibleCols.some((c) => (l.values[c.id] ?? 0) !== 0);
+    });
+
   const handleExportPdf = async () => {
     if (!reportRef.current) return;
     setExporting(true);
@@ -303,6 +348,35 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
               )}
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {generated && unitCols.filter(c => c.id !== '__all__' && c.id !== '__none__').map((c) => {
+                const hidden = !!hiddenUnits[c.id];
+                return (
+                  <Button
+                    key={c.id}
+                    type="button"
+                    variant={hidden ? 'outline' : 'secondary'}
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => toggleUnit(c.id)}
+                    title={hidden ? 'Mostrar unidade' : 'Ocultar unidade'}
+                  >
+                    {hidden ? `+ ${c.label}` : c.label}
+                  </Button>
+                );
+              })}
+            </div>
+            <ReportCustomizer<DcSecKey>
+              groups={dcGroups}
+              sections={dcSec.sections}
+              onToggle={dcSec.toggle}
+              onReset={() => { dcSec.reset(); setHiddenUnits({}); try { localStorage.removeItem('dre-comparativo.hiddenUnits.v1'); } catch { /* */ } }}
+              inlineKeys={['hideZero', 'onlySubtotals']}
+              description="Mostre/oculte colunas de unidade, Consolidado e Sem unidade, e ajuste as linhas exibidas."
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -314,12 +388,12 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
                 Nenhuma linha DRE configurada ou sem dados no período.
               </div>
             ) : (
-              <Table>
+              <Table className={cn(dcSec.isOn('compact') && '[&_td]:py-1.5 [&_th]:py-2')}>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12 sticky left-0 bg-background z-10">#</TableHead>
                     <TableHead className="min-w-[200px] sticky left-12 bg-background z-10">Linha</TableHead>
-                    {unitCols.map(col => (
+                    {visibleCols.map(col => (
                       <TableHead key={col.id} className={cn(
                         'text-right min-w-[120px]',
                         col.id === '__all__' && 'font-bold bg-muted/30',
@@ -331,7 +405,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map(line => (
+                  {visibleLines.map(line => (
                     <TableRow
                       key={line.id}
                       className={cn(
@@ -351,7 +425,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
                       >
                         {line.name}
                       </TableCell>
-                      {unitCols.map(col => {
+                      {visibleCols.map(col => {
                         const v = line.values[col.id] ?? 0;
                         return (
                           <TableCell key={col.id} className={cn(

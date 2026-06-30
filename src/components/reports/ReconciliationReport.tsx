@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast as sonner } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -813,6 +814,36 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
   const [generated, setGenerated] = useState(false);
   const [auditRefresh, setAuditRefresh] = useState(0);
 
+  type RecSecKey =
+    | 'showBridge' | 'showSummary' | 'showChecklist' | 'showRules' | 'showAudit'
+    | 'showReceitas' | 'showDespesas';
+  const recGroups: SectionGroup<RecSecKey>[] = [
+    {
+      label: 'Blocos da reconciliação',
+      items: [
+        { key: 'showBridge', label: 'Ponte de buckets (Receitas / Despesas)' },
+        { key: 'showSummary', label: 'Resumo em uma frase' },
+        { key: 'showChecklist', label: 'Checklist de conferência' },
+        { key: 'showRules', label: 'Regras aplicadas (passo a passo)' },
+        { key: 'showAudit', label: 'Histórico de correções (auditoria)' },
+      ],
+    },
+    {
+      label: 'Lados',
+      items: [
+        { key: 'showReceitas', label: 'Coluna Receitas' },
+        { key: 'showDespesas', label: 'Coluna Despesas' },
+      ],
+    },
+  ];
+  const recSec = useReportSections<RecSecKey>('reconciliacao.sections.v1', {
+    showBridge: true, showSummary: true, showChecklist: true, showRules: true, showAudit: true,
+    showReceitas: true, showDespesas: true,
+  });
+  const showRec = recSec.isOn('showReceitas');
+  const showDesp = recSec.isOn('showDespesas');
+  const sideClass = showRec && showDesp ? 'grid lg:grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4';
+
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => setUnits(data ?? []));
     supabase.from('business_fronts').select('id, name').eq('active', true).order('name').then(({ data }) => setFronts(data ?? []));
@@ -938,18 +969,26 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
             >
               Limpar filtros
             </Button>
+            <ReportCustomizer<RecSecKey>
+              groups={recGroups}
+              sections={recSec.sections}
+              onToggle={recSec.toggle}
+              onReset={recSec.reset}
+              inlineKeys={['showChecklist', 'showRules']}
+              description="Mostre apenas os blocos que você quer ver na reconciliação. As correções inline continuam funcionando normalmente."
+            />
           </div>
         </CardContent>
       </Card>
 
-      {generated && data && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Bridge title="Receitas" side={data.receitas} color="success" kind="receita" lookups={lookups} api={api} />
-          <Bridge title="Despesas" side={data.despesas} color="destructive" kind="despesa" lookups={lookups} api={api} />
+      {generated && data && recSec.isOn('showBridge') && (showRec || showDesp) && (
+        <div className={sideClass}>
+          {showRec && <Bridge title="Receitas" side={data.receitas} color="success" kind="receita" lookups={lookups} api={api} />}
+          {showDesp && <Bridge title="Despesas" side={data.despesas} color="destructive" kind="despesa" lookups={lookups} api={api} />}
         </div>
       )}
 
-      {generated && data && (
+      {generated && data && recSec.isOn('showSummary') && (
         <Card className="shadow-card rounded-2xl border-primary/30 bg-primary/5">
           <CardHeader className="flex flex-row items-center gap-2 pb-3">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -975,18 +1014,18 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
         </Card>
       )}
 
-      {generated && data && (
+      {generated && data && recSec.isOn('showChecklist') && (
         <Checklist items={data.checklist} data={data} lookups={lookups} api={api} />
       )}
 
-      {generated && data && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <RulesBreakdown title="Receitas" side={data.receitas} color="success" kind="receita" />
-          <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" kind="despesa" />
+      {generated && data && recSec.isOn('showRules') && (showRec || showDesp) && (
+        <div className={sideClass}>
+          {showRec && <RulesBreakdown title="Receitas" side={data.receitas} color="success" kind="receita" />}
+          {showDesp && <RulesBreakdown title="Despesas" side={data.despesas} color="destructive" kind="despesa" />}
         </div>
       )}
 
-      {generated && <AuditHistory refreshKey={auditRefresh} />}
+      {generated && recSec.isOn('showAudit') && <AuditHistory refreshKey={auditRefresh} />}
     </div>
   );
 }

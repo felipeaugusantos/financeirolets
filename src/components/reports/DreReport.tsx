@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
+import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -32,10 +33,51 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     includePrevious: false,
     onlyRealized: false,
   });
-  const [showAV, setShowAV] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  type DreSecKey =
+    | 'colCode' | 'colAV' | 'colBudget' | 'colPrevious'
+    | 'hideZero' | 'onlySubtotals' | 'compact'
+    | 'showAlertSemUnidade';
+  const dreSectionGroups: SectionGroup<DreSecKey>[] = [
+    {
+      label: 'Colunas',
+      items: [
+        { key: 'colCode', label: 'Código da linha', hint: 'Mostra a coluna "#" com o código contábil.' },
+        { key: 'colAV', label: 'Análise Vertical (AV %)', hint: 'Percentual de cada linha sobre a receita base.' },
+        { key: 'colBudget', label: 'Orçado + Variação %', hint: 'Requer "Orçado vs Realizado" ligado.' },
+        { key: 'colPrevious', label: 'Período anterior + AH %', hint: 'Requer "Análise Horizontal" ligado.' },
+      ],
+    },
+    {
+      label: 'Linhas',
+      items: [
+        { key: 'hideZero', label: 'Ocultar linhas zeradas', hint: 'Esconde linhas sem valor em nenhuma coluna visível.' },
+        { key: 'onlySubtotals', label: 'Somente subtotais', hint: 'Mostra apenas grupos e subtotais, esconde linhas analíticas.' },
+        { key: 'compact', label: 'Densidade compacta', hint: 'Reduz padding para caber mais linhas na tela.' },
+      ],
+    },
+    {
+      label: 'Avisos',
+      items: [
+        { key: 'showAlertSemUnidade', label: 'Alerta de lançamentos sem unidade', hint: 'Aparece apenas quando há filtro de unidade.' },
+      ],
+    },
+  ];
+  const dreSec = useReportSections<DreSecKey>('dre.sections.v1', {
+    colCode: true, colAV: false, colBudget: true, colPrevious: true,
+    hideZero: false, onlySubtotals: false, compact: false,
+    showAlertSemUnidade: true,
+  });
+  const showAV = dreSec.isOn('colAV');
+  const showCode = dreSec.isOn('colCode');
+  const showBudgetCol = dreSec.isOn('colBudget') && !!filters.includeBudget;
+  const showPreviousCol = dreSec.isOn('colPrevious') && !!filters.includePrevious;
+  const hideZero = dreSec.isOn('hideZero');
+  const onlySubtotals = dreSec.isOn('onlySubtotals');
+  const compact = dreSec.isOn('compact');
 
   const defaultFilters: DreFilters = {
     dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -48,7 +90,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
 
   const handleClearFilters = () => {
     setFilters(defaultFilters);
-    setShowAV(false);
+    dreSec.reset();
   };
 
   useEffect(() => {
@@ -88,7 +130,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     const headers = ['Código', 'Linha', 'Tipo', 'Realizado'];
     if (filters.includeBudget) headers.push('Orçado', 'Variação %');
     if (filters.includePrevious) headers.push('Período Anterior', 'AH %');
-    if (showAV) headers.push('AV %');
+    headers.push('AV %');
 
     const rows = lines.map(l => {
       const r: (string | number)[] = [
@@ -107,9 +149,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
         const v = p !== 0 ? ((l.value - p) / Math.abs(p)) * 100 : 0;
         r.push(p.toFixed(2).replace('.', ','), v.toFixed(1).replace('.', ','));
       }
-      if (showAV) {
-        r.push(avFor(l.value).toFixed(1).replace('.', ','));
-      }
+      r.push(avFor(l.value).toFixed(1).replace('.', ','));
       return r;
     });
     exportToCsv(`DRE_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
@@ -236,10 +276,6 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
               />
               <Label htmlFor="previous" className="text-sm cursor-pointer">Análise Horizontal (vs ano anterior)</Label>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch id="av" checked={showAV} onCheckedChange={setShowAV} />
-              <Label htmlFor="av" className="text-sm cursor-pointer">Análise Vertical (% receita)</Label>
-            </div>
             {filters.regime === 'competencia' && (
               <div className="flex items-center gap-2">
                 <Switch
@@ -252,11 +288,21 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 </Label>
               </div>
             )}
+            <div className="ml-auto">
+              <ReportCustomizer<DreSecKey>
+                groups={dreSectionGroups}
+                sections={dreSec.sections}
+                onToggle={dreSec.toggle}
+                onReset={dreSec.reset}
+                inlineKeys={['colAV', 'hideZero']}
+                description="Escolha as colunas e linhas que aparecem na tabela do DRE. A exportação (CSV/PDF) inclui todas as colunas."
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {generated && filters.unit_id && unallocatedCount > 0 && (
+      {generated && filters.unit_id && unallocatedCount > 0 && dreSec.isOn('showAlertSemUnidade') && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm">
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
           <span className="text-amber-800 dark:text-amber-300">
@@ -273,21 +319,31 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 Nenhuma linha DRE configurada ou sem dados no período.
               </div>
             ) : (
-              <Table>
+              <Table className={cn(compact && '[&_td]:py-1.5 [&_th]:py-2')}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">#</TableHead>
+                    {showCode && <TableHead className="w-16">#</TableHead>}
                     <TableHead>Linha</TableHead>
                     <TableHead className="text-right w-36">Realizado</TableHead>
                     {showAV && <TableHead className="text-right w-20">AV %</TableHead>}
-                    {filters.includeBudget && <TableHead className="text-right w-32">Orçado</TableHead>}
-                    {filters.includeBudget && <TableHead className="text-right w-24">Var %</TableHead>}
-                    {filters.includePrevious && <TableHead className="text-right w-32">Ano Anterior</TableHead>}
-                    {filters.includePrevious && <TableHead className="text-right w-24">AH %</TableHead>}
+                    {showBudgetCol && <TableHead className="text-right w-32">Orçado</TableHead>}
+                    {showBudgetCol && <TableHead className="text-right w-24">Var %</TableHead>}
+                    {showPreviousCol && <TableHead className="text-right w-32">Ano Anterior</TableHead>}
+                    {showPreviousCol && <TableHead className="text-right w-24">AH %</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines.map(line => {
+                  {lines
+                    .filter(line => !onlySubtotals || line.is_subtotal)
+                    .filter(line => {
+                      if (!hideZero) return true;
+                      const b = line.budgetValue ?? 0;
+                      const p = line.previousValue ?? 0;
+                      return line.value !== 0
+                        || (showBudgetCol && b !== 0)
+                        || (showPreviousCol && p !== 0);
+                    })
+                    .map(line => {
                     const budget = line.budgetValue ?? 0;
                     const prev = line.previousValue ?? 0;
                     const budgetVar = budget !== 0 ? ((line.value - budget) / Math.abs(budget)) * 100 : 0;
@@ -306,7 +362,9 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                           line.depth === 0 && line.is_subtotal && 'border-t-2 border-border'
                         )}
                       >
-                        <TableCell className="text-xs text-muted-foreground">{line.code || ''}</TableCell>
+                        {showCode && (
+                          <TableCell className="text-xs text-muted-foreground">{line.code || ''}</TableCell>
+                        )}
                         <TableCell
                           style={{ paddingLeft: `${(line.depth * 1.5) + 1}rem` }}
                           className={cn(line.is_subtotal ? 'font-semibold' : 'text-sm')}
@@ -326,22 +384,22 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                             {revenueBase ? `${avFor(line.value).toFixed(1)}%` : '—'}
                           </TableCell>
                         )}
-                        {filters.includeBudget && (
+                        {showBudgetCol && (
                           <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
                             {budget !== 0 ? fmt(budget) : '—'}
                           </TableCell>
                         )}
-                        {filters.includeBudget && (
+                        {showBudgetCol && (
                           <TableCell className={cn('text-right tabular-nums text-xs font-medium', budgetClass)}>
                             {budget !== 0 ? fmtPct(budgetVar) : '—'}
                           </TableCell>
                         )}
-                        {filters.includePrevious && (
+                        {showPreviousCol && (
                           <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
                             {prev !== 0 ? fmt(prev) : '—'}
                           </TableCell>
                         )}
-                        {filters.includePrevious && (
+                        {showPreviousCol && (
                           <TableCell className={cn('text-right tabular-nums text-xs font-medium', ahClass)}>
                             {prev !== 0 ? fmtPct(ahVar) : '—'}
                           </TableCell>
