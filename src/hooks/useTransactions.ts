@@ -53,6 +53,7 @@ export interface TransactionFilters {
   unit_id?: string;
   front_id?: string;
   partner_id?: string;
+  payment_method?: string;
 }
 
 export interface AllocationInput {
@@ -119,6 +120,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (filters.unit_id) query = filters.unit_id === '__null__' ? query.is('unit_id', null) : query.eq('unit_id', filters.unit_id);
     if (filters.front_id) query = filters.front_id === '__null__' ? query.is('front_id', null) : query.eq('front_id', filters.front_id);
     if (filters.partner_id) query = filters.partner_id === '__null__' ? query.is('partner_id', null) : query.eq('partner_id', filters.partner_id);
+    if (filters.payment_method) query = filters.payment_method === '__null__' ? query.is('payment_method', null) : query.eq('payment_method', filters.payment_method as any);
     if (filters.dateFrom) query = query.gte('competence_date', filters.dateFrom);
     if (filters.dateTo) query = query.lte('competence_date', filters.dateTo);
     if (filters.search) {
@@ -149,7 +151,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setTotals({ receitas, despesas, saldo: receitas - despesas });
     }
     setLoading(false);
-  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.dateFrom, filters.dateTo, filters.search]);
+  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
