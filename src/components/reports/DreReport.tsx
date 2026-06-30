@@ -166,6 +166,24 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
               </Select>
             </div>
             <div className="space-y-1">
+              <Label className="text-xs">Forma de pagamento</Label>
+              <Select value={filters.payment_method || '__all__'} onValueChange={v => setFilters(f => ({ ...f, payment_method: v === '__all__' ? undefined : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__none__">Sem forma</SelectItem>
+                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                  <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                  <SelectItem value="transferencia">Transferência</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label className="text-xs">Regime</Label>
               <Select value={filters.regime} onValueChange={(v: any) => setFilters(f => ({ ...f, regime: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
