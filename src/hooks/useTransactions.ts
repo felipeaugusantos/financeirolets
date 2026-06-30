@@ -114,11 +114,11 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
     if (filters.type) query = query.eq('type', filters.type as any);
     if (filters.status) query = query.eq('status', filters.status as any);
-    if (filters.category_id) query = query.eq('category_id', filters.category_id);
-    if (filters.account_id) query = query.eq('account_id', filters.account_id);
-    if (filters.unit_id) query = query.eq('unit_id', filters.unit_id);
-    if (filters.front_id) query = query.eq('front_id', filters.front_id);
-    if (filters.partner_id) query = query.eq('partner_id', filters.partner_id);
+    if (filters.category_id) query = filters.category_id === '__null__' ? query.is('category_id', null) : query.eq('category_id', filters.category_id);
+    if (filters.account_id) query = filters.account_id === '__null__' ? query.is('account_id', null) : query.eq('account_id', filters.account_id);
+    if (filters.unit_id) query = filters.unit_id === '__null__' ? query.is('unit_id', null) : query.eq('unit_id', filters.unit_id);
+    if (filters.front_id) query = filters.front_id === '__null__' ? query.is('front_id', null) : query.eq('front_id', filters.front_id);
+    if (filters.partner_id) query = filters.partner_id === '__null__' ? query.is('partner_id', null) : query.eq('partner_id', filters.partner_id);
     if (filters.dateFrom) query = query.gte('competence_date', filters.dateFrom);
     if (filters.dateTo) query = query.lte('competence_date', filters.dateTo);
     if (filters.search) {
@@ -314,8 +314,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return true;
   };
 
-  const remove = async (id: string) => {
+  const remove = async (id: string): Promise<{ row: any; allocations: any[] } | null> => {
     const backup = [...data];
+    // Capture row + allocations BEFORE deleting so we can undo
+    const { data: rowFull } = await supabase.from('transactions').select('*').eq('id', id).maybeSingle();
+    const { data: allocs } = await supabase.from('transaction_allocations').select('*').eq('transaction_id', id);
+
     // Optimistic removal from UI
     setData(prev => prev.filter(t => t.id !== id));
 
@@ -327,9 +331,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (error || !deleted || deleted.length === 0) {
       toast({ title: 'Erro ao excluir', description: error?.message || 'Não foi possível excluir o lançamento. Verifique suas permissões.', variant: 'destructive' });
       setData(backup); // revert
-      return false;
+      return null;
     }
-    toast({ title: 'Excluído com sucesso' });
     // Recalculate totals from current state
     setData(prev => {
       const receitas = prev.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
@@ -337,6 +340,21 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setTotals({ receitas, despesas, saldo: receitas - despesas });
       return prev;
     });
+    return { row: rowFull, allocations: allocs ?? [] };
+  };
+
+  const restore = async (captured: { row: any; allocations: any[] }) => {
+    if (!captured?.row) return false;
+    const { category, account, partner, unit, front, ...rowOnly } = captured.row;
+    const { error } = await supabase.from('transactions').insert(rowOnly as any);
+    if (error) {
+      toast({ title: 'Erro ao restaurar', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    if (captured.allocations.length > 0) {
+      await supabase.from('transaction_allocations').insert(captured.allocations as any);
+    }
+    await fetchData();
     return true;
   };
 
@@ -367,5 +385,5 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return count;
   };
 
-  return { data, loading, totals, fetchData, create, update, remove, markAs, generateRecurring };
+  return { data, loading, totals, fetchData, create, update, remove, restore, markAs, generateRecurring };
 }

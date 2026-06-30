@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { parseDateUTC } from '@/lib/utils';
@@ -9,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { TransactionRow } from '@/hooks/useTransactions';
 
@@ -70,6 +72,7 @@ function VisibilityBadges({ tx }: { tx: TransactionRow }) {
 
 export default function TransactionList({ data, loading, onEdit, onDelete, onMarkAs }: Props) {
   const isMobile = useIsMobile();
+  const [confirmDelete, setConfirmDelete] = useState<TransactionRow | null>(null);
 
   if (loading) {
     return (
@@ -104,15 +107,43 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
             <CheckCircle className="h-3 w-3 mr-2" /> Marcar como {tx.type === 'receita' ? 'recebido' : 'pago'}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem className="text-destructive" onClick={() => onDelete(tx.id)}>
+        <DropdownMenuItem className="text-destructive" onClick={() => setConfirmDelete(tx)}>
           <Trash2 className="h-3 w-3 mr-2" /> Excluir
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 
+  const ConfirmDialog = (
+    <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {confirmDelete && (
+              <>Tem certeza que deseja excluir <strong>{confirmDelete.description}</strong> ({formatCurrency(Number(confirmDelete.net_amount))})? Você poderá desfazer logo em seguida.</>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              if (confirmDelete) onDelete(confirmDelete.id);
+              setConfirmDelete(null);
+            }}
+          >
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (isMobile) {
     return (
+      <>
       <div className="space-y-2">
         {data.map(tx => (
           <Card key={tx.id} className="rounded-2xl border-border shadow-card">
@@ -148,10 +179,13 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
           </Card>
         ))}
       </div>
+      {ConfirmDialog}
+      </>
     );
   }
 
   return (
+    <>
     <Card className="rounded-2xl border-border shadow-card overflow-hidden">
       <Table>
         <TableHeader>
@@ -197,5 +231,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
         </TableBody>
       </Table>
     </Card>
+    {ConfirmDialog}
+    </>
   );
 }

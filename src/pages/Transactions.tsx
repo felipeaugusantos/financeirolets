@@ -3,12 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle, CreditCard } from 'lucide-react';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle, CreditCard, Undo2, Redo2 } from 'lucide-react';
 import { useTransactions, TransactionFilters as TFilters, TransactionRow } from '@/hooks/useTransactions';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import CardSaleDialog from '@/components/transactions/CardSaleDialog';
 import TransactionFilters from '@/components/transactions/TransactionFilters';
 import TransactionList from '@/components/transactions/TransactionList';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -22,7 +24,8 @@ export default function Transactions() {
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
 
   const appliedFilters = { ...filters, search: search || undefined };
-  const { data, loading, totals, create, update, remove, markAs, fetchData } = useTransactions(appliedFilters);
+  const { data, loading, totals, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
+  const { toast } = useToast();
 
   const incompleteStats = useMemo(() => {
     const noCategory = data.filter(t => !t.category_id && t.status !== 'cancelado').length;
@@ -45,6 +48,49 @@ export default function Transactions() {
       return update(editingTx.id, input);
     }
     return create(input);
+  };
+
+  const handleRedo = async (id: string) => {
+    // Re-delete after undo, capturing again so the user can re-undo
+    const recaptured = await remove(id);
+    if (recaptured) {
+      toast({
+        title: 'Lançamento excluído novamente',
+        action: (
+          <ToastAction altText="Desfazer" onClick={() => handleUndo(recaptured)}>
+            <Undo2 className="h-3 w-3 mr-1" /> Desfazer
+          </ToastAction>
+        ),
+      });
+    }
+  };
+
+  const handleUndo = async (captured: { row: any; allocations: any[] }) => {
+    const ok = await restore(captured);
+    if (ok) {
+      toast({
+        title: 'Lançamento restaurado',
+        action: (
+          <ToastAction altText="Refazer" onClick={() => handleRedo(captured.row.id)}>
+            <Redo2 className="h-3 w-3 mr-1" /> Refazer
+          </ToastAction>
+        ),
+      });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const captured = await remove(id);
+    if (captured) {
+      toast({
+        title: 'Lançamento excluído',
+        action: (
+          <ToastAction altText="Desfazer" onClick={() => handleUndo(captured)}>
+            <Undo2 className="h-3 w-3 mr-1" /> Desfazer
+          </ToastAction>
+        ),
+      });
+    }
   };
 
   const summaryCards = [
@@ -122,7 +168,7 @@ export default function Transactions() {
         data={data}
         loading={loading}
         onEdit={handleEdit}
-        onDelete={remove}
+        onDelete={handleDelete}
         onMarkAs={markAs}
       />
 
