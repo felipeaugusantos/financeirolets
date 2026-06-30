@@ -15,6 +15,7 @@ export interface CashFlowFilters {
   dateFrom: string;
   dateTo: string;
   unit_id?: string;
+  category_id?: string;
 }
 
 export function useCashFlowReport() {
@@ -27,19 +28,30 @@ export function useCashFlowReport() {
     try {
       let query = supabase
         .from('transactions')
-        .select('id, type, net_amount, payment_date, status, unit_id')
+        .select('id, type, net_amount, payment_date, status, unit_id, category_id')
         .not('payment_date', 'is', null)
         .in('status', ['pago', 'recebido'] as any)
         .eq('affects_cashflow', true)
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo);
 
+      if (filters.category_id) {
+        query = (filters.category_id === '__none__' || filters.category_id === '__null__')
+          ? query.is('category_id', null)
+          : query.eq('category_id', filters.category_id);
+      }
+      if (filters.unit_id === '__none__') {
+        query = query.is('unit_id', null);
+      }
+
       const { data: rows, error } = await query;
       if (error) throw error;
 
       // Fetch allocations if filtering by unit
       let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null; allocation_type: string }[]>();
-      if (filters.unit_id && rows && rows.length > 0) {
+      const isUnitFilterReal = filters.unit_id && filters.unit_id !== '__none__';
+      const needsAllocs = (filters.unit_id) && rows && rows.length > 0;
+      if (needsAllocs) {
         const txIds = rows.map((r: any) => r.id);
         const { data: allocs } = await supabase
           .from('transaction_allocations')
@@ -61,7 +73,11 @@ export function useCashFlowReport() {
         const totalVal = Number(tx.net_amount) || 0;
 
         let val = totalVal;
-        if (filters.unit_id) {
+        if (filters.unit_id === '__none__') {
+          // Already filtered to unit_id IS NULL; also exclude those with allocations to any unit
+          const allocs = allocMap.get(tx.id);
+          if (allocs && allocs.length > 0) val = 0;
+        } else if (isUnitFilterReal) {
           const allocs = allocMap.get(tx.id);
           if (allocs && allocs.length > 0) {
             const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
