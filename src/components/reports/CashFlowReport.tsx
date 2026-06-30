@@ -14,6 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
+import { FilterPresets } from './FilterPresets';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -232,6 +233,12 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
               )}
             </div>
           </div>
+
+          <FilterPresets<CashFlowFilters>
+            storageKey="cashflow.filterPresets.v1"
+            currentFilters={filters}
+            onApply={(p) => setFilters(p)}
+          />
         </CardContent>
       </Card>
 
