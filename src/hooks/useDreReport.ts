@@ -25,6 +25,7 @@ export interface DreFilters {
   includeBudget?: boolean;
   includePrevious?: boolean;
   onlyRealized?: boolean;
+  payment_method?: string;
 }
 
 function shiftDateBackOneYear(d: string) {
@@ -140,6 +141,11 @@ async function fetchPeriodValues(
     txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
   } else if (filters.onlyRealized) {
     txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
+  }
+  if (filters.payment_method) {
+    txQuery = (filters.payment_method === '__none__' || filters.payment_method === '__null__')
+      ? txQuery.is('payment_method', null)
+      : txQuery.eq('payment_method', filters.payment_method as any);
   }
   const { data: transactions, error } = await txQuery;
   if (error) throw error;
