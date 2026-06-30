@@ -929,6 +929,16 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
               </Button>
             </div>
           </div>
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground gap-1"
+              onClick={() => setFilters({ dateFrom: firstOfMonth, dateTo: lastOfMonth })}
+            >
+              Limpar filtros
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
