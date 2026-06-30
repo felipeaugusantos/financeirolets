@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
@@ -35,6 +35,20 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const defaultFilters: DreFilters = {
+    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+    dateTo: new Date().toISOString().split('T')[0],
+    regime: 'competencia',
+    includeBudget: false,
+    includePrevious: false,
+    onlyRealized: false,
+  };
+
+  const handleClearFilters = () => {
+    setFilters(defaultFilters);
+    setShowAV(false);
+  };
 
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
@@ -163,6 +177,9 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
             <div className="flex items-end gap-2">
               <Button onClick={handleGenerate} disabled={loading} className="flex-1">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleClearFilters} title="Limpar filtros">
+                <RotateCcw className="h-4 w-4" />
               </Button>
               {generated && lines.length > 0 && (
                 <>
