@@ -430,6 +430,21 @@ export default function Dashboard() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 text-xs text-muted-foreground"
+            onClick={() => {
+              setPeriodPreset('current_month');
+              setCustomFrom(undefined);
+              setCustomTo(undefined);
+              setUnitId('all');
+              setFrontId('all');
+              setIncludeProvisioned(false);
+            }}
+          >
+            Limpar filtros
+          </Button>
         </div>
       </div>
 
