@@ -333,6 +333,18 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setData(backup); // revert
       return null;
     }
+    // Audit log (DELETE / REDO_DELETE)
+    try {
+      await supabase.rpc('log_transaction_action' as any, {
+        _record_id: id,
+        _action: 'DELETE',
+        _old_data: { row: rowFull, allocations: allocs ?? [] } as any,
+        _new_data: null as any,
+        _context: 'transactions',
+      });
+    } catch (e) {
+      console.warn('Audit log (DELETE) failed', e);
+    }
     // Recalculate totals from current state
     setData(prev => {
       const receitas = prev.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
@@ -353,6 +365,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
     if (captured.allocations.length > 0) {
       await supabase.from('transaction_allocations').insert(captured.allocations as any);
+    }
+    try {
+      await supabase.rpc('log_transaction_action' as any, {
+        _record_id: rowOnly.id,
+        _action: 'UNDO_DELETE',
+        _old_data: null as any,
+        _new_data: { row: rowOnly, allocations: captured.allocations } as any,
+        _context: 'transactions',
+      });
+    } catch (e) {
+      console.warn('Audit log (UNDO_DELETE) failed', e);
     }
     await fetchData();
     return true;
