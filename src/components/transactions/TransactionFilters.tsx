@@ -11,6 +11,17 @@ import { useState } from 'react';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import type { TransactionFilters as TFilters } from '@/hooks/useTransactions';
 
+const PAYMENT_METHODS = [
+  { value: 'dinheiro', label: 'Dinheiro' },
+  { value: 'pix', label: 'PIX' },
+  { value: 'cartao_credito', label: 'Cartão de Crédito' },
+  { value: 'cartao_debito', label: 'Cartão de Débito' },
+  { value: 'boleto', label: 'Boleto' },
+  { value: 'transferencia', label: 'Transferência' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'outro', label: 'Outro' },
+];
+
 interface Props {
   filters: TFilters;
   onChange: (f: TFilters) => void;
@@ -28,7 +39,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
     onChange({ ...filters, [key]: value });
   };
 
-  const activeCount = [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.dateFrom, filters.dateTo].filter(Boolean).length;
+  const activeCount = [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo].filter(Boolean).length;
 
   const DateFilter = ({ label, value, filterKey }: { label: string; value?: string; filterKey: keyof TFilters }) => (
     <div className="space-y-1">
@@ -87,7 +98,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
             </Select>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Categoria</Label>
             <Select value={filters.category_id || '__none__'} onValueChange={v => set('category_id', v === '__none__' ? undefined : v)}>
@@ -140,6 +151,17 @@ export default function TransactionFilters({ filters, onChange }: Props) {
                 <SelectItem value="__none__">Todos</SelectItem>
                 <SelectItem value="__null__">Sem parceiro</SelectItem>
                 {partners.filter((p: any) => p.active).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
+            <Select value={filters.payment_method || '__none__'} onValueChange={v => set('payment_method' as any, v === '__none__' ? undefined : v)}>
+              <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Todas</SelectItem>
+                <SelectItem value="__null__">Sem forma</SelectItem>
+                {PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
