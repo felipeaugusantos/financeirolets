@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle, CreditCard, Undo2, Redo2 } from 'lucide-react';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle, CreditCard, Undo2, Redo2, History, Trash2 } from 'lucide-react';
 import { useTransactions, TransactionFilters as TFilters, TransactionRow } from '@/hooks/useTransactions';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import CardSaleDialog from '@/components/transactions/CardSaleDialog';
@@ -11,6 +11,7 @@ import TransactionFilters from '@/components/transactions/TransactionFilters';
 import TransactionList from '@/components/transactions/TransactionList';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import { useDeleteHistory, DeletedCapture } from '@/hooks/useDeleteHistory';
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -26,6 +27,7 @@ export default function Transactions() {
   const appliedFilters = { ...filters, search: search || undefined };
   const { data, loading, totals, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
   const { toast } = useToast();
+  const history = useDeleteHistory();
 
   const incompleteStats = useMemo(() => {
     const noCategory = data.filter(t => !t.category_id && t.status !== 'cancelado').length;
@@ -50,28 +52,22 @@ export default function Transactions() {
     return create(input);
   };
 
-  const handleRedo = async (id: string) => {
-    // Re-delete after undo, capturing again so the user can re-undo
-    const recaptured = await remove(id);
-    if (recaptured) {
-      toast({
-        title: 'Lançamento excluído novamente',
-        action: (
-          <ToastAction altText="Desfazer" onClick={() => handleUndo(recaptured)}>
-            <Undo2 className="h-3 w-3 mr-1" /> Desfazer
-          </ToastAction>
-        ),
-      });
-    }
-  };
-
-  const handleUndo = async (captured: { row: any; allocations: any[] }) => {
-    const ok = await restore(captured);
+  const handleUndoEntry = async (entry: DeletedCapture) => {
+    const ok = await restore({ row: entry.row, allocations: entry.allocations });
     if (ok) {
+      // Move from undo → redo stack (persisted)
+      const popped = history.popUndo();
+      // If the popped one isn't the same (e.g. user clicked an older entry),
+      // we still want the chosen entry to flow into redo.
+      if (popped && popped.row?.id !== entry.row?.id) {
+        // restore order: put popped back and remove the target one manually
+        // (rare path — fallback: just clear redo and rebuild)
+        history.removeFromUndo(entry.row.id);
+      }
       toast({
         title: 'Lançamento restaurado',
         action: (
-          <ToastAction altText="Refazer" onClick={() => handleRedo(captured.row.id)}>
+          <ToastAction altText="Refazer" onClick={() => handleRedoEntry(entry)}>
             <Redo2 className="h-3 w-3 mr-1" /> Refazer
           </ToastAction>
         ),
@@ -79,19 +75,56 @@ export default function Transactions() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const captured = await remove(id);
-    if (captured) {
+  const handleRedoEntry = async (entry: DeletedCapture) => {
+    const recaptured = await remove(entry.row.id);
+    if (recaptured) {
+      // Consume from redo stack and re-push to undo (persisted)
+      history.popRedo();
+      history.pushDeleted({
+        row: recaptured.row,
+        allocations: recaptured.allocations,
+        label: entry.label,
+      });
       toast({
-        title: 'Lançamento excluído',
+        title: 'Lançamento excluído novamente',
         action: (
-          <ToastAction altText="Desfazer" onClick={() => handleUndo(captured)}>
+          <ToastAction altText="Desfazer" onClick={() => handleUndoEntry({
+            row: recaptured.row,
+            allocations: recaptured.allocations,
+            deletedAt: new Date().toISOString(),
+            label: entry.label,
+          })}>
             <Undo2 className="h-3 w-3 mr-1" /> Desfazer
           </ToastAction>
         ),
       });
     }
   };
+
+  const handleDelete = async (id: string) => {
+    const target = data.find(t => t.id === id);
+    const captured = await remove(id);
+    if (captured) {
+      const label = target ? `${target.description} • ${formatCurrency(Number(target.amount))}` : undefined;
+      history.pushDeleted({ row: captured.row, allocations: captured.allocations, label });
+      toast({
+        title: 'Lançamento excluído',
+        action: (
+          <ToastAction altText="Desfazer" onClick={() => handleUndoEntry({
+            row: captured.row,
+            allocations: captured.allocations,
+            deletedAt: new Date().toISOString(),
+            label,
+          })}>
+            <Undo2 className="h-3 w-3 mr-1" /> Desfazer
+          </ToastAction>
+        ),
+      });
+    }
+  };
+
+  const lastUndo = history.undoStack[0];
+  const lastRedo = history.redoStack[0];
 
   const summaryCards = [
     { label: 'Receitas', value: totals.receitas, icon: TrendingUp, color: 'text-[hsl(var(--success))]' },
@@ -162,6 +195,53 @@ export default function Transactions() {
         </div>
         <TransactionFilters filters={filters} onChange={setFilters} />
       </div>
+
+      {/* Persistent undo/redo bar */}
+      {(lastUndo || lastRedo) && (
+        <Card className="rounded-2xl border-border shadow-card">
+          <CardContent className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0 flex-1">
+              <History className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {lastUndo
+                  ? <>Última exclusão: <span className="text-card-foreground">{lastUndo.label ?? lastUndo.row?.description ?? '—'}</span></>
+                  : <>Sem exclusões para desfazer. Há {history.redoStack.length} restauração{history.redoStack.length > 1 ? 'ões' : ''} para refazer.</>}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1"
+                disabled={!lastUndo}
+                onClick={() => lastUndo && handleUndoEntry(lastUndo)}
+              >
+                <Undo2 className="h-3 w-3" /> Desfazer
+                {history.undoStack.length > 1 && <span className="text-muted-foreground">({history.undoStack.length})</span>}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1"
+                disabled={!lastRedo}
+                onClick={() => lastRedo && handleRedoEntry(lastRedo)}
+              >
+                <Redo2 className="h-3 w-3" /> Refazer
+                {history.redoStack.length > 1 && <span className="text-muted-foreground">({history.redoStack.length})</span>}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="rounded-xl gap-1 text-muted-foreground hover:text-destructive"
+                onClick={() => history.clear()}
+                title="Limpar histórico"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* List */}
       <TransactionList
