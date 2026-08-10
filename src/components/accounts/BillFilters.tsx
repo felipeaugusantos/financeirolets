@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, toLocalISODate } from '@/lib/utils';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 
 export interface BillFiltersState {
@@ -41,7 +41,7 @@ export default function BillFilters({ filters, onChange }: BillFiltersProps) {
 
   const clearAll = () => onChange(emptyFilters);
 
-  const toDateStr = (d: Date) => d.toISOString().substring(0, 10);
+  const toDateStr = (d: Date) => toLocalISODate(d);
   const fromDateStr = (s: string | null) => s ? new Date(s + 'T12:00:00') : undefined;
 
   return (

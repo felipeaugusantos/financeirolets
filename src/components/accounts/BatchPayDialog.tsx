@@ -15,6 +15,7 @@ import SelectWithAdd from '@/components/ui/select-with-add';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { todayLocalISO } from '@/lib/utils';
 
 interface Props {
   open: boolean;
@@ -39,7 +40,7 @@ export default function BatchPayDialog({ open, onOpenChange, ids, tab, onDone }:
   const { data: accounts, create: createAccount } = useSupabaseCrud<any>('accounts');
   const [accountId, setAccountId] = useState('');
   const [method, setMethod] = useState('pix');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocalISO());
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 

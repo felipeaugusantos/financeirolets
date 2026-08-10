@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle, RotateCcw } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
@@ -26,8 +26,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   const [units, setUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: todayLocalISO(),
     regime: 'competencia',
     includeBudget: false,
     includePrevious: false,
@@ -80,8 +80,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   const compact = dreSec.isOn('compact');
 
   const defaultFilters: DreFilters = {
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: todayLocalISO(),
     regime: 'competencia',
     includeBudget: false,
     includePrevious: false,

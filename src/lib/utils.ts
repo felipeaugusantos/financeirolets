@@ -11,3 +11,21 @@ export function parseDateUTC(dateStr: string): Date {
   if (!dateStr) return new Date();
   return new Date(dateStr + 'T12:00:00');
 }
+
+/** Format a Date using its local calendar components (no UTC shift) → "yyyy-MM-dd". */
+export function toLocalISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Current date in America/Sao_Paulo as "yyyy-MM-dd". */
+export function todayLocalISO(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { todayLocalISO, toLocalISODate } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -189,7 +190,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (input.due_date) {
         const base = new Date(input.due_date + 'T12:00:00');
         base.setMonth(base.getMonth() + i);
-        dueDate = base.toISOString().split('T')[0];
+        dueDate = toLocalISODate(base);
       }
       return {
         ...baseRow,
@@ -384,7 +385,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
   };
 
   const markAs = async (id: string, status: 'pago' | 'recebido') => {
-    const payment_date = new Date().toISOString().split('T')[0];
+    const payment_date = todayLocalISO();
     const { error } = await supabase.from('transactions').update({ status, payment_date }).eq('id', id);
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });

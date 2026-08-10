@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Columns3, Loader2, Download, FileSpreadsheet } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useToast } from '@/hooks/use-toast';
@@ -40,8 +40,8 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [filters, setFilters] = useState({
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: todayLocalISO(),
     regime: 'competencia' as 'competencia' | 'caixa',
   });
   const reportRef = useRef<HTMLDivElement>(null);

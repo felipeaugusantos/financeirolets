@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, toLocalISODate } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, Treemap } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -213,7 +213,7 @@ function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: strin
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
-  const ymd = (d: Date) => d.toISOString().substring(0, 10);
+  const ymd = (d: Date) => toLocalISODate(d);
   switch (preset) {
     case 'last_month': {
       const from = new Date(y, m - 1, 1);

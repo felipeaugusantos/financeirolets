@@ -84,7 +84,11 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const isEditing = !!initialData?.id;
 
   useEffect(() => {
-    if (open && initialData) {
+    // Hidrata o formulário apenas quando o diálogo abre (ou muda o registro editado).
+    // Depender do objeto `initialData` inteiro fazia o efeito rodar de novo a cada
+    // render do pai, sobrescrevendo datas já escolhidas pelo usuário.
+    if (!open) return;
+    if (initialData) {
       setType(initialData.type || 'despesa');
       setDescription(initialData.description || '');
       setAmount(String(initialData.amount || ''));
@@ -122,10 +126,11 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
             }
           });
       }
-    } else if (open) {
+    } else {
       resetForm();
     }
-  }, [open, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialData?.id]);
 
   const resetForm = () => {
     setType('despesa');

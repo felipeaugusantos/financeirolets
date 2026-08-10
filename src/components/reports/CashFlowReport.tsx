@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, TrendingUp, Loader2, Download, FileSpreadsheet, RotateCcw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
-import { cn } from '@/lib/utils';
+import { cn, toLocalISODate } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
@@ -34,8 +34,8 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   const [units, setUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<CashFlowFilters>({
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: toLocalISODate(new Date(new Date().getFullYear(), 11, 31)),
   });
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -87,8 +87,8 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   const hideZero = cfSec.isOn('hideZeroRows');
 
   const defaultFilters: CashFlowFilters = {
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: toLocalISODate(new Date(new Date().getFullYear(), 11, 31)),
   };
 
   const handleClearFilters = () => setFilters(defaultFilters);
