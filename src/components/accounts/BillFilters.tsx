@@ -41,7 +41,7 @@ export default function BillFilters({ filters, onChange }: BillFiltersProps) {
 
   const clearAll = () => onChange(emptyFilters);
 
-  const toDateStr = (d: Date) => d.toISOString().substring(0, 10);
+  const toDateStr = (d: Date) => toLocalISODate(d);
   const fromDateStr = (s: string | null) => s ? new Date(s + 'T12:00:00') : undefined;
 
   return (

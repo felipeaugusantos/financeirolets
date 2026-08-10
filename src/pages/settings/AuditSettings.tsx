@@ -42,11 +42,11 @@ const ACTION_LABEL: Record<string, string> = {
 function todayIso(offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() - offsetDays);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 function startOfMonthIso() {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return toLocalISODate(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
 function fmtDate(iso: string) {

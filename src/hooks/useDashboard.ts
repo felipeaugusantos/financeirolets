@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toLocalISODate } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface OverdueBill {
@@ -49,7 +50,7 @@ export interface DashboardFilters {
 }
 
 function ymd(d: Date) {
-  return d.toISOString().substring(0, 10);
+  return toLocalISODate(d);
 }
 
 function addMonths(d: Date, n: number) {

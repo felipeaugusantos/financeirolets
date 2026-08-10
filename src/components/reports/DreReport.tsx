@@ -26,8 +26,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   const [units, setUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: todayLocalISO(),
     regime: 'competencia',
     includeBudget: false,
     includePrevious: false,
@@ -80,8 +80,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   const compact = dreSec.isOn('compact');
 
   const defaultFilters: DreFilters = {
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: todayLocalISO(),
     regime: 'competencia',
     includeBudget: false,
     includePrevious: false,

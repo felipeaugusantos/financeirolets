@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { todayLocalISO } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -55,7 +56,7 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const today = new Date().toISOString().substring(0, 10);
+    const today = todayLocalISO();
     const type = tab === 'pagar' ? 'despesa' : 'receita';
 
     let query = supabase
@@ -113,7 +114,7 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const markAs = async (id: string, status: 'pago' | 'recebido', accountId?: string, paymentMethod?: string) => {
-    const payment_date = new Date().toISOString().split('T')[0];
+    const payment_date = todayLocalISO();
     const updateData: Record<string, unknown> = { status, payment_date };
     if (accountId) updateData.account_id = accountId;
     if (paymentMethod) updateData.payment_method = paymentMethod;

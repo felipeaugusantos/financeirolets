@@ -40,8 +40,8 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [filters, setFilters] = useState({
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: todayLocalISO(),
     regime: 'competencia' as 'competencia' | 'caixa',
   });
   const reportRef = useRef<HTMLDivElement>(null);

@@ -27,12 +27,13 @@ import {
   Repeat,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { todayLocalISO } from '@/lib/utils';
 import BillFilters, { BillFiltersState, emptyFilters } from '@/components/accounts/BillFilters';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function getStatusInfo(bill: BillRow) {
-  const today = new Date().toISOString().substring(0, 10);
+  const today = todayLocalISO();
   if (bill.status === 'pago' || bill.status === 'recebido') {
     return { label: bill.status === 'pago' ? 'Pago' : 'Recebido', variant: 'default' as const, className: 'bg-success text-success-foreground' };
   }

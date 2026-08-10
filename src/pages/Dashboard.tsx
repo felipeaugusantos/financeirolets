@@ -213,7 +213,7 @@ function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: strin
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
-  const ymd = (d: Date) => d.toISOString().substring(0, 10);
+  const ymd = (d: Date) => toLocalISODate(d);
   switch (preset) {
     case 'last_month': {
       const from = new Date(y, m - 1, 1);

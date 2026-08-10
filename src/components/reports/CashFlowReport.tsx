@@ -34,8 +34,8 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   const [units, setUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<CashFlowFilters>({
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: toLocalISODate(new Date(new Date().getFullYear(), 11, 31)),
   });
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -87,8 +87,8 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   const hideZero = cfSec.isOn('hideZeroRows');
 
   const defaultFilters: CashFlowFilters = {
-    dateFrom: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    dateTo: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
+    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+    dateTo: toLocalISODate(new Date(new Date().getFullYear(), 11, 31)),
   };
 
   const handleClearFilters = () => setFilters(defaultFilters);

@@ -178,7 +178,7 @@ interface FixApi {
   apply: (item: TxDetail, patch: Record<string, unknown>, message: string) => Promise<void>;
 }
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+const todayISO = () => todayLocalISO();
 
 function FixActions({
   item, kind, side, lookups, api,
@@ -804,8 +804,8 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
   const [catReceita, setCatReceita] = useState<any[]>([]);
   const [catDespesa, setCatDespesa] = useState<any[]>([]);
   const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+  const firstOfMonth = toLocalISODate(new Date(today.getFullYear(), today.getMonth(), 1));
+  const lastOfMonth = toLocalISODate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
 
   const [filters, setFilters] = useState<ReconciliationFilters>({
     dateFrom: firstOfMonth,

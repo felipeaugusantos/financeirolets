@@ -106,7 +106,7 @@ function emptyDetail(): BucketDetail {
   return { total: 0, count: 0, items: [], byCategory: [], byFront: [] };
 }
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+const todayISO = () => todayLocalISO();
 
 function pushDetail(d: BucketDetail, item: TxDetail) {
   d.items.push(item);

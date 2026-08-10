@@ -41,7 +41,7 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lancamentos_${new Date().toISOString().substring(0, 10)}.csv`;
+      a.download = `lancamentos_${todayLocalISO()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: 'CSV exportado com sucesso' });
@@ -86,7 +86,7 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
 
         const rawType = (cols[typeIdx] || '').toLowerCase();
         const type = rawType.includes('receita') ? 'receita' : 'despesa';
-        let competence_date = new Date().toISOString().substring(0, 10);
+        let competence_date = todayLocalISO();
         if (dateIdx !== -1 && cols[dateIdx]) {
           const d = cols[dateIdx];
           // Try DD/MM/YYYY or YYYY-MM-DD
