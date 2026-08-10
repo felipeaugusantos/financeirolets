@@ -107,6 +107,15 @@ const TOOLS = [
   },
 ];
 
+function todaySaoPaulo(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
 function makeClient(authHeader: string | null) {
   const url = Deno.env.get('SUPABASE_URL')!;
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -133,7 +142,7 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
       if (args.missing_category) q = q.is('category_id', null);
       if (args.missing_unit) q = q.is('unit_id', null);
       if (args.overdue_only) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todaySaoPaulo();
         q = q.in('status', ['pendente', 'agendado']).lt('due_date', today);
       }
       q = q.not('status', 'eq', 'cancelado');
