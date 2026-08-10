@@ -228,6 +228,7 @@ Deno.serve(async (req) => {
 
     const chatMessages: any[] = [
       { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: `Hoje (America/Sao_Paulo) é ${todaySaoPaulo()}. Sempre use essa data como "hoje".` },
     ];
     if (pageContext) {
       chatMessages.push({
