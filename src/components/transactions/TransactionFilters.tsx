@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { CalendarIcon, Filter } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, parseDateUTC } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
@@ -48,11 +48,11 @@ export default function TransactionFilters({ filters, onChange }: Props) {
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className={cn('w-full justify-start text-left font-normal rounded-xl text-xs bg-card border-border', !value && 'text-muted-foreground')}>
             <CalendarIcon className="mr-1 h-3 w-3" />
-            {value ? format(new Date(value), 'dd/MM/yy') : '—'}
+            {value ? format(parseDateUTC(value), 'dd/MM/yy') : '—'}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar mode="single" selected={value ? new Date(value) : undefined} onSelect={(d) => set(filterKey, d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+          <Calendar mode="single" selected={value ? parseDateUTC(value) : undefined} onSelect={(d) => set(filterKey, d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
         </PopoverContent>
       </Popover>
     </div>
