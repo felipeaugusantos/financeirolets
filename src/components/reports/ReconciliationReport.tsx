@@ -13,7 +13,7 @@ import { ArrowLeft, GitCompare, Loader2, Info, ChevronDown, ChevronRight, Tag, L
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast as sonner } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
 const fmt = (v: number) =>

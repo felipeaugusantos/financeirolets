@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { todayLocalISO } from '@/lib/utils';
 
 export interface ReconciliationFilters {
   dateFrom: string;
