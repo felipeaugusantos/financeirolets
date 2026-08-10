@@ -47,6 +47,25 @@ const PAYMENT_METHODS = [
   { value: 'outro', label: 'Outro' },
 ];
 
+function DatePickerField({ label, value, onChange }: { label: string; value?: Date; onChange: (d?: Date) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" className={cn('w-full justify-start text-left font-normal rounded-xl bg-card border-border', !value && 'text-muted-foreground')}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {value ? format(value, 'dd/MM/yyyy') : 'Selecionar'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar mode="single" selected={value} onSelect={(d) => onChange(d || undefined)} initialFocus className="p-3 pointer-events-auto" />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function TransactionFormDialog({ open, onOpenChange, onSave, initialData }: Props) {
   const { data: categories, create: createCategory, fetch: refetchCategories } = useSupabaseCrud<any>('categories', 'name');
   const { data: accounts, create: createAccount, fetch: refetchAccounts } = useSupabaseCrud<any>('accounts', 'name');
@@ -220,23 +239,6 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setSaving(false);
     if (ok) onOpenChange(false);
   };
-
-  const DatePickerField = ({ label, value, onChange }: { label: string; value?: Date; onChange: (d?: Date) => void }) => (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className={cn('w-full justify-start text-left font-normal rounded-xl bg-card border-border', !value && 'text-muted-foreground')}>
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? format(value, 'dd/MM/yyyy') : 'Selecionar'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar mode="single" selected={value} onSelect={(d) => onChange(d || undefined)} initialFocus className="p-3 pointer-events-auto" />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
