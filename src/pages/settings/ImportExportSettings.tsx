@@ -60,10 +60,17 @@ function parseAmount(raw: string): number {
 function parseDateFlexible(raw: string): string | null {
   const d = (raw || '').trim();
   if (!d) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const isValid = (y: number, m: number, day: number) => {
+    if (m < 1 || m > 12 || day < 1) return false;
+    const dt = new Date(Date.UTC(y, m - 1, day));
+    return dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
+  };
+  const iso = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return isValid(+iso[1], +iso[2], +iso[3]) ? d : null;
   const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m) {
     const yy = m[3].length === 2 ? `20${m[3]}` : m[3];
+    if (!isValid(+yy, +m[2], +m[1])) return null;
     return `${yy}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   }
   return null;
