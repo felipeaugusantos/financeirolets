@@ -207,8 +207,10 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              O CSV deve ter ao menos as colunas: <strong>Descrição</strong> e <strong>Valor</strong>. 
-              Colunas opcionais: Tipo, Data, Status.
+              O CSV deve ter ao menos as colunas: <strong>Descrição</strong> e <strong>Valor</strong>.
+              Colunas opcionais: Tipo, Data, Status. Aceita separador <strong>;</strong> (padrão Excel pt-BR)
+              ou <strong>,</strong> (arquivos antigos), datas em <strong>dd/mm/aaaa</strong> ou aaaa-mm-dd e
+              valores com vírgula ou ponto decimal.
             </p>
             <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={handleImportCSV} />
             <Button
