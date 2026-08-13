@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle, RotateCcw } from 'lucide-react';
 import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
-import { exportToCsv } from '@/lib/exportCsv';
+import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
@@ -133,23 +133,23 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     headers.push('AV %');
 
     const rows = lines.map(l => {
-      const r: (string | number)[] = [
-        l.code || '',
-        '  '.repeat(l.depth) + l.name,
+      const r: CsvCell[] = [
+        csvCode(l.code),
+        csvIndent(l.depth, l.name),
         l.is_subtotal ? 'Subtotal' : 'Linha',
-        l.value.toFixed(2).replace('.', ','),
+        csvNumber(l.value),
       ];
       if (filters.includeBudget) {
         const b = l.budgetValue ?? 0;
         const v = b !== 0 ? ((l.value - b) / Math.abs(b)) * 100 : 0;
-        r.push(b.toFixed(2).replace('.', ','), v.toFixed(1).replace('.', ','));
+        r.push(csvNumber(b), csvNumber(v, 1));
       }
       if (filters.includePrevious) {
         const p = l.previousValue ?? 0;
         const v = p !== 0 ? ((l.value - p) / Math.abs(p)) * 100 : 0;
-        r.push(p.toFixed(2).replace('.', ','), v.toFixed(1).replace('.', ','));
+        r.push(csvNumber(p), csvNumber(v, 1));
       }
-      r.push(avFor(l.value).toFixed(1).replace('.', ','));
+      r.push(csvNumber(avFor(l.value), 1));
       return r;
     });
     exportToCsv(`DRE_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);

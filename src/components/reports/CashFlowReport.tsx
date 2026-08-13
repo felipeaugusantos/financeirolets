@@ -13,7 +13,7 @@ import { ArrowLeft, TrendingUp, Loader2, Download, FileSpreadsheet, RotateCcw } 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
 import { cn, toLocalISODate } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
-import { exportToCsv } from '@/lib/exportCsv';
+import { exportToCsv, csvNumber, CsvCell } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
@@ -133,41 +133,39 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   // CSV depending on mode
   const handleExportCsv = () => {
     if (mode === 'realizado') {
-      const headers = ['Mês', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
-      const rows = realizedData.map(d => [
+      const headers: CsvCell[] = ['Mês', 'Competência', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
+      const rows: CsvCell[][] = realizedData.map(d => [
+        d.label,
         d.month,
-        d.receitas.toFixed(2).replace('.', ','),
-        d.despesas.toFixed(2).replace('.', ','),
-        (d.receitas - d.despesas).toFixed(2).replace('.', ','),
-        d.acumulado.toFixed(2).replace('.', ','),
+        csvNumber(d.receitas),
+        csvNumber(d.despesas),
+        csvNumber(d.receitas - d.despesas),
+        csvNumber(d.acumulado),
       ]);
       exportToCsv(`FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
     } else if (mode === 'projetado') {
-      const headers = ['Mês', 'Receitas Realiz.', 'Despesas Realiz.', 'Receitas Proj.', 'Despesas Proj.', 'Saldo Total', 'Acumulado'];
-      const rows = projectedData.map(d => [
+      const headers: CsvCell[] = ['Mês', 'Competência', 'Receitas Realiz.', 'Despesas Realiz.', 'Receitas Proj.', 'Despesas Proj.', 'Saldo Total', 'Acumulado'];
+      const rows: CsvCell[][] = projectedData.map(d => [
+        d.label,
         d.month,
-        d.receitasRealizadas.toFixed(2).replace('.', ','),
-        d.despesasRealizadas.toFixed(2).replace('.', ','),
-        d.receitasProjetadas.toFixed(2).replace('.', ','),
-        d.despesasProjetadas.toFixed(2).replace('.', ','),
-        d.saldoTotal.toFixed(2).replace('.', ','),
-        d.acumulado.toFixed(2).replace('.', ','),
+        csvNumber(d.receitasRealizadas),
+        csvNumber(d.despesasRealizadas),
+        csvNumber(d.receitasProjetadas),
+        csvNumber(d.despesasProjetadas),
+        csvNumber(d.saldoTotal),
+        csvNumber(d.acumulado),
       ]);
       exportToCsv(`FluxoCaixa_Projetado_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
     } else {
       // Comparativo: realizado vs projetado lado a lado
-      const headers = ['Mês', 'Saldo Realizado', 'Saldo Projetado', 'Diferença'];
-      const months = new Set<string>([
-        ...realizedData.map(d => d.month),
-        ...projectedData.map(d => d.month),
+      const headers: CsvCell[] = ['Mês', 'Competência', 'Saldo Realizado', 'Saldo Projetado', 'Diferença'];
+      const rows: CsvCell[][] = comparativeData.map(d => [
+        d.label,
+        d.month,
+        csvNumber(d.realizado),
+        csvNumber(d.projetado),
+        csvNumber(d.projetado - d.realizado),
       ]);
-      const rows = Array.from(months).sort().map(m => {
-        const r = realizedData.find(d => d.month === m);
-        const p = projectedData.find(d => d.month === m);
-        const sr = r ? r.receitas - r.despesas : 0;
-        const sp = p ? p.saldoTotal : 0;
-        return [m, sr.toFixed(2).replace('.', ','), sp.toFixed(2).replace('.', ','), (sp - sr).toFixed(2).replace('.', ',')];
-      });
       exportToCsv(`FluxoCaixa_Comparativo_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
     }
   };
