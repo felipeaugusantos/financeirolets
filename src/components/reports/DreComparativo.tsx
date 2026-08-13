@@ -285,11 +285,10 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
   };
 
   const handleExportCsv = () => {
-    const headers: CsvCell[] = ['Código', 'Linha', 'Tipo', ...unitCols.map(c => c.label)];
+    const headers: CsvCell[] = ['Código', 'Linha', ...unitCols.map(c => c.label)];
     const rows: CsvCell[][] = lines.map(l => [
       csvCode(l.code),
       csvIndent(l.depth, l.name),
-      l.is_subtotal ? 'Subtotal' : 'Linha',
       ...unitCols.map(c => csvNumber(l.values[c.id] ?? 0)),
     ]);
     exportToCsv(`DRE_Comparativo_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);

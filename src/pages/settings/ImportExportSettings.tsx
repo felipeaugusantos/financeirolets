@@ -60,10 +60,17 @@ function parseAmount(raw: string): number {
 function parseDateFlexible(raw: string): string | null {
   const d = (raw || '').trim();
   if (!d) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const isValid = (y: number, m: number, day: number) => {
+    if (m < 1 || m > 12 || day < 1) return false;
+    const dt = new Date(Date.UTC(y, m - 1, day));
+    return dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
+  };
+  const iso = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return isValid(+iso[1], +iso[2], +iso[3]) ? d : null;
   const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m) {
     const yy = m[3].length === 2 ? `20${m[3]}` : m[3];
+    if (!isValid(+yy, +m[2], +m[1])) return null;
     return `${yy}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   }
   return null;
@@ -153,9 +160,20 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
 
         const rawType = (cols[typeIdx] || '').toLowerCase();
         const type = rawType.includes('receita') ? 'receita' : 'despesa';
-        let competence_date = todayLocalISO();
-        if (dateIdx !== -1 && cols[dateIdx]) {
-          competence_date = parseDateFlexible(cols[dateIdx]) ?? competence_date;
+        // Data: nunca substituir silenciosamente por hoje.
+        let competence_date: string;
+        if (dateIdx === -1) {
+          // Arquivo sem coluna de data: usa a data de hoje (comportamento explícito no aviso da tela).
+          competence_date = todayLocalISO();
+        } else {
+          const parsed = parseDateFlexible(cols[dateIdx] || '');
+          if (!parsed) {
+            errors.push(
+              `Linha ${i + 1}: data inválida ou vazia ("${(cols[dateIdx] || '').trim()}"). Use dd/mm/aaaa ou aaaa-mm-dd. Linha não importada.`
+            );
+            continue;
+          }
+          competence_date = parsed;
         }
 
         const { error } = await supabase.from('transactions').insert({
@@ -211,6 +229,9 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
               Colunas opcionais: Tipo, Data, Status. Aceita separador <strong>;</strong> (padrão Excel pt-BR)
               ou <strong>,</strong> (arquivos antigos), datas em <strong>dd/mm/aaaa</strong> ou aaaa-mm-dd e
               valores com vírgula ou ponto decimal.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Linhas com data inválida ou vazia <strong>não são importadas</strong> e aparecem na lista de erros.
             </p>
             <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={handleImportCSV} />
             <Button

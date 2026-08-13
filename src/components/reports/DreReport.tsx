@@ -127,17 +127,16 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   };
 
   const handleExportCsv = () => {
-    const headers = ['Código', 'Linha', 'Tipo', 'Realizado'];
-    if (filters.includeBudget) headers.push('Orçado', 'Variação %');
-    if (filters.includePrevious) headers.push('Período Anterior', 'AH %');
-    headers.push('AV %');
+    const headers: CsvCell[] = ['Código', 'Linha', 'Realizado', 'AV %'];
+    if (filters.includeBudget) headers.push('Orçado', 'Var %');
+    if (filters.includePrevious) headers.push('Ano Anterior', 'AH %');
 
     const rows = lines.map(l => {
       const r: CsvCell[] = [
         csvCode(l.code),
         csvIndent(l.depth, l.name),
-        l.is_subtotal ? 'Subtotal' : 'Linha',
         csvNumber(l.value),
+        csvNumber(avFor(l.value), 1),
       ];
       if (filters.includeBudget) {
         const b = l.budgetValue ?? 0;
@@ -149,7 +148,6 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
         const v = p !== 0 ? ((l.value - p) / Math.abs(p)) * 100 : 0;
         r.push(csvNumber(p), csvNumber(v, 1));
       }
-      r.push(csvNumber(avFor(l.value), 1));
       return r;
     });
     exportToCsv(`DRE_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
