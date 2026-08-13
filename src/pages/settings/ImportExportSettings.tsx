@@ -230,6 +230,9 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
               ou <strong>,</strong> (arquivos antigos), datas em <strong>dd/mm/aaaa</strong> ou aaaa-mm-dd e
               valores com vírgula ou ponto decimal.
             </p>
+            <p className="text-xs text-muted-foreground">
+              Linhas com data inválida ou vazia <strong>não são importadas</strong> e aparecem na lista de erros.
+            </p>
             <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={handleImportCSV} />
             <Button
               variant="outline"
