@@ -133,10 +133,9 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   // CSV depending on mode
   const handleExportCsv = () => {
     if (mode === 'realizado') {
-      const headers: CsvCell[] = ['Mês', 'Competência', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
+      const headers: CsvCell[] = ['Mês', 'Receitas', 'Despesas', 'Saldo', 'Acumulado'];
       const rows: CsvCell[][] = realizedData.map(d => [
         d.label,
-        d.month,
         csvNumber(d.receitas),
         csvNumber(d.despesas),
         csvNumber(d.receitas - d.despesas),
@@ -144,13 +143,12 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
       ]);
       exportToCsv(`FluxoCaixa_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
     } else if (mode === 'projetado') {
-      const headers: CsvCell[] = ['Mês', 'Competência', 'Receitas Realiz.', 'Despesas Realiz.', 'Receitas Proj.', 'Despesas Proj.', 'Saldo Total', 'Acumulado'];
+      const headers: CsvCell[] = ['Mês', 'Receitas Realiz.', 'Receitas Proj.', 'Despesas Realiz.', 'Despesas Proj.', 'Saldo', 'Acumulado'];
       const rows: CsvCell[][] = projectedData.map(d => [
         d.label,
-        d.month,
         csvNumber(d.receitasRealizadas),
-        csvNumber(d.despesasRealizadas),
         csvNumber(d.receitasProjetadas),
+        csvNumber(d.despesasRealizadas),
         csvNumber(d.despesasProjetadas),
         csvNumber(d.saldoTotal),
         csvNumber(d.acumulado),
@@ -158,10 +156,9 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
       exportToCsv(`FluxoCaixa_Projetado_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
     } else {
       // Comparativo: realizado vs projetado lado a lado
-      const headers: CsvCell[] = ['Mês', 'Competência', 'Saldo Realizado', 'Saldo Projetado', 'Diferença'];
+      const headers: CsvCell[] = ['Mês', 'Saldo Realizado', 'Saldo Projetado', 'Diferença'];
       const rows: CsvCell[][] = comparativeData.map(d => [
         d.label,
-        d.month,
         csvNumber(d.realizado),
         csvNumber(d.projetado),
         csvNumber(d.projetado - d.realizado),

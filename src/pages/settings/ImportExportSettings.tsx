@@ -153,9 +153,20 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
 
         const rawType = (cols[typeIdx] || '').toLowerCase();
         const type = rawType.includes('receita') ? 'receita' : 'despesa';
-        let competence_date = todayLocalISO();
-        if (dateIdx !== -1 && cols[dateIdx]) {
-          competence_date = parseDateFlexible(cols[dateIdx]) ?? competence_date;
+        // Data: nunca substituir silenciosamente por hoje.
+        let competence_date: string;
+        if (dateIdx === -1) {
+          // Arquivo sem coluna de data: usa a data de hoje (comportamento explícito no aviso da tela).
+          competence_date = todayLocalISO();
+        } else {
+          const parsed = parseDateFlexible(cols[dateIdx] || '');
+          if (!parsed) {
+            errors.push(
+              `Linha ${i + 1}: data inválida ou vazia ("${(cols[dateIdx] || '').trim()}"). Use dd/mm/aaaa ou aaaa-mm-dd. Linha não importada.`
+            );
+            continue;
+          }
+          competence_date = parsed;
         }
 
         const { error } = await supabase.from('transactions').insert({
