@@ -374,22 +374,22 @@ export default function Dashboard() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn('h-9 text-xs font-normal', !customFrom && 'text-muted-foreground')}>
                     <CalendarIcon className="mr-1 h-3 w-3" />
-                    {customFrom ? format(new Date(customFrom + 'T00:00:00'), 'dd/MM/yy') : 'De'}
+                    {customFrom ? format(parseDateUTC(customFrom), 'dd/MM/yy') : 'De'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={customFrom ? new Date(customFrom + 'T00:00:00') : undefined} onSelect={(d) => setCustomFrom(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+                  <Calendar mode="single" selected={customFrom ? parseDateUTC(customFrom) : undefined} onSelect={(d) => setCustomFrom(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn('h-9 text-xs font-normal', !customTo && 'text-muted-foreground')}>
                     <CalendarIcon className="mr-1 h-3 w-3" />
-                    {customTo ? format(new Date(customTo + 'T00:00:00'), 'dd/MM/yy') : 'Até'}
+                    {customTo ? format(parseDateUTC(customTo), 'dd/MM/yy') : 'Até'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={customTo ? new Date(customTo + 'T00:00:00') : undefined} onSelect={(d) => setCustomTo(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
+                  <Calendar mode="single" selected={customTo ? parseDateUTC(customTo) : undefined} onSelect={(d) => setCustomTo(d ? format(d, 'yyyy-MM-dd') : undefined)} initialFocus className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </>
