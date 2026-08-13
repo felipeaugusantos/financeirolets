@@ -179,8 +179,8 @@ async function fetchBudgetValues(
   allLines: any[]
 ): Promise<Map<string, number>> {
   // Sum budget rows for months within [dateFrom..dateTo]
-  const start = new Date(dateFrom + 'T00:00:00');
-  const end = new Date(dateTo + 'T00:00:00');
+  const start = new Date(dateFrom + 'T12:00:00');
+  const end = new Date(dateTo + 'T12:00:00');
   const months: { year: number; month: number }[] = [];
   const cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
