@@ -7,6 +7,67 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { todayLocalISO } from '@/lib/utils';
+import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
+
+/** Divide uma linha CSV respeitando aspas, aceitando ';' ou ',' como delimitador. */
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = false;
+      } else cur += ch;
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === delimiter) {
+      out.push(cur.trim()); cur = '';
+    } else cur += ch;
+  }
+  out.push(cur.trim());
+  return out.map(c => c.replace(/^="(.*)"$/, '$1'));
+}
+
+/** Detecta o delimitador do arquivo (compatível com CSVs antigos com vírgula). */
+function detectDelimiter(headerLine: string): string {
+  const semi = (headerLine.match(/;/g) || []).length;
+  const comma = (headerLine.match(/,/g) || []).length;
+  return semi >= comma && semi > 0 ? ';' : ',';
+}
+
+/** Aceita "1234,56", "1.234,56", "1234.56" e "1,234.56". */
+function parseAmount(raw: string): number {
+  let s = (raw || '').replace(/[^\d,.-]/g, '').trim();
+  if (!s) return NaN;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma > -1 && lastDot > -1) {
+    if (lastComma > lastDot) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+  } else if (lastComma > -1) {
+    // vírgula única: decimal pt-BR (a menos que pareça milhar: ,000 no fim)
+    s = /,\d{3}$/.test(s) && s.replace(/[^,]/g, '').length === 1 && s.length > 5
+      ? s.replace(',', '')
+      : s.replace(',', '.');
+  }
+  return parseFloat(s);
+}
+
+/** Aceita dd/MM/yyyy, dd/MM/yy e yyyy-MM-dd. */
+function parseDateFlexible(raw: string): string | null {
+  const d = (raw || '').trim();
+  if (!d) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    const yy = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${yy}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  return null;
+}
 
 export default function ImportExportSettings({ onBack }: { onBack: () => void }) {
   const { toast } = useToast();
@@ -29,22 +90,26 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
       }
 
       const headers = ['Data Competência', 'Tipo', 'Descrição', 'Valor Bruto', 'Impostos', 'Valor Líquido', 'Vencimento', 'Pagamento', 'Status', 'Forma Pgto', 'Categoria', 'Conta', 'Parceiro', 'Unidade', 'Frente', 'Observações'];
-      const csvRows = rows.map((r: any) => [
-        r.competence_date, r.type, `"${(r.description || '').replace(/"/g, '""')}"`,
-        r.amount, r.tax_amount, r.net_amount, r.due_date || '', r.payment_date || '',
-        r.status, r.payment_method || '', r.category?.name || '', r.account?.name || '',
-        r.partner?.name || '', r.unit?.name || '', r.front?.name || '',
-        `"${(r.notes || '').replace(/"/g, '""')}"`,
-      ].join(','));
+      const csvRows: CsvCell[][] = rows.map((r: any) => [
+        csvDate(r.competence_date),
+        r.type || '',
+        r.description || '',
+        csvNumber(r.amount),
+        csvNumber(r.tax_amount),
+        csvNumber(r.net_amount),
+        csvDate(r.due_date),
+        csvDate(r.payment_date),
+        r.status || '',
+        r.payment_method || '',
+        r.category?.name || '',
+        r.account?.name || '',
+        r.partner?.name || '',
+        r.unit?.name || '',
+        r.front?.name || '',
+        r.notes || '',
+      ]);
 
-      const csv = [headers.join(','), ...csvRows].join('\n');
-      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `lancamentos_${todayLocalISO()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      exportToCsv(`lancamentos_${todayLocalISO()}.csv`, headers, csvRows);
       toast({ title: 'CSV exportado com sucesso' });
     } catch (err: any) {
       toast({ title: 'Erro ao exportar', description: err.message, variant: 'destructive' });
@@ -58,13 +123,14 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
     setImportResult(null);
 
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
+      const text = (await file.text()).replace(/^\uFEFF/, '');
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
       if (lines.length < 2) throw new Error('CSV vazio ou sem dados');
+      const delimiter = detectDelimiter(lines[0]);
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const headers = splitCsvLine(lines[0], delimiter).map(h => h.toLowerCase());
       const descIdx = headers.findIndex(h => h.includes('descri'));
-      const amountIdx = headers.findIndex(h => h.includes('valor') || h.includes('amount'));
+      const amountIdx = headers.findIndex(h => h.includes('valor bruto') || h.includes('valor') || h.includes('amount'));
       const typeIdx = headers.findIndex(h => h.includes('tipo') || h.includes('type'));
       const dateIdx = headers.findIndex(h => h.includes('data') || h.includes('date') || h.includes('competência'));
 
@@ -76,11 +142,11 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
       const errors: string[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].match(/(".*?"|[^,]*)/g)?.map(c => c.replace(/^"|"$/g, '').trim()) || [];
+        const cols = splitCsvLine(lines[i], delimiter);
         const description = cols[descIdx];
-        const amount = parseFloat(cols[amountIdx]?.replace(',', '.') || '0');
+        const amount = parseAmount(cols[amountIdx] || '');
 
-        if (!description || !amount) {
+        if (!description || !amount || !isFinite(amount)) {
           errors.push(`Linha ${i + 1}: descrição ou valor inválido`);
           continue;
         }
@@ -89,14 +155,7 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
         const type = rawType.includes('receita') ? 'receita' : 'despesa';
         let competence_date = todayLocalISO();
         if (dateIdx !== -1 && cols[dateIdx]) {
-          const d = cols[dateIdx];
-          // Try DD/MM/YYYY or YYYY-MM-DD
-          if (d.includes('/')) {
-            const [dd, mm, yy] = d.split('/');
-            competence_date = `${yy.length === 2 ? '20' + yy : yy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-          } else if (d.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            competence_date = d;
-          }
+          competence_date = parseDateFlexible(cols[dateIdx]) ?? competence_date;
         }
 
         const { error } = await supabase.from('transactions').insert({
