@@ -111,8 +111,8 @@ export default function AuditSettings({ onBack }: Props) {
           `new_data->>unit_id.eq.${unitFilter},old_data->>unit_id.eq.${unitFilter}`,
         );
       }
-      if (dateFrom) q = q.gte('created_at', dateFrom);
-      if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59');
+      if (dateFrom) q = q.gte('created_at', spDayStart(dateFrom));
+      if (dateTo) q = q.lte('created_at', spDayEnd(dateTo));
       const { data, error } = await q;
       if (error) {
         toast({ title: 'Erro ao carregar auditoria', description: error.message, variant: 'destructive' });
