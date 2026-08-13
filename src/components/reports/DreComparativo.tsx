@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, Columns3, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
-import { exportToCsv } from '@/lib/exportCsv';
+import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { useToast } from '@/hooks/use-toast';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
@@ -285,11 +285,12 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
   };
 
   const handleExportCsv = () => {
-    const headers = ['Código', 'Linha', ...unitCols.map(c => c.label)];
-    const rows = lines.map(l => [
-      l.code || '',
-      '  '.repeat(l.depth) + l.name,
-      ...unitCols.map(c => (l.values[c.id] ?? 0).toFixed(2).replace('.', ',')),
+    const headers: CsvCell[] = ['Código', 'Linha', 'Tipo', ...unitCols.map(c => c.label)];
+    const rows: CsvCell[][] = lines.map(l => [
+      csvCode(l.code),
+      csvIndent(l.depth, l.name),
+      l.is_subtotal ? 'Subtotal' : 'Linha',
+      ...unitCols.map(c => csvNumber(l.values[c.id] ?? 0)),
     ]);
     exportToCsv(`DRE_Comparativo_${filters.dateFrom}_${filters.dateTo}.csv`, headers, rows);
   };
