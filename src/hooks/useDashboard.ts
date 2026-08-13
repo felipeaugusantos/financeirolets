@@ -58,8 +58,8 @@ function addMonths(d: Date, n: number) {
 }
 
 function diffDays(fromIso: string, toIso: string) {
-  const a = new Date(fromIso + 'T00:00:00');
-  const b = new Date(toIso + 'T00:00:00');
+  const a = new Date(fromIso + 'T12:00:00');
+  const b = new Date(toIso + 'T12:00:00');
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
@@ -115,9 +115,9 @@ export function useDashboard(filters?: DashboardFilters) {
 
       // Previous period of same length (for variation)
       const periodDays = diffDays(rangeStart, rangeEnd) + 1;
-      const prevStartDate = new Date(rangeStart + 'T00:00:00');
+      const prevStartDate = new Date(rangeStart + 'T12:00:00');
       prevStartDate.setDate(prevStartDate.getDate() - periodDays);
-      const prevEndDate = new Date(rangeStart + 'T00:00:00');
+      const prevEndDate = new Date(rangeStart + 'T12:00:00');
       prevEndDate.setDate(prevEndDate.getDate() - 1);
       const prevStart = ymd(prevStartDate);
       const prevEnd = ymd(prevEndDate);
@@ -252,14 +252,14 @@ export function useDashboard(filters?: DashboardFilters) {
       // Build monthly array: iterate months from rangeStart→rangeEnd (cap 24)
       const shortMonth = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const monthlyData: { label: string; receitas: number; despesas: number; receitasProv: number; despesasProv: number }[] = [];
-      const startD = new Date(rangeStart + 'T00:00:00');
-      const endD = new Date(rangeEnd + 'T00:00:00');
+      const startD = new Date(rangeStart + 'T12:00:00');
+      const endD = new Date(rangeEnd + 'T12:00:00');
       const monthsCount =
         (endD.getFullYear() - startD.getFullYear()) * 12 + (endD.getMonth() - startD.getMonth()) + 1;
       const cappedMonths = Math.min(Math.max(monthsCount, 1), 24);
       for (let i = 0; i < cappedMonths; i++) {
         const d = new Date(startD.getFullYear(), startD.getMonth() + i, 1);
-        const key = d.toISOString().substring(0, 7);
+        const key = toLocalISODate(d).substring(0, 7);
         const entry = monthMap.get(key) || { receitas: 0, despesas: 0, receitasProv: 0, despesasProv: 0 };
         monthlyData.push({
           label: `${shortMonth[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`,
