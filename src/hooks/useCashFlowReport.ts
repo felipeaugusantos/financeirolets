@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { toLocalISODate } from '@/lib/utils';
 
 export interface CashFlowMonth {
   month: string; // YYYY-MM
@@ -101,12 +102,12 @@ export function useCashFlowReport() {
       });
 
       // Fill missing months in range
-      const start = new Date(filters.dateFrom + 'T00:00:00');
-      const end = new Date(filters.dateTo + 'T00:00:00');
+      const start = new Date(filters.dateFrom + 'T12:00:00');
+      const end = new Date(filters.dateTo + 'T12:00:00');
       const months: string[] = [];
       const cur = new Date(start.getFullYear(), start.getMonth(), 1);
       while (cur <= end) {
-        months.push(cur.toISOString().substring(0, 7));
+        months.push(toLocalISODate(cur).substring(0, 7));
         cur.setMonth(cur.getMonth() + 1);
       }
 

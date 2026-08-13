@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { toLocalISODate } from '@/lib/utils';
 
 export interface DreLineResult {
   id: string;
@@ -29,9 +30,10 @@ export interface DreFilters {
 }
 
 function shiftDateBackOneYear(d: string) {
-  const dt = new Date(d + 'T00:00:00');
-  dt.setFullYear(dt.getFullYear() - 1);
-  return dt.toISOString().split('T')[0];
+  // Coluna `date` (YYYY-MM-DD): manipulação puramente textual/local, sem UTC.
+  const [y, m, day] = d.split('-').map(Number);
+  const dt = new Date(y - 1, m - 1, day);
+  return toLocalISODate(dt);
 }
 
 // Compute totals per dre_line_id from a set of transactions, given allocations and filter
