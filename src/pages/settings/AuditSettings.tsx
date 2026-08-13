@@ -55,6 +55,12 @@ function fmtDate(iso: string) {
   return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// created_at é timestamptz. Os inputs de data são "dia civil" em America/Sao_Paulo (UTC-3, sem DST desde 2019),
+// então convertemos o intervalo explicitamente com o offset para não pegar o dia anterior/seguinte.
+const SP_OFFSET = '-03:00';
+const spDayStart = (isoDate: string) => `${isoDate}T00:00:00.000${SP_OFFSET}`;
+const spDayEnd = (isoDate: string) => `${isoDate}T23:59:59.999${SP_OFFSET}`;
+
 function diffFields(oldData: any, newData: any): { key: string; old: any; new: any }[] {
   if (!oldData && !newData) return [];
   if (!oldData) return Object.entries(newData).map(([key, value]) => ({ key, old: undefined, new: value }));
