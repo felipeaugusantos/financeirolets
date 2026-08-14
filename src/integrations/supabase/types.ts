@@ -469,6 +469,47 @@ export type Database = {
           },
         ]
       }
+      transaction_reviews: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          reviewed_at: string
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["review_status"]
+          transaction_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["review_status"]
+          transaction_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["review_status"]
+          transaction_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_reviews_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           account_id: string | null
@@ -745,6 +786,7 @@ export type Database = {
         | "cheque"
         | "outro"
       recurrence_frequency: "semanal" | "mensal" | "anual"
+      review_status: "pending" | "reviewed" | "corrected" | "ignored"
       transaction_status:
         | "pendente"
         | "pago"
@@ -900,6 +942,7 @@ export const Constants = {
         "outro",
       ],
       recurrence_frequency: ["semanal", "mensal", "anual"],
+      review_status: ["pending", "reviewed", "corrected", "ignored"],
       transaction_status: [
         "pendente",
         "pago",

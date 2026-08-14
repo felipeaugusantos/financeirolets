@@ -13,7 +13,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataQuality, QualityTx } from '@/hooks/useDataQuality';
-import { useReviewActions, useReviewStatus, ReviewStatus } from '@/hooks/useReviewActions';
+import { useReviewActions, useReviewStatus, ReviewStatus, ReviewEntry } from '@/hooks/useReviewActions';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import ConfirmChangeDialog, { ConfirmChangePayload } from '@/components/quality/ConfirmChangeDialog';
 import AllocationAssistant, { AllocationTarget } from '@/components/quality/AllocationAssistant';
 import {
@@ -35,17 +37,64 @@ const REVIEW_LABEL: Record<ReviewStatus, string> = {
 };
 
 function ReviewBadge({
-  id, value, onChange,
-}: { id: string; value: ReviewStatus; onChange: (id: string, s: ReviewStatus) => void }) {
+  id, value, note, onChange,
+}: {
+  id: string; value: ReviewStatus; note?: string | null;
+  onChange: (id: string, s: ReviewStatus, note?: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [pending, setPending] = useState<ReviewStatus>(value);
+
+  const openNote = (status: ReviewStatus) => {
+    setPending(status);
+    setDraft(note ?? '');
+    setOpen(true);
+  };
+
   return (
-    <Select value={value} onValueChange={(v: any) => onChange(id, v)}>
-      <SelectTrigger className="h-7 w-[190px] text-xs"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {(Object.keys(REVIEW_LABEL) as ReviewStatus[]).map((s) => (
-          <SelectItem key={s} value={s} className="text-xs">{REVIEW_LABEL[s]}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <Select
+        value={value}
+        onValueChange={(v: ReviewStatus) => (v === 'ignorado' ? openNote(v) : onChange(id, v))}
+      >
+        <SelectTrigger className="h-7 w-[190px] text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {(Object.keys(REVIEW_LABEL) as ReviewStatus[]).map((s) => (
+            <SelectItem key={s} value={s} className="text-xs">{REVIEW_LABEL[s]}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openNote(value)}>
+        {note ? 'Nota ✓' : 'Nota'}
+      </Button>
+      {note && <span className="text-[11px] text-muted-foreground truncate max-w-[220px]" title={note}>{note}</span>}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Nota da conferência</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            {pending === 'ignorado'
+              ? 'Explique por que este alerta será ignorado (recomendado).'
+              : 'Registro opcional, ex.: "Conferido com extrato em 14/08/2026".'}
+          </p>
+          <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                onChange(id, pending, draft.trim() || null);
+                setOpen(false);
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
@@ -88,7 +137,8 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
   });
   const q = useDataQuality(range);
   const { applyPatch, deleteTransactions, saveAllocations, busy } = useReviewActions(q.reload);
-  const { reviewStatus, setReviewStatus, clearReviewStatus } = useReviewStatus();
+  const { reviewStatus, setReviewStatus, reloadReviews, reviewsLoading } = useReviewStatus();
+  const [reviewFilter, setReviewFilter] = useState<ReviewStatus | 'todos'>('pendente');
   const [confirm, setConfirm] = useState<ConfirmChangePayload | null>(null);
   const [allocTarget, setAllocTarget] = useState<AllocationTarget | null>(null);
 
@@ -104,7 +154,25 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
   const setAll = (block: string, ids: string[], on: boolean) =>
     setSel((p) => ({ ...p, [block]: on ? new Set(ids) : new Set() }));
 
-  const rs = (id: string): ReviewStatus => reviewStatus[id] ?? 'pendente';
+  const rs = (id: string): ReviewStatus => reviewStatus[id]?.status ?? 'pendente';
+  const rnote = (id: string): string | null => reviewStatus[id]?.note ?? null;
+  const passesReview = (id: string) => reviewFilter === 'todos' || rs(id) === reviewFilter;
+
+  const reviewCounts = useMemo(() => {
+    const all = new Set<string>([
+      ...q.semCategoria.map((t) => t.id),
+      ...q.semUnidade.map((t) => t.id),
+      ...q.typeStatusMismatch.map((t) => t.id),
+      ...q.foraDoDre.map((t) => t.id),
+      ...q.pagoSemData.map((t) => t.id),
+    ]);
+    const c: Record<ReviewStatus | 'todos', number> = {
+      todos: all.size, pendente: 0, revisado: 0, corrigido: 0, ignorado: 0,
+    };
+    all.forEach((id) => { c[rs(id)] += 1; });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.semCategoria, q.semUnidade, q.typeStatusMismatch, q.foraDoDre, q.pagoSemData, reviewStatus]);
 
   const row = (t: QualityTx, before: string, after: string) => ({
     id: t.id,
@@ -145,7 +213,9 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
     exportToCsv(`conferencia_${name}_${todayLocalISO()}.csv`, headers, rows);
   };
 
-  const SelRow = ({ block, t, extra }: { block: string; t: QualityTx; extra?: React.ReactNode }) => (
+  const SelRow = ({ block, t, extra }: { block: string; t: QualityTx; extra?: React.ReactNode }) => {
+    if (!passesReview(t.id)) return null;
+    return (
     <div className="p-3 space-y-2">
       <div className="flex items-start gap-3">
         <Checkbox checked={selected(block).has(t.id)} onCheckedChange={() => toggle(block, t.id)} className="mt-1" />
@@ -166,12 +236,13 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
             <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openTx(t)}>
               <ExternalLink className="h-3 w-3" /> Abrir lançamento
             </Button>
-            <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+            <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
           </div>
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const BulkBar = ({ block, ids, children }: { block: string; ids: string[]; children?: React.ReactNode }) => (
     <div className="flex items-center gap-2 flex-wrap p-3 bg-muted/40 border-b border-border">
@@ -219,14 +290,37 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
             <Input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} />
           </div>
           <div className="flex items-end">
-            <Button variant="outline" className="gap-2" onClick={q.reload} disabled={q.loading}>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => { q.reload(); reloadReviews(); }}
+              disabled={q.loading || reviewsLoading}
+            >
               {q.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Atualizar
             </Button>
           </div>
-          <div className="flex items-end">
-            <Button variant="ghost" size="sm" onClick={clearReviewStatus}>Limpar marcações de revisão</Button>
+          <div className="space-y-1">
+            <Label className="text-xs">Situação da conferência</Label>
+            <Select value={reviewFilter} onValueChange={(v: any) => setReviewFilter(v)}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pendente" className="text-xs">Pendente ({reviewCounts.pendente})</SelectItem>
+                <SelectItem value="revisado" className="text-xs">Revisado ({reviewCounts.revisado})</SelectItem>
+                <SelectItem value="corrigido" className="text-xs">Corrigido ({reviewCounts.corrigido})</SelectItem>
+                <SelectItem value="ignorado" className="text-xs">Ignorado ({reviewCounts.ignorado})</SelectItem>
+                <SelectItem value="todos" className="text-xs">Todos ({reviewCounts.todos})</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </CardContent>
+        <CardContent className="pt-0 flex flex-wrap gap-2">
+          {(['pendente', 'revisado', 'corrigido', 'ignorado'] as ReviewStatus[]).map((s) => (
+            <Badge key={s} variant={s === 'pendente' ? 'destructive' : 'secondary'} className="text-[11px]">
+              {REVIEW_LABEL[s]}: {reviewCounts[s]}
+            </Badge>
+          ))}
+          <Badge variant="outline" className="text-[11px]">Total analisado: {reviewCounts.todos}</Badge>
         </CardContent>
       </Card>
 
@@ -285,7 +379,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                     >
                       Excluir
                     </Button>
-                    <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+                    <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
                   </div>
                 </div>
               ))}
@@ -544,7 +638,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                           >
                             Excluir
                           </Button>
-                          <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+                          <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
                         </div>
                       </div>
                     ))}
@@ -724,7 +818,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                     <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => openTx(t)}>
                       <ExternalLink className="h-3 w-3" /> Abrir lançamento
                     </Button>
-                    <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+                    <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
                   </div>
                 </div>
               ))}
