@@ -20,6 +20,13 @@ import { Separator } from '@/components/ui/separator';
 import SelectWithAdd from '@/components/ui/select-with-add';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import type { TransactionInput, AllocationInput } from '@/hooks/useTransactions';
+import {
+  isLegacyCategory,
+  isSalaryCategory,
+  isPartnerRequired,
+  CATEGORY_HELP,
+  validateCategoryRules,
+} from '@/lib/categoryRules';
 
 interface Props {
   open: boolean;
@@ -180,11 +187,29 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   };
 
   const netAmount = (parseFloat(amount) || 0) - (parseFloat(taxAmount) || 0);
-  const filteredCategories = categories.filter((c: any) => c.active && c.type === type);
+  // Categorias legadas somem do seletor de lançamentos novos, mas continuam visíveis
+  // quando o lançamento em edição já usa uma delas (para não alterar o histórico).
+  const filteredCategories = categories.filter(
+    (c: any) =>
+      c.active &&
+      c.type === type &&
+      (!isLegacyCategory(c.id) || c.id === initialData?.category_id)
+  );
   const activeAccounts = accounts.filter((a: any) => a.active);
   const activePartners = partners.filter((p: any) => p.active);
   const activeUnits = units.filter((u: any) => u.active);
   const activeFronts = fronts.filter((f: any) => f.active);
+
+  const unitCodeById = new Map<string, string | null>(
+    units.map((u: any) => [u.id, u.code ?? null])
+  );
+  const { errors: ruleErrors, warnings: ruleWarnings } = validateCategoryRules({
+    categoryId: categoryId || undefined,
+    unitId: unitId || undefined,
+    partnerId: partnerId || undefined,
+    unitCodeById,
+  });
+  const categoryHelp = categoryId ? CATEGORY_HELP[categoryId] : undefined;
 
   const addAllocation = () => {
     setAllocations(prev => [...prev, { allocation_type: 'percentual', percentage: 0 }]);
@@ -208,6 +233,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
 
   const handleSubmit = async () => {
     if (!description.trim() || !amount) return;
+    if (ruleErrors.length > 0) return;
     setSaving(true);
     const input: TransactionInput = {
       type,
