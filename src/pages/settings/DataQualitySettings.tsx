@@ -137,7 +137,8 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
   });
   const q = useDataQuality(range);
   const { applyPatch, deleteTransactions, saveAllocations, busy } = useReviewActions(q.reload);
-  const { reviewStatus, setReviewStatus, clearReviewStatus } = useReviewStatus();
+  const { reviewStatus, setReviewStatus, reloadReviews, reviewsLoading } = useReviewStatus();
+  const [reviewFilter, setReviewFilter] = useState<ReviewStatus | 'todos'>('pendente');
   const [confirm, setConfirm] = useState<ConfirmChangePayload | null>(null);
   const [allocTarget, setAllocTarget] = useState<AllocationTarget | null>(null);
 
@@ -153,7 +154,25 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
   const setAll = (block: string, ids: string[], on: boolean) =>
     setSel((p) => ({ ...p, [block]: on ? new Set(ids) : new Set() }));
 
-  const rs = (id: string): ReviewStatus => reviewStatus[id] ?? 'pendente';
+  const rs = (id: string): ReviewStatus => reviewStatus[id]?.status ?? 'pendente';
+  const rnote = (id: string): string | null => reviewStatus[id]?.note ?? null;
+  const passesReview = (id: string) => reviewFilter === 'todos' || rs(id) === reviewFilter;
+
+  const reviewCounts = useMemo(() => {
+    const all = new Set<string>([
+      ...q.semCategoria.map((t) => t.id),
+      ...q.semUnidade.map((t) => t.id),
+      ...q.tipoStatus.map((t) => t.id),
+      ...q.foraDre.map((t) => t.id),
+      ...q.pagosSemData.map((t) => t.id),
+    ]);
+    const c: Record<ReviewStatus | 'todos', number> = {
+      todos: all.size, pendente: 0, revisado: 0, corrigido: 0, ignorado: 0,
+    };
+    all.forEach((id) => { c[rs(id)] += 1; });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.semCategoria, q.semUnidade, q.tipoStatus, q.foraDre, q.pagosSemData, reviewStatus]);
 
   const row = (t: QualityTx, before: string, after: string) => ({
     id: t.id,
