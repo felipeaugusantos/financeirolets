@@ -847,7 +847,7 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => setUnits(data ?? []));
     supabase.from('business_fronts').select('id, name').eq('active', true).order('name').then(({ data }) => setFronts(data ?? []));
-    supabase.from('categories').select('id, name, type').eq('active', true).order('name').then(({ data }) => {
+    supabase.from('categories').select('id, name, type').order('name').then(({ data }) => {
       const rows = (data ?? []) as Array<{ id: string; name: string; type: string }>;
       setCatReceita(rows.filter(r => r.type === 'receita').map(({ id, name }) => ({ id, name })));
       setCatDespesa(rows.filter(r => r.type === 'despesa').map(({ id, name }) => ({ id, name })));
