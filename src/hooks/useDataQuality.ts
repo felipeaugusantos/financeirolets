@@ -91,7 +91,7 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
       const [{ data: txs, error }, { data: allocs }, { data: cats }, { data: dreLines }] = await Promise.all([
         q,
         supabase.from('transaction_allocations').select('transaction_id, unit_id'),
-        supabase.from('categories').select('id, name, type, dre_line_id, active').eq('active', true),
+        supabase.from('categories').select('id, name, type, dre_line_id, active'),
         supabase.from('dre_lines').select('id, name').eq('active', true),
       ]);
       if (error) throw error;
