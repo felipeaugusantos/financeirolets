@@ -11,6 +11,15 @@ import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { useToast } from '@/hooks/use-toast';
+import {
+  applyDreBase,
+  buildAllocationMap,
+  dateFieldForRegime,
+  splitByUnit,
+  NO_UNIT_KEY,
+  ALL_KEY,
+  type AllocationRow,
+} from '@/lib/finance';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
 const fmt = (v: number) =>
@@ -97,35 +106,29 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       const units = unitRes.data ?? [];
 
       // 2. Fetch transactions
-      const dateField = filters.regime === 'caixa' ? 'payment_date' : 'competence_date';
+      // Mesma base do DRE normal: exclui cancelados, exige affects_dre e respeita o regime.
+      const dateField = dateFieldForRegime(filters.regime);
       let txQuery = supabase
         .from('transactions')
-        .select('id, amount, tax_amount, net_amount, category_id, type, status, unit_id')
+        .select('id, net_amount, category_id, type, status, unit_id')
         .gte(dateField, filters.dateFrom)
-        .lte(dateField, filters.dateTo);
-
-      if (filters.regime === 'caixa') {
-        txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
-      }
+        .lte(dateField, filters.dateTo)
+        .limit(10000);
+      txQuery = applyDreBase(txQuery, { regime: filters.regime });
 
       const { data: transactions, error: txErr } = await txQuery;
       if (txErr) throw txErr;
 
       // 3. Fetch allocations
       const txIds = (transactions ?? []).map((t: any) => t.id);
-      const allocMap = new Map<string, { unit_id: string | null; allocation_type: string; percentage: number; amount: number | null }[]>();
+      let allocMap = new Map<string, AllocationRow[]>();
 
       if (txIds.length > 0) {
         const { data: allocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, allocation_type, percentage, amount')
           .in('transaction_id', txIds);
-
-        (allocs ?? []).forEach((a: any) => {
-          const list = allocMap.get(a.transaction_id) || [];
-          list.push(a);
-          allocMap.set(a.transaction_id, list);
-        });
+        allocMap = buildAllocationMap(allocs as any);
       }
 
       // 4. Map category -> dre_line
@@ -141,46 +144,29 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
         if (!lineValues.has(dreLineId)) lineValues.set(dreLineId, new Map());
         const m = lineValues.get(dreLineId)!;
         m.set(unitKey, (m.get(unitKey) || 0) + val);
-        m.set('__all__', (m.get('__all__') || 0) + val);
-        if (unitKey !== '__none__') unitsWithData.add(unitKey);
+        m.set(ALL_KEY, (m.get(ALL_KEY) || 0) + val);
+        if (unitKey !== NO_UNIT_KEY) unitsWithData.add(unitKey);
       };
 
       (transactions ?? []).forEach((tx: any) => {
         if (!tx.category_id) return;
         const dreLineId = catToDre.get(tx.category_id);
         if (!dreLineId) return;
-        const totalVal = Number(tx.net_amount) || 0;
-        const txAllocs = allocMap.get(tx.id);
-
-        if (txAllocs && txAllocs.length > 0) {
-          txAllocs.forEach(a => {
-            const key = a.unit_id || '__none__';
-            let allocVal = 0;
-            if (a.allocation_type === 'percentual' && a.percentage) {
-              allocVal = totalVal * (a.percentage / 100);
-            } else if (a.amount) {
-              allocVal = Number(a.amount);
-            }
-            addValue(dreLineId, key, allocVal);
-            if (a.unit_id) unitsWithData.add(a.unit_id);
-          });
-        } else if (tx.unit_id) {
-          addValue(dreLineId, tx.unit_id, totalVal);
-          unitsWithData.add(tx.unit_id);
-        } else {
-          addValue(dreLineId, '__none__', totalVal);
-        }
+        // Regra única de rateio/unidade (Consolidado = unidades + Sem unidade).
+        splitByUnit(tx, allocMap).forEach(({ unitKey, value }) => {
+          addValue(dreLineId, unitKey, value);
+        });
       });
 
       // 6. Build unit columns (only units with data)
-      const cols: UnitCol[] = [{ id: '__all__', label: 'Consolidado' }];
+      const cols: UnitCol[] = [{ id: ALL_KEY, label: 'Consolidado' }];
       units.forEach(u => {
         if (unitsWithData.has(u.id)) cols.push({ id: u.id, label: u.name });
       });
       // Check if there's any "sem unidade" data
       let hasNone = false;
-      lineValues.forEach(m => { if (m.has('__none__') && m.get('__none__') !== 0) hasNone = true; });
-      if (hasNone) cols.push({ id: '__none__', label: 'Sem unidade' });
+      lineValues.forEach(m => { if (m.has(NO_UNIT_KEY) && m.get(NO_UNIT_KEY) !== 0) hasNone = true; });
+      if (hasNone) cols.push({ id: NO_UNIT_KEY, label: 'Sem unidade' });
 
       // 7. Depths
       const depthMap = new Map<string, number>();
