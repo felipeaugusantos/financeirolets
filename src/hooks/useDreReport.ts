@@ -223,8 +223,10 @@ export function useDreReport() {
 
       const { data: categories, error: catErr } = await supabase
         .from('categories')
+        // NÃO filtrar por `active`: `active` controla apenas o que aparece para
+        // NOVOS lançamentos. Uma categoria desativada que já tem histórico precisa
+        // continuar somando normalmente no DRE.
         .select('id, dre_line_id')
-        .eq('active', true)
         .not('dre_line_id', 'is', null);
       if (catErr) throw catErr;
 
