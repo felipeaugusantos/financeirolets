@@ -115,7 +115,7 @@ const CATEGORY_KEYWORDS: { keywords: string[]; categoryName: string; reason: str
   { keywords: ['grafica', 'impress', 'banner', 'adesiv'], categoryName: 'Material Gráfico', reason: 'Descrição indica serviço gráfico.' },
   { keywords: ['motoqueiro', 'motoboy', 'entregador'], categoryName: 'Mensal Motoqueiro (Variável)', reason: 'Descrição indica custo de entrega.' },
   { keywords: ['embalagem', 'sacola', 'caixa '], categoryName: 'Embalagens', reason: 'Descrição indica embalagem.' },
-  { keywords: ['materia prima', 'insumo', 'farinha', 'chocolate', 'manteiga'], categoryName: 'Matéria-Prima', reason: 'Descrição indica insumo de produção.' },
+  { keywords: ['materia prima', 'materia-prima', 'insumo', 'farinha', 'chocolate', 'manteiga'], categoryName: 'Matéria-Prima', reason: 'Descrição indica insumo de produção.' },
   { keywords: ['energia', 'enel', 'cemig', 'luz'], categoryName: 'Energia Elétrica', reason: 'Descrição indica conta de energia.' },
   { keywords: ['agua', 'saneago', 'sabesp'], categoryName: 'Água', reason: 'Descrição indica conta de água.' },
   { keywords: ['aluguel'], categoryName: 'Aluguel', reason: 'Descrição indica aluguel.' },
@@ -165,7 +165,7 @@ export function suggestStatus(tx: { type: string; status: string }): string | nu
 // ---------------------------------------------------------------------------
 
 export function suggestUnitLabel(tx: SuggestTx, categoryName?: string): string | null {
-  const d = norm(`${tx.description} ${categoryName || ''}`);
-  if (d.includes('materia prima') || d.includes('matéria-prima') || d.includes('insumo')) return 'Fábrica';
+  const d = norm(`${tx.description} ${categoryName || ''}`).replace(/[-_/]+/g, ' ');
+  if (d.includes('materia prima') || d.includes('insumo')) return 'Fábrica';
   return null;
 }
