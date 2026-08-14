@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { transactionFingerprint } from '@/lib/finance';
+import { looksLikeTest, looksLikeTransfer } from '@/lib/reviewSuggestions';
 
 export interface QualityTx {
   id: string;
@@ -16,6 +17,7 @@ export interface QualityTx {
   unit_id: string | null;
   front_id: string | null;
   partner_id: string | null;
+  account_id: string | null;
   affects_dre: boolean;
   affects_cashflow: boolean;
 }
@@ -38,6 +40,14 @@ export interface DreLineIssue {
   categories: string[];
 }
 
+export interface LookupItem { id: string; name: string }
+
+export interface OrphanCategoryGroup {
+  categoryId: string;
+  categoryName: string;
+  items: QualityTx[];
+}
+
 export interface DataQualityResult {
   loading: boolean;
   duplicates: DuplicateGroup[];
@@ -50,6 +60,19 @@ export interface DataQualityResult {
   semFornecedor: QualityTx[];
   categoryIssues: CategoryIssue[];
   dreLineIssues: DreLineIssue[];
+  /** Lançamentos com cara de teste/demo. Nunca excluídos automaticamente. */
+  testSuspects: QualityTx[];
+  /** Transferências entre contas que hoje entram no DRE. */
+  transfersInDre: QualityTx[];
+  /** Lançamentos em categorias sem linha de DRE, agrupados por categoria. */
+  orphanCategoryGroups: OrphanCategoryGroup[];
+  categories: (LookupItem & { type: string; dre_line_id: string | null; active: boolean })[];
+  units: LookupItem[];
+  accounts: LookupItem[];
+  dreLines: LookupItem[];
+  categoryNameById: Map<string, string>;
+  unitNameById: Map<string, string>;
+  accountNameById: Map<string, string>;
   total: number;
 }
 
@@ -65,6 +88,16 @@ const empty: DataQualityResult = {
   semFornecedor: [],
   categoryIssues: [],
   dreLineIssues: [],
+  testSuspects: [],
+  transfersInDre: [],
+  orphanCategoryGroups: [],
+  categories: [],
+  units: [],
+  accounts: [],
+  dreLines: [],
+  categoryNameById: new Map(),
+  unitNameById: new Map(),
+  accountNameById: new Map(),
   total: 0,
 };
 
@@ -81,18 +114,27 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
       let q = supabase
         .from('transactions')
         .select(
-          'id, description, type, status, amount, net_amount, competence_date, due_date, payment_date, category_id, unit_id, front_id, partner_id, affects_dre, affects_cashflow'
+          'id, description, type, status, amount, net_amount, competence_date, due_date, payment_date, category_id, unit_id, front_id, partner_id, account_id, affects_dre, affects_cashflow'
         )
         .order('competence_date', { ascending: false })
         .limit(10000);
       if (range?.from) q = q.gte('competence_date', range.from);
       if (range?.to) q = q.lte('competence_date', range.to);
 
-      const [{ data: txs, error }, { data: allocs }, { data: cats }, { data: dreLines }] = await Promise.all([
+      const [
+        { data: txs, error },
+        { data: allocs },
+        { data: cats },
+        { data: dreLines },
+        { data: unitRows },
+        { data: accountRows },
+      ] = await Promise.all([
         q,
         supabase.from('transaction_allocations').select('transaction_id, unit_id'),
         supabase.from('categories').select('id, name, type, dre_line_id, active'),
         supabase.from('dre_lines').select('id, name').eq('active', true),
+        supabase.from('units').select('id, name').order('name'),
+        supabase.from('accounts').select('id, name').order('name'),
       ]);
       if (error) throw error;
 
@@ -128,6 +170,30 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         (t) => (t.status === 'pago' || t.status === 'recebido') && !t.payment_date
       );
       const semFornecedor = active.filter((t) => t.type === 'despesa' && !t.partner_id);
+
+      // Blocos novos de revisão manual
+      const testSuspects = active.filter((t) => looksLikeTest(t));
+      const transfersInDre = active.filter((t) => looksLikeTransfer(t) && t.affects_dre !== false);
+
+      const orphanCatIds = new Map<string, string>();
+      (cats ?? []).forEach((c: any) => {
+        if (!c.dre_line_id) orphanCatIds.set(c.id, c.name);
+      });
+      const orphanMap = new Map<string, QualityTx[]>();
+      active.forEach((t) => {
+        if (t.category_id && orphanCatIds.has(t.category_id)) {
+          const list = orphanMap.get(t.category_id) || [];
+          list.push(t);
+          orphanMap.set(t.category_id, list);
+        }
+      });
+      const orphanCategoryGroups: OrphanCategoryGroup[] = Array.from(orphanMap.entries())
+        .map(([categoryId, items]) => ({
+          categoryId,
+          categoryName: orphanCatIds.get(categoryId) || 'Categoria',
+          items,
+        }))
+        .sort((a, b) => b.items.length - a.items.length);
 
       // Categorias
       const usage = new Map<string, number>();
@@ -168,6 +234,16 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         semFornecedor,
         categoryIssues,
         dreLineIssues,
+        testSuspects,
+        transfersInDre,
+        orphanCategoryGroups,
+        categories: (cats ?? []) as any,
+        units: (unitRows ?? []) as any,
+        accounts: (accountRows ?? []) as any,
+        dreLines: (dreLines ?? []) as any,
+        categoryNameById: new Map((cats ?? []).map((c: any) => [c.id, c.name as string])),
+        unitNameById: new Map((unitRows ?? []).map((u: any) => [u.id, u.name as string])),
+        accountNameById: new Map((accountRows ?? []).map((a: any) => [a.id, a.name as string])),
         total:
           duplicates.reduce((s, g) => s + g.items.length, 0) +
           typeStatusMismatch.length +
