@@ -146,7 +146,8 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
           list.push(c.name);
           perDreLine.set(c.dre_line_id, list);
         }
-        if (used === 0) {
+        // Categorias desativadas sem uso não são problema: foram aposentadas de propósito.
+        if (used === 0 && c.active !== false) {
           categoryIssues.push({ id: c.id, name: c.name, type: c.type, problem: 'sem-uso', usageCount: 0 });
         }
       });
