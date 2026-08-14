@@ -189,7 +189,6 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           competence_date = parsed;
         }
 
-        const { error } = await supabase.from('transactions').insert({
         const fingerprint = transactionFingerprint({ type, description, amount, competence_date });
         if (existingFingerprints.has(fingerprint)) {
           skipped.push(`Linha ${i + 1}: "${description}" (${competence_date}) já existe no sistema — não importada.`);
