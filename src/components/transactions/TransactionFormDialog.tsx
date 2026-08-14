@@ -410,6 +410,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                     return id || null;
                   }}
                 />
+                {categoryHelp && (
+                  <p className="text-[11px] text-muted-foreground leading-snug">{categoryHelp}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Conta</Label>
