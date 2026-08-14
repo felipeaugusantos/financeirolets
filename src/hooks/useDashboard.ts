@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { toLocalISODate } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  buildAllocationMap,
+  splitByUnit,
+  txValue,
+  NO_UNIT_KEY,
+  type AllocationRow,
+} from '@/lib/finance';
 
 export interface OverdueBill {
   id: string;
@@ -20,6 +27,11 @@ export interface UnitRanking {
 
 export interface DashboardData {
   saldoTotal: number;
+  /** Movimentação calculada (entradas - saídas) sem considerar saldo inicial. */
+  movimentacaoCalculada: number;
+  /** Alguma conta possui saldo inicial configurado? */
+  saldoInicialConfigurado: boolean;
+  saldoInicialTotal: number;
   receitasMes: number;
   despesasMes: number;
   receitasProvisionadas: number;
@@ -66,6 +78,9 @@ function diffDays(fromIso: string, toIso: string) {
 export function useDashboard(filters?: DashboardFilters) {
   const [data, setData] = useState<DashboardData>({
     saldoTotal: 0,
+    movimentacaoCalculada: 0,
+    saldoInicialConfigurado: false,
+    saldoInicialTotal: 0,
     receitasMes: 0,
     despesasMes: 0,
     receitasProvisionadas: 0,
@@ -96,11 +111,8 @@ export function useDashboard(filters?: DashboardFilters) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters?.unitId, filters?.frontId, filters?.includeProvisioned, periodFrom, periodTo]);
 
-  function applyFilters(query: any) {
-    if (filters?.unitId) query = query.eq('unit_id', filters.unitId);
-    if (filters?.frontId) query = query.eq('front_id', filters.frontId);
-    return query;
-  }
+  const unitFilter = filters?.unitId;
+  const frontFilter = filters?.frontId;
 
   async function fetchData() {
     try {
@@ -128,17 +140,53 @@ export function useDashboard(filters?: DashboardFilters) {
 
       let txQuery = supabase
         .from('transactions')
-        .select('type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id, affects_dre, affects_cashflow')
+        .select('id, type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id, front_id, affects_dre, affects_cashflow')
         .or(`and(competence_date.gte.${queryStart},competence_date.lte.${queryEnd}),and(payment_date.gte.${queryStart},payment_date.lte.${queryEnd})`)
         .not('status', 'eq', 'cancelado')
         .limit(10000);
-      txQuery = applyFilters(txQuery);
       const { data: txs } = await txQuery;
       if (txs && txs.length >= 10000) {
         console.warn('[useDashboard] Possível truncamento: 10.000 transações retornadas');
       }
 
       const rows = txs ?? [];
+
+      // Rateios — necessários para que o filtro de unidade não descarte lançamentos rateados.
+      let allocMap = new Map<string, AllocationRow[]>();
+      if ((unitFilter || frontFilter) && rows.length > 0) {
+        const { data: allocs } = await supabase
+          .from('transaction_allocations')
+          .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
+          .in('transaction_id', rows.map((r: any) => r.id));
+        allocMap = buildAllocationMap(allocs as any);
+      }
+
+      /** Valor do lançamento atribuível aos filtros atuais (rateio-aware). */
+      const filteredValue = (tx: any): number => {
+        const total = txValue(tx);
+        let value = total;
+        if (unitFilter) {
+          value = splitByUnit(tx, allocMap)
+            .filter((s) => s.unitKey === unitFilter)
+            .reduce((sum, s) => sum + s.value, 0);
+        }
+        if (frontFilter) {
+          const allocs = allocMap.get(tx.id);
+          const hasFrontAlloc = (allocs ?? []).some((a) => a.front_id);
+          if (hasFrontAlloc) {
+            const share = (allocs ?? [])
+              .filter((a) => a.front_id === frontFilter)
+              .reduce((sum, a) => sum + (a.allocation_type === 'percentual' && a.percentage != null
+                ? total * (Number(a.percentage) / 100)
+                : Number(a.amount) || 0), 0);
+            value = Math.min(value, share);
+          } else if (tx.front_id !== frontFilter) {
+            value = 0;
+          }
+        }
+        return value;
+      };
+      const inFilters = (tx: any) => filteredValue(tx) !== 0 || (!unitFilter && !frontFilter);
 
       let receitasMes = 0;
       let despesasMes = 0;
@@ -165,7 +213,8 @@ export function useDashboard(filters?: DashboardFilters) {
       rows.forEach((tx: any) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
-        const val = Number(tx.net_amount) || 0;
+        const val = filteredValue(tx);
+        if (val === 0 && (unitFilter || frontFilter)) return;
         const affectsCash = tx.affects_cashflow !== false;
         const affectsDre = tx.affects_dre !== false;
 
@@ -181,7 +230,7 @@ export function useDashboard(filters?: DashboardFilters) {
             if (tx.type === 'receita') semCategoriaReceita++;
             else semCategoriaDespesa++;
           }
-          if (!tx.unit_id) semUnidade++;
+          if (!tx.unit_id && !(allocMap.get(tx.id) ?? []).some((a) => a.unit_id)) semUnidade++;
         }
 
         // Monthly buckets (paid by payment_date, prov by competence_date) within current range
@@ -294,25 +343,32 @@ export function useDashboard(filters?: DashboardFilters) {
       // Saldo total (snapshot, independente do período)
       let saldoQuery = supabase
         .from('transactions')
-        .select('type, net_amount, status')
+        .select('id, type, net_amount, status, unit_id, front_id')
         .in('status', ['pago', 'recebido'] as any)
         .eq('affects_cashflow', true)
         .limit(10000);
-      saldoQuery = applyFilters(saldoQuery);
+      if (unitFilter && unitFilter !== NO_UNIT_KEY) saldoQuery = saldoQuery.eq('unit_id', unitFilter);
+      if (frontFilter) saldoQuery = saldoQuery.eq('front_id', frontFilter);
       const { data: allTxs } = await saldoQuery;
 
-      let saldoTotal = 0;
+      let movimentacaoCalculada = 0;
       (allTxs ?? []).forEach((tx: any) => {
-        const val = Number(tx.net_amount) || 0;
-        saldoTotal += tx.type === 'receita' ? val : -val;
+        const val = txValue(tx);
+        movimentacaoCalculada += tx.type === 'receita' ? val : -val;
       });
 
-      if (!filters?.unitId && !filters?.frontId) {
-        const { data: accounts } = await supabase.from('accounts').select('initial_balance');
+      // Saldo inicial: nunca inventar. Só soma o que estiver configurado.
+      let saldoInicialTotal = 0;
+      let saldoInicialConfigurado = false;
+      if (!unitFilter && !frontFilter) {
+        const { data: accounts } = await supabase.from('accounts').select('initial_balance').eq('active', true);
         (accounts ?? []).forEach((a: any) => {
-          saldoTotal += Number(a.initial_balance) || 0;
+          const ib = Number(a.initial_balance) || 0;
+          if (ib !== 0) saldoInicialConfigurado = true;
+          saldoInicialTotal += ib;
         });
       }
+      const saldoTotal = movimentacaoCalculada + saldoInicialTotal;
 
       // Overdue / due-today (snapshot)
       let alertQuery = supabase
@@ -323,7 +379,8 @@ export function useDashboard(filters?: DashboardFilters) {
         .lte('due_date', today)
         .order('due_date', { ascending: true })
         .limit(100);
-      alertQuery = applyFilters(alertQuery);
+      if (unitFilter && unitFilter !== NO_UNIT_KEY) alertQuery = alertQuery.eq('unit_id', unitFilter);
+      if (frontFilter) alertQuery = alertQuery.eq('front_id', frontFilter);
       const { data: alertBills } = await alertQuery;
 
       const overdueBills: OverdueBill[] = [];
@@ -359,27 +416,35 @@ export function useDashboard(filters?: DashboardFilters) {
         const paidInPeriod = isPaid && inRange(tx.payment_date, rangeStart, rangeEnd);
         const provInPeriod = isProvisioned && inRange(tx.competence_date, rangeStart, rangeEnd);
         const include = paidInPeriod || (incluirProv && provInPeriod);
-        if (include && tx.unit_id) {
-          const entry = unitDespMap.get(tx.unit_id) || { despesas: 0, receitas: 0 };
-          const val = Number(tx.net_amount) || 0;
-          if (tx.type === 'despesa') entry.despesas += val;
-          else entry.receitas += val;
-          unitDespMap.set(tx.unit_id, entry);
-        }
+        if (!include) return;
+        // Rateio-aware: cada lançamento distribui entre unidades e "Sem unidade".
+        splitByUnit(tx, allocMap).forEach(({ unitKey, value }) => {
+          if (value === 0) return;
+          const entry = unitDespMap.get(unitKey) || { despesas: 0, receitas: 0 };
+          if (tx.type === 'despesa') entry.despesas += value;
+          else entry.receitas += value;
+          unitDespMap.set(unitKey, entry);
+        });
       });
 
       let unitRanking: UnitRanking[] = [];
       if (unitDespMap.size > 0) {
-        const unitIds = Array.from(unitDespMap.keys());
+        const unitIds = Array.from(unitDespMap.keys()).filter((k) => k !== NO_UNIT_KEY);
         const { data: unitRows } = await supabase.from('units').select('id, name').in('id', unitIds);
         const uNameMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.name]));
         unitRanking = Array.from(unitDespMap.entries())
-          .map(([id, v]) => ({ unitId: id, unitName: uNameMap.get(id) || 'Desconhecida', despesas: v.despesas, receitas: v.receitas }))
+          .map(([id, v]) => ({
+            unitId: id,
+            unitName: id === NO_UNIT_KEY ? 'Sem unidade' : (uNameMap.get(id) || 'Desconhecida'),
+            despesas: v.despesas,
+            receitas: v.receitas,
+          }))
           .sort((a, b) => b.despesas - a.despesas);
       }
 
       setData({
-        saldoTotal, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas,
+        saldoTotal, movimentacaoCalculada, saldoInicialConfigurado, saldoInicialTotal,
+        receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas,
         contasAtrasadas, vencendoHoje,
         overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading: false,
         semCategoria, semCategoriaReceita, semCategoriaDespesa,
