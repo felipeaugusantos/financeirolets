@@ -296,7 +296,7 @@ export default function Dashboard() {
     period: { from: period.from, to: period.to },
   };
 
-  const { saldoTotal, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
+  const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
   const activeUnits = (units as any[])?.filter((u: any) => u.active) ?? [];
@@ -316,7 +316,13 @@ export default function Dashboard() {
     : (variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' ' + variationLabel : '');
 
   const cards = [
-    { title: 'Saldo Total', value: fmt(saldoTotal), icon: DollarSign, color: 'text-secondary', sub: '' },
+    {
+      title: saldoInicialConfigurado ? 'Saldo Total' : 'Movimentação calculada',
+      value: fmt(saldoTotal),
+      icon: DollarSign,
+      color: 'text-secondary',
+      sub: saldoInicialConfigurado ? '' : 'Saldo inicial não configurado — não é o saldo bancário',
+    },
     { title: `Receitas do ${periodSuffix}`, value: fmt(receitasTotal), icon: TrendingUp, color: 'text-success', sub: receitasSub },
     { title: `Despesas do ${periodSuffix}`, value: fmt(despesasTotal), icon: TrendingDown, color: 'text-destructive', sub: despesasSub },
     { title: 'Margem', value: fmt(margemContribuicao), icon: BarChart3, color: margemContribuicao >= 0 ? 'text-success' : 'text-destructive', sub: '' },
