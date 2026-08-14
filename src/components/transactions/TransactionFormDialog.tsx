@@ -497,6 +497,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
 
             {/* Installments */}
             {!isEditing && (
+
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Checkbox id="installment" checked={isInstallment} onCheckedChange={(c) => setIsInstallment(!!c)} />
