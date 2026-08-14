@@ -710,7 +710,11 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
         </ScrollArea>
         <DialogFooter className="p-6 pt-0">
           <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button className="rounded-xl" onClick={handleSubmit} disabled={saving || !description.trim() || !amount}>
+          <Button
+            className="rounded-xl"
+            onClick={handleSubmit}
+            disabled={saving || !description.trim() || !amount || ruleErrors.length > 0}
+          >
             {saving ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
           </Button>
         </DialogFooter>
