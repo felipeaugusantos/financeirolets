@@ -234,7 +234,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
             <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => openTx(t)}>
               <ExternalLink className="h-3 w-3" /> Abrir lançamento
             </Button>
-            <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+            <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
           </div>
         </div>
       </div>
@@ -376,7 +376,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                     >
                       Excluir
                     </Button>
-                    <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+                    <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
                   </div>
                 </div>
               ))}
@@ -635,7 +635,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                           >
                             Excluir
                           </Button>
-                          <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+                          <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
                         </div>
                       </div>
                     ))}
@@ -815,7 +815,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                     <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => openTx(t)}>
                       <ExternalLink className="h-3 w-3" /> Abrir lançamento
                     </Button>
-                    <ReviewBadge id={t.id} value={rs(t.id)} onChange={setReviewStatus} />
+                    <ReviewBadge id={t.id} value={rs(t.id)} note={rnote(t.id)} onChange={setReviewStatus} />
                   </div>
                 </div>
               ))}
