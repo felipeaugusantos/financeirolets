@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,42 +12,119 @@ import { useToast } from '@/hooks/use-toast';
 
 export type ReviewStatus = 'pendente' | 'revisado' | 'corrigido' | 'ignorado';
 
-const REVIEW_KEY = 'lets:conferencia:review-status';
+/** Status da conferência: o banco é a fonte oficial (tabela transaction_reviews). */
+type DbStatus = 'pending' | 'reviewed' | 'corrected' | 'ignored';
 
-function loadReview(): Record<string, ReviewStatus> {
+const TO_DB: Record<ReviewStatus, DbStatus> = {
+  pendente: 'pending',
+  revisado: 'reviewed',
+  corrigido: 'corrected',
+  ignorado: 'ignored',
+};
+const FROM_DB: Record<DbStatus, ReviewStatus> = {
+  pending: 'pendente',
+  reviewed: 'revisado',
+  corrected: 'corrigido',
+  ignored: 'ignorado',
+};
+
+const CACHE_KEY = 'lets:conferencia:review-cache';
+
+export interface ReviewEntry {
+  status: ReviewStatus;
+  note: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+function readCache(): Record<string, ReviewEntry> {
   try {
-    return JSON.parse(localStorage.getItem(REVIEW_KEY) || '{}');
+    return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
   } catch {
     return {};
   }
 }
 
+/**
+ * Carrega e persiste o andamento da conferência. Nenhum registro é criado
+ * automaticamente: sem linha em transaction_reviews o lançamento é apenas
+ * exibido como "Pendente".
+ */
 export function useReviewStatus() {
-  const [map, setMap] = useState<Record<string, ReviewStatus>>(loadReview);
+  const { toast } = useToast();
+  const [map, setMap] = useState<Record<string, ReviewEntry>>(readCache);
+  const [loading, setLoading] = useState(true);
 
-  const setStatus = useCallback((id: string, status: ReviewStatus) => {
-    setMap((prev) => {
-      const next = { ...prev, [id]: status };
-      if (status === 'pendente') delete next[id];
-      try {
-        localStorage.setItem(REVIEW_KEY, JSON.stringify(next));
-      } catch {
-        /* storage indisponível: o controle vira apenas de sessão */
-      }
-      return next;
-    });
-  }, []);
-
-  const clearAll = useCallback(() => {
-    setMap({});
-    try {
-      localStorage.removeItem(REVIEW_KEY);
-    } catch {
-      /* ignore */
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('transaction_reviews')
+      .select('transaction_id, status, note, reviewed_at, reviewed_by');
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Não foi possível carregar as marcações', description: error.message, variant: 'destructive' });
+      return;
     }
-  }, []);
+    const next: Record<string, ReviewEntry> = {};
+    (data ?? []).forEach((r: any) => {
+      next[r.transaction_id] = {
+        status: FROM_DB[r.status as DbStatus] ?? 'pendente',
+        note: r.note ?? null,
+        reviewed_at: r.reviewed_at ?? null,
+        reviewed_by: r.reviewed_by ?? null,
+      };
+    });
+    setMap(next);
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+    } catch {
+      /* cache opcional */
+    }
+  }, [toast]);
 
-  return { reviewStatus: map, setReviewStatus: setStatus, clearReviewStatus: clearAll };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const setStatus = useCallback(
+    async (id: string, status: ReviewStatus, note?: string | null) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) {
+        toast({ title: 'Sessão expirada', description: 'Entre novamente para marcar a conferência.', variant: 'destructive' });
+        return;
+      }
+      const payload = {
+        transaction_id: id,
+        status: TO_DB[status],
+        note: note === undefined ? map[id]?.note ?? null : note || null,
+        reviewed_by: uid,
+        reviewed_at: new Date().toISOString(),
+      };
+      const { error } = await supabase
+        .from('transaction_reviews')
+        .upsert(payload as any, { onConflict: 'transaction_id' });
+      if (error) {
+        toast({ title: 'Erro ao salvar marcação', description: error.message, variant: 'destructive' });
+        return;
+      }
+      setMap((prev) => {
+        const next = {
+          ...prev,
+          [id]: { status, note: payload.note, reviewed_at: payload.reviewed_at, reviewed_by: uid },
+        };
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+        } catch {
+          /* cache opcional */
+        }
+        return next;
+      });
+    },
+    [map, toast]
+  );
+
+  return { reviewStatus: map, setReviewStatus: setStatus, reloadReviews: load, reviewsLoading: loading };
 }
 
 export interface AllocationDraft {
