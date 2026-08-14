@@ -186,7 +186,6 @@ export function useDashboard(filters?: DashboardFilters) {
         }
         return value;
       };
-      const inFilters = (tx: any) => filteredValue(tx) !== 0 || (!unitFilter && !frontFilter);
 
       let receitasMes = 0;
       let despesasMes = 0;
