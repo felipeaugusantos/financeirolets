@@ -260,6 +260,10 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
             <p className="text-xs text-muted-foreground">
               Linhas com data inválida ou vazia <strong>não são importadas</strong> e aparecem na lista de erros.
             </p>
+            <p className="text-xs text-muted-foreground">
+              Lançamentos idênticos (mesmo tipo, data, valor e descrição) já existentes <strong>não são
+              reimportados</strong>. Nada é apagado — as linhas suspeitas ficam listadas para revisão.
+            </p>
             <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={handleImportCSV} />
             <Button
               variant="outline"
@@ -299,6 +303,19 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <p className="font-medium">{importResult.success} lançamentos importados com sucesso.</p>
+            {importResult.skipped.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-xs font-medium">
+                  {importResult.skipped.length} linha(s) ignorada(s) por suspeita de duplicidade:
+                </p>
+                {importResult.skipped.slice(0, 10).map((s, i) => (
+                  <p key={i} className="text-xs">{s}</p>
+                ))}
+                {importResult.skipped.length > 10 && (
+                  <p className="text-xs">... e mais {importResult.skipped.length - 10}</p>
+                )}
+              </div>
+            )}
             {importResult.errors.length > 0 && (
               <div className="mt-2 space-y-1">
                 <p className="text-xs font-medium">{importResult.errors.length} erros:</p>
