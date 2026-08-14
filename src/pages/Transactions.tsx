@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,8 +19,10 @@ function formatCurrency(v: number) {
 }
 
 export default function Transactions() {
+  const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState<TFilters>({});
-  const [search, setSearch] = useState('');
+  // Permite abrir a tela já filtrada a partir da Conferência de lançamentos.
+  const [search, setSearch] = useState(() => searchParams.get('q') || '');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cardSaleOpen, setCardSaleOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
