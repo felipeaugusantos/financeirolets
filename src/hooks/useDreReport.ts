@@ -2,6 +2,16 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { toLocalISODate } from '@/lib/utils';
+import {
+  applyDreBase,
+  applyCategoryFilter,
+  buildAllocationMap,
+  dateFieldForRegime,
+  splitByUnit,
+  txValue,
+  NO_UNIT_KEY,
+  type AllocationRow,
+} from '@/lib/finance';
 
 export interface DreLineResult {
   id: string;
@@ -39,7 +49,7 @@ function shiftDateBackOneYear(d: string) {
 // Compute totals per dre_line_id from a set of transactions, given allocations and filter
 function computeLineValues(
   transactions: any[],
-  allocMap: Map<string, any[]>,
+  allocMap: Map<string, AllocationRow[]>,
   catToDre: Map<string, string>,
   unitFilter: string | undefined
 ) {
@@ -51,30 +61,26 @@ function computeLineValues(
     if (!tx.category_id) return;
     const dreLineId = catToDre.get(tx.category_id);
     if (!dreLineId) return;
-    const totalVal = Number(tx.net_amount) || 0;
-    const allocs = allocMap.get(tx.id);
+    const totalVal = txValue(tx);
+    // Regra única de rateio/unidade compartilhada com Dashboard, DRE Comparativo e Fluxo de Caixa.
+    const splits = splitByUnit(tx, allocMap);
+    const add = (v: number) => lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + v);
 
-    if (unitFilter === '__none__') {
-      if (!tx.unit_id && (!allocs || allocs.length === 0)) {
-        lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
-      }
-    } else if (unitFilter) {
-      if (allocs && allocs.length > 0) {
-        const u = allocs.find(a => a.unit_id === unitFilter);
-        if (u) {
-          let v = 0;
-          if (u.allocation_type === 'percentual' && u.percentage) v = totalVal * (u.percentage / 100);
-          else if (u.amount) v = Number(u.amount);
-          lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + v);
-        }
-      } else if (tx.unit_id === unitFilter) {
-        lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
-      } else if (!tx.unit_id) {
-        unallocTotal += totalVal;
-        unallocCount++;
-      }
-    } else {
-      lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + totalVal);
+    if (!unitFilter) {
+      add(totalVal);
+      return;
+    }
+
+    const matched = splits
+      .filter((s) => s.unitKey === unitFilter)
+      .reduce((sum, s) => sum + s.value, 0);
+    if (matched !== 0) add(matched);
+
+    // Lançamentos sem unidade e sem rateio ficam visíveis como "sem unidade"
+    // quando um filtro de unidade real está aplicado (nunca somem silenciosamente).
+    if (unitFilter !== NO_UNIT_KEY && splits.every((s) => s.unitKey === NO_UNIT_KEY)) {
+      unallocTotal += totalVal;
+      unallocCount++;
     }
   });
 
@@ -125,25 +131,15 @@ async function fetchPeriodValues(
   filters: DreFilters,
   catToDre: Map<string, string>
 ) {
-  const dateField = filters.regime === 'caixa' ? 'payment_date' : 'competence_date';
+  const dateField = dateFieldForRegime(filters.regime);
   let txQuery = supabase
     .from('transactions')
     .select('id, net_amount, category_id, status, unit_id')
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo)
-    .not('status', 'eq', 'cancelado')
-    .eq('affects_dre', true)
     .limit(10000);
-  if (filters.category_id) {
-    txQuery = (filters.category_id === '__none__' || filters.category_id === '__null__')
-      ? txQuery.is('category_id', null)
-      : txQuery.eq('category_id', filters.category_id);
-  }
-  if (filters.regime === 'caixa') {
-    txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
-  } else if (filters.onlyRealized) {
-    txQuery = txQuery.in('status', ['pago', 'recebido'] as any);
-  }
+  txQuery = applyDreBase(txQuery, { regime: filters.regime, onlyRealized: filters.onlyRealized });
+  txQuery = applyCategoryFilter(txQuery, filters.category_id);
   if (filters.payment_method) {
     txQuery = (filters.payment_method === '__none__' || filters.payment_method === '__null__')
       ? txQuery.is('payment_method', null)
@@ -156,17 +152,13 @@ async function fetchPeriodValues(
   }
 
   const txIds = (transactions ?? []).map((t: any) => t.id);
-  const allocMap = new Map<string, any[]>();
+  let allocMap = new Map<string, AllocationRow[]>();
   if (txIds.length > 0) {
     const { data: allocs } = await supabase
       .from('transaction_allocations')
       .select('transaction_id, unit_id, allocation_type, percentage, amount')
       .in('transaction_id', txIds);
-    (allocs ?? []).forEach((a: any) => {
-      const list = allocMap.get(a.transaction_id) || [];
-      list.push(a);
-      allocMap.set(a.transaction_id, list);
-    });
+    allocMap = buildAllocationMap(allocs as any);
   }
 
   return computeLineValues(transactions ?? [], allocMap, catToDre, filters.unit_id);

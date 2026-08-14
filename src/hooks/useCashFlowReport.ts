@@ -2,6 +2,14 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { toLocalISODate } from '@/lib/utils';
+import {
+  applyCashRealizedBase,
+  applyCategoryFilter,
+  buildAllocationMap,
+  valueForUnitFilter,
+  txValue,
+  type AllocationRow,
+} from '@/lib/finance';
 
 export interface CashFlowMonth {
   month: string; // YYYY-MM
@@ -30,39 +38,26 @@ export function useCashFlowReport() {
       let query = supabase
         .from('transactions')
         .select('id, type, net_amount, payment_date, status, unit_id, category_id')
-        .not('payment_date', 'is', null)
-        .in('status', ['pago', 'recebido'] as any)
-        .eq('affects_cashflow', true)
         .gte('payment_date', filters.dateFrom)
-        .lte('payment_date', filters.dateTo);
-
-      if (filters.category_id) {
-        query = (filters.category_id === '__none__' || filters.category_id === '__null__')
-          ? query.is('category_id', null)
-          : query.eq('category_id', filters.category_id);
-      }
-      if (filters.unit_id === '__none__') {
-        query = query.is('unit_id', null);
-      }
+        .lte('payment_date', filters.dateTo)
+        .limit(10000);
+      query = applyCashRealizedBase(query);
+      query = applyCategoryFilter(query, filters.category_id);
+      // O filtro de unidade é aplicado no cliente para respeitar rateios.
 
       const { data: rows, error } = await query;
       if (error) throw error;
 
       // Fetch allocations if filtering by unit
-      let allocMap = new Map<string, { unit_id: string | null; percentage: number; amount: number | null; allocation_type: string }[]>();
-      const isUnitFilterReal = filters.unit_id && filters.unit_id !== '__none__';
-      const needsAllocs = (filters.unit_id) && rows && rows.length > 0;
+      let allocMap = new Map<string, AllocationRow[]>();
+      const needsAllocs = !!filters.unit_id && !!rows && rows.length > 0;
       if (needsAllocs) {
-        const txIds = rows.map((r: any) => r.id);
+        const txIds = (rows ?? []).map((r: any) => r.id);
         const { data: allocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, allocation_type, percentage, amount')
           .in('transaction_id', txIds);
-        (allocs ?? []).forEach((a: any) => {
-          const list = allocMap.get(a.transaction_id) || [];
-          list.push(a);
-          allocMap.set(a.transaction_id, list);
-        });
+        allocMap = buildAllocationMap(allocs as any);
       }
 
       // Group by month
@@ -71,30 +66,12 @@ export function useCashFlowReport() {
       (rows ?? []).forEach((tx: any) => {
         const m = tx.payment_date.substring(0, 7);
         const entry = monthMap.get(m) || { receitas: 0, despesas: 0 };
-        const totalVal = Number(tx.net_amount) || 0;
+        void txValue(tx);
+        const val = valueForUnitFilter(tx, allocMap, filters.unit_id);
 
-        let val = totalVal;
-        if (filters.unit_id === '__none__') {
-          // Already filtered to unit_id IS NULL; also exclude those with allocations to any unit
-          const allocs = allocMap.get(tx.id);
-          if (allocs && allocs.length > 0) val = 0;
-        } else if (isUnitFilterReal) {
-          const allocs = allocMap.get(tx.id);
-          if (allocs && allocs.length > 0) {
-            const unitAlloc = allocs.find(a => a.unit_id === filters.unit_id);
-            if (unitAlloc) {
-              val = unitAlloc.allocation_type === 'percentual' && unitAlloc.percentage
-                ? totalVal * (unitAlloc.percentage / 100)
-                : Number(unitAlloc.amount) || 0;
-            } else {
-              val = 0; // not allocated to this unit
-            }
-          } else if (tx.unit_id !== filters.unit_id) {
-            val = 0;
-          }
-        }
-
-        if (val > 0) {
+        // O sinal vem da natureza (receita/despesa); valores negativos ou
+        // estornos NÃO são descartados — apenas o zero é irrelevante.
+        if (val !== 0) {
           if (tx.type === 'receita') entry.receitas += val;
           else entry.despesas += val;
           monthMap.set(m, entry);

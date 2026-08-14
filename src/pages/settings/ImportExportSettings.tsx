@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { todayLocalISO } from '@/lib/utils';
 import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
+import { transactionFingerprint } from '@/lib/finance';
 
 /** Divide uma linha CSV respeitando aspas, aceitando ';' ou ',' como delimitador. */
 function splitCsvLine(line: string, delimiter: string): string[] {
@@ -81,7 +82,7 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ success: number; errors: string[]; skipped: string[] } | null>(null);
 
   const handleExportCSV = async () => {
     try {
@@ -147,6 +148,18 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
 
       let success = 0;
       const errors: string[] = [];
+      const skipped: string[] = [];
+
+      // Proteção contra duplicidade: carrega os lançamentos já existentes no
+      // intervalo de datas do arquivo e compara por impressão digital.
+      // Nada é apagado — linhas suspeitas apenas NÃO são inseridas.
+      const existingFingerprints = new Set<string>();
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('type, description, amount, competence_date')
+        .limit(10000);
+      (existing ?? []).forEach((t: any) => existingFingerprints.add(transactionFingerprint(t)));
+      const fileFingerprints = new Set<string>();
 
       for (let i = 1; i < lines.length; i++) {
         const cols = splitCsvLine(lines[i], delimiter);
@@ -176,6 +189,16 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           competence_date = parsed;
         }
 
+        const fingerprint = transactionFingerprint({ type, description, amount, competence_date });
+        if (existingFingerprints.has(fingerprint)) {
+          skipped.push(`Linha ${i + 1}: "${description}" (${competence_date}) já existe no sistema — não importada.`);
+          continue;
+        }
+        if (fileFingerprints.has(fingerprint)) {
+          skipped.push(`Linha ${i + 1}: "${description}" (${competence_date}) está duplicada dentro do próprio arquivo — não importada.`);
+          continue;
+        }
+
         const { error } = await supabase.from('transactions').insert({
           type: type as any,
           description,
@@ -191,11 +214,15 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           errors.push(`Linha ${i + 1}: ${error.message}`);
         } else {
           success++;
+          fileFingerprints.add(fingerprint);
         }
       }
 
-      setImportResult({ success, errors });
-      toast({ title: `Importação concluída: ${success} lançamentos criados` });
+      setImportResult({ success, errors, skipped });
+      toast({
+        title: `Importação concluída: ${success} lançamentos criados`,
+        description: skipped.length ? `${skipped.length} linha(s) ignorada(s) por suspeita de duplicidade.` : undefined,
+      });
     } catch (err: any) {
       toast({ title: 'Erro na importação', description: err.message, variant: 'destructive' });
     } finally {
@@ -232,6 +259,10 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
             </p>
             <p className="text-xs text-muted-foreground">
               Linhas com data inválida ou vazia <strong>não são importadas</strong> e aparecem na lista de erros.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Lançamentos idênticos (mesmo tipo, data, valor e descrição) já existentes <strong>não são
+              reimportados</strong>. Nada é apagado — as linhas suspeitas ficam listadas para revisão.
             </p>
             <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={handleImportCSV} />
             <Button
@@ -272,6 +303,19 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <p className="font-medium">{importResult.success} lançamentos importados com sucesso.</p>
+            {importResult.skipped.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-xs font-medium">
+                  {importResult.skipped.length} linha(s) ignorada(s) por suspeita de duplicidade:
+                </p>
+                {importResult.skipped.slice(0, 10).map((s, i) => (
+                  <p key={i} className="text-xs">{s}</p>
+                ))}
+                {importResult.skipped.length > 10 && (
+                  <p className="text-xs">... e mais {importResult.skipped.length - 10}</p>
+                )}
+              </div>
+            )}
             {importResult.errors.length > 0 && (
               <div className="mt-2 space-y-1">
                 <p className="text-xs font-medium">{importResult.errors.length} erros:</p>

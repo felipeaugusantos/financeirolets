@@ -930,6 +930,10 @@ export default function ReconciliationReport({ onBack }: { onBack: () => void })
             <p className="text-xs text-muted-foreground">
               Mostra, no período, a ponte entre Dashboard, DRE Competência (cheio e somente realizado) e DRE Caixa.
             </p>
+            <p className="text-[11px] text-warning mt-1">
+              Sem extrato bancário importado: os valores são movimentação calculada a partir dos lançamentos,
+              não saldo bancário conciliado.
+            </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
