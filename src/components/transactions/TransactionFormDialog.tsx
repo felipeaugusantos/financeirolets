@@ -437,7 +437,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Parceiro</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Parceiro / Fornecedor{isPartnerRequired(categoryId) ? ' *' : ''}
+                </Label>
                 <SelectWithAdd
                   value={partnerId}
                   onValueChange={setPartnerId}
@@ -456,7 +458,9 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Unidade</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Unidade{isSalaryCategory(categoryId) ? ' *' : ''}
+                </Label>
                 <SelectWithAdd
                   value={unitId}
                   onValueChange={setUnitId}
