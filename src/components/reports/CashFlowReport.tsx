@@ -97,7 +97,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     supabase.from('units').select('id, name').eq('active', true).order('name').then(({ data }) => {
       setUnits(data ?? []);
     });
-    supabase.from('categories').select('id, name').eq('active', true).order('name').then(({ data }) => {
+    supabase.from('categories').select('id, name').order('name').then(({ data }) => {
       setCategories(data ?? []);
     });
   }, []);

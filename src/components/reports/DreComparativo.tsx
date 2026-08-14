@@ -94,7 +94,9 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       // 1. Fetch DRE lines, categories, units
       const [dreRes, catRes, unitRes] = await Promise.all([
         supabase.from('dre_lines').select('*').eq('active', true).order('sort_order'),
-        supabase.from('categories').select('id, dre_line_id, type').eq('active', true).not('dre_line_id', 'is', null),
+        // `active` só controla a disponibilidade para novos lançamentos; categorias
+        // desativadas com histórico continuam somando no DRE.
+        supabase.from('categories').select('id, dre_line_id, type').not('dre_line_id', 'is', null),
         supabase.from('units').select('id, name').eq('active', true).order('name'),
       ]);
 
