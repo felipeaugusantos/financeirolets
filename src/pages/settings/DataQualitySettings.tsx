@@ -213,7 +213,9 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
     exportToCsv(`conferencia_${name}_${todayLocalISO()}.csv`, headers, rows);
   };
 
-  const SelRow = ({ block, t, extra }: { block: string; t: QualityTx; extra?: React.ReactNode }) => (
+  const SelRow = ({ block, t, extra }: { block: string; t: QualityTx; extra?: React.ReactNode }) => {
+    if (!passesReview(t.id)) return null;
+    return (
     <div className="p-3 space-y-2">
       <div className="flex items-start gap-3">
         <Checkbox checked={selected(block).has(t.id)} onCheckedChange={() => toggle(block, t.id)} className="mt-1" />
@@ -239,7 +241,8 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const BulkBar = ({ block, ids, children }: { block: string; ids: string[]; children?: React.ReactNode }) => (
     <div className="flex items-center gap-2 flex-wrap p-3 bg-muted/40 border-b border-border">
