@@ -287,14 +287,37 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
             <Input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} />
           </div>
           <div className="flex items-end">
-            <Button variant="outline" className="gap-2" onClick={q.reload} disabled={q.loading}>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => { q.reload(); reloadReviews(); }}
+              disabled={q.loading || reviewsLoading}
+            >
               {q.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Atualizar
             </Button>
           </div>
-          <div className="flex items-end">
-            <Button variant="ghost" size="sm" onClick={clearReviewStatus}>Limpar marcações de revisão</Button>
+          <div className="space-y-1">
+            <Label className="text-xs">Situação da conferência</Label>
+            <Select value={reviewFilter} onValueChange={(v: any) => setReviewFilter(v)}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pendente" className="text-xs">Pendente ({reviewCounts.pendente})</SelectItem>
+                <SelectItem value="revisado" className="text-xs">Revisado ({reviewCounts.revisado})</SelectItem>
+                <SelectItem value="corrigido" className="text-xs">Corrigido ({reviewCounts.corrigido})</SelectItem>
+                <SelectItem value="ignorado" className="text-xs">Ignorado ({reviewCounts.ignorado})</SelectItem>
+                <SelectItem value="todos" className="text-xs">Todos ({reviewCounts.todos})</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </CardContent>
+        <CardContent className="pt-0 flex flex-wrap gap-2">
+          {(['pendente', 'revisado', 'corrigido', 'ignorado'] as ReviewStatus[]).map((s) => (
+            <Badge key={s} variant={s === 'pendente' ? 'destructive' : 'secondary'} className="text-[11px]">
+              {REVIEW_LABEL[s]}: {reviewCounts[s]}
+            </Badge>
+          ))}
+          <Badge variant="outline" className="text-[11px]">Total analisado: {reviewCounts.todos}</Badge>
         </CardContent>
       </Card>
 
