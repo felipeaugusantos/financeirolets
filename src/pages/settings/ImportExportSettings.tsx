@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { todayLocalISO } from '@/lib/utils';
 import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
+import { transactionFingerprint } from '@/lib/finance';
 
 /** Divide uma linha CSV respeitando aspas, aceitando ';' ou ',' como delimitador. */
 function splitCsvLine(line: string, delimiter: string): string[] {
@@ -81,7 +82,7 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ success: number; errors: string[]; skipped: string[] } | null>(null);
 
   const handleExportCSV = async () => {
     try {
@@ -147,6 +148,18 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
 
       let success = 0;
       const errors: string[] = [];
+      const skipped: string[] = [];
+
+      // Proteção contra duplicidade: carrega os lançamentos já existentes no
+      // intervalo de datas do arquivo e compara por impressão digital.
+      // Nada é apagado — linhas suspeitas apenas NÃO são inseridas.
+      const existingFingerprints = new Set<string>();
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('type, description, amount, competence_date')
+        .limit(10000);
+      (existing ?? []).forEach((t: any) => existingFingerprints.add(transactionFingerprint(t)));
+      const fileFingerprints = new Set<string>();
 
       for (let i = 1; i < lines.length; i++) {
         const cols = splitCsvLine(lines[i], delimiter);
@@ -177,6 +190,17 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
         }
 
         const { error } = await supabase.from('transactions').insert({
+        const fingerprint = transactionFingerprint({ type, description, amount, competence_date });
+        if (existingFingerprints.has(fingerprint)) {
+          skipped.push(`Linha ${i + 1}: "${description}" (${competence_date}) já existe no sistema — não importada.`);
+          continue;
+        }
+        if (fileFingerprints.has(fingerprint)) {
+          skipped.push(`Linha ${i + 1}: "${description}" (${competence_date}) está duplicada dentro do próprio arquivo — não importada.`);
+          continue;
+        }
+
+        const { error } = await supabase.from('transactions').insert({
           type: type as any,
           description,
           amount,
@@ -191,11 +215,15 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           errors.push(`Linha ${i + 1}: ${error.message}`);
         } else {
           success++;
+          fileFingerprints.add(fingerprint);
         }
       }
 
-      setImportResult({ success, errors });
-      toast({ title: `Importação concluída: ${success} lançamentos criados` });
+      setImportResult({ success, errors, skipped });
+      toast({
+        title: `Importação concluída: ${success} lançamentos criados`,
+        description: skipped.length ? `${skipped.length} linha(s) ignorada(s) por suspeita de duplicidade.` : undefined,
+      });
     } catch (err: any) {
       toast({ title: 'Erro na importação', description: err.message, variant: 'destructive' });
     } finally {
