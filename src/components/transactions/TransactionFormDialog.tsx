@@ -493,11 +493,25 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
               </div>
             </div>
 
+            {(ruleErrors.length > 0 || ruleWarnings.length > 0) && (
+              <div className="space-y-2">
+                {ruleErrors.map((m, i) => (
+                  <p key={`e${i}`} className="text-xs rounded-xl border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2">
+                    {m}
+                  </p>
+                ))}
+                {ruleWarnings.map((m, i) => (
+                  <p key={`w${i}`} className="text-xs rounded-xl border border-warning/40 bg-warning/10 text-warning px-3 py-2">
+                    ⚠️ {m}
+                  </p>
+                ))}
+              </div>
+            )}
+
             <Separator />
 
             {/* Installments */}
             {!isEditing && (
-
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Checkbox id="installment" checked={isInstallment} onCheckedChange={(c) => setIsInstallment(!!c)} />
