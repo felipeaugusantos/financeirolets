@@ -162,9 +162,9 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
     const all = new Set<string>([
       ...q.semCategoria.map((t) => t.id),
       ...q.semUnidade.map((t) => t.id),
-      ...q.tipoStatus.map((t) => t.id),
-      ...q.foraDre.map((t) => t.id),
-      ...q.pagosSemData.map((t) => t.id),
+      ...q.typeStatusMismatch.map((t) => t.id),
+      ...q.foraDoDre.map((t) => t.id),
+      ...q.pagoSemData.map((t) => t.id),
     ]);
     const c: Record<ReviewStatus | 'todos', number> = {
       todos: all.size, pendente: 0, revisado: 0, corrigido: 0, ignorado: 0,
@@ -172,7 +172,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
     all.forEach((id) => { c[rs(id)] += 1; });
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q.semCategoria, q.semUnidade, q.tipoStatus, q.foraDre, q.pagosSemData, reviewStatus]);
+  }, [q.semCategoria, q.semUnidade, q.typeStatusMismatch, q.foraDoDre, q.pagoSemData, reviewStatus]);
 
   const row = (t: QualityTx, before: string, after: string) => ({
     id: t.id,
