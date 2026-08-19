@@ -22,7 +22,7 @@ const fmtPct = (v: number) =>
   `${(v >= 0 ? '+' : '')}${v.toFixed(1)}%`;
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
-  const { lines, loading, generate, unallocatedTotal, unallocatedCount } = useDreReport();
+  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount } = useDreReport();
   const [units, setUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
