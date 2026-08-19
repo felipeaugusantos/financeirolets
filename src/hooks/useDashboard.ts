@@ -5,6 +5,7 @@ import {
   buildAllocationMap,
   splitByUnit,
   txValue,
+  valueForFilters,
   NO_UNIT_KEY,
   type AllocationRow,
 } from '@/lib/finance';
@@ -162,30 +163,8 @@ export function useDashboard(filters?: DashboardFilters) {
       }
 
       /** Valor do lançamento atribuível aos filtros atuais (rateio-aware). */
-      const filteredValue = (tx: any): number => {
-        const total = txValue(tx);
-        let value = total;
-        if (unitFilter) {
-          value = splitByUnit(tx, allocMap)
-            .filter((s) => s.unitKey === unitFilter)
-            .reduce((sum, s) => sum + s.value, 0);
-        }
-        if (frontFilter) {
-          const allocs = allocMap.get(tx.id);
-          const hasFrontAlloc = (allocs ?? []).some((a) => a.front_id);
-          if (hasFrontAlloc) {
-            const share = (allocs ?? [])
-              .filter((a) => a.front_id === frontFilter)
-              .reduce((sum, a) => sum + (a.allocation_type === 'percentual' && a.percentage != null
-                ? total * (Number(a.percentage) / 100)
-                : Number(a.amount) || 0), 0);
-            value = Math.min(value, share);
-          } else if (tx.front_id !== frontFilter) {
-            value = 0;
-          }
-        }
-        return value;
-      };
+      const filteredValue = (tx: any): number =>
+        valueForFilters(tx, allocMap, unitFilter, frontFilter);
 
       let receitasMes = 0;
       let despesasMes = 0;
