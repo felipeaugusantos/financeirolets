@@ -37,3 +37,4 @@ Updated: now
 - [Exportação: CSV](mem://features/relatorios/exportacao-csv) — UTF-8 com BOM para garantir compatibilidade no Excel.
 - [Orçamento (Budgets)](mem://features/orcamento) — Planejamento anual por linha do DRE, integrado ao DRE como Orçado vs Realizado + Análise Vertical/Horizontal.
 - [Fluxo Projetado](mem://features/fluxo-projetado) — Tabs Realizado/Projetado/Comparativo no Fluxo de Caixa.
+- [Invariantes Financeiras](mem://features/invariantes-financeiras) — Rateio residual, filtro unidade×frente e bloco "fora do DRE".

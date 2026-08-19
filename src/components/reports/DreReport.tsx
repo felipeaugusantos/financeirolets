@@ -22,7 +22,7 @@ const fmtPct = (v: number) =>
   `${(v >= 0 ? '+' : '')}${v.toFixed(1)}%`;
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
-  const { lines, loading, generate, unallocatedTotal, unallocatedCount } = useDreReport();
+  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount } = useDreReport();
   const [units, setUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
@@ -305,6 +305,15 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
           <span className="text-amber-800 dark:text-amber-300">
             <strong>{unallocatedCount} lançamento(s)</strong> sem unidade atribuída ({fmt(Math.abs(unallocatedTotal))}) não estão incluídos neste relatório filtrado. Atribua uma unidade ou configure rateio nesses lançamentos para incluí-los.
+          </span>
+        </div>
+      )}
+
+      {generated && outOfDreCount > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+          <span className="text-destructive">
+            <strong>{outOfDreCount} lançamento(s)</strong> fora do DRE ({fmt(Math.abs(outOfDreTotal))} de impacto líquido) porque estão sem categoria ou em categoria sem linha de DRE. Eles existem no caixa, mas não aparecem em nenhuma linha abaixo. Vincule as categorias em Configurações → Categorias.
           </span>
         </div>
       )}

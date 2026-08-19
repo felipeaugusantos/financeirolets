@@ -5,6 +5,7 @@ import {
   buildAllocationMap,
   splitByUnit,
   txValue,
+  valueForFilters,
   NO_UNIT_KEY,
   type AllocationRow,
 } from '@/lib/finance';
@@ -162,30 +163,8 @@ export function useDashboard(filters?: DashboardFilters) {
       }
 
       /** Valor do lançamento atribuível aos filtros atuais (rateio-aware). */
-      const filteredValue = (tx: any): number => {
-        const total = txValue(tx);
-        let value = total;
-        if (unitFilter) {
-          value = splitByUnit(tx, allocMap)
-            .filter((s) => s.unitKey === unitFilter)
-            .reduce((sum, s) => sum + s.value, 0);
-        }
-        if (frontFilter) {
-          const allocs = allocMap.get(tx.id);
-          const hasFrontAlloc = (allocs ?? []).some((a) => a.front_id);
-          if (hasFrontAlloc) {
-            const share = (allocs ?? [])
-              .filter((a) => a.front_id === frontFilter)
-              .reduce((sum, a) => sum + (a.allocation_type === 'percentual' && a.percentage != null
-                ? total * (Number(a.percentage) / 100)
-                : Number(a.amount) || 0), 0);
-            value = Math.min(value, share);
-          } else if (tx.front_id !== frontFilter) {
-            value = 0;
-          }
-        }
-        return value;
-      };
+      const filteredValue = (tx: any): number =>
+        valueForFilters(tx, allocMap, unitFilter, frontFilter);
 
       let receitasMes = 0;
       let despesasMes = 0;
@@ -346,13 +325,23 @@ export function useDashboard(filters?: DashboardFilters) {
         .in('status', ['pago', 'recebido'] as any)
         .eq('affects_cashflow', true)
         .limit(10000);
-      if (unitFilter && unitFilter !== NO_UNIT_KEY) saldoQuery = saldoQuery.eq('unit_id', unitFilter);
-      if (frontFilter) saldoQuery = saldoQuery.eq('front_id', frontFilter);
       const { data: allTxs } = await saldoQuery;
+
+      // Rateio também no saldo: filtrar por unit_id/front_id direto na query
+      // descartaria lançamentos rateados e deixaria o saldo incoerente com os KPIs.
+      let saldoAllocMap = new Map<string, AllocationRow[]>();
+      if ((unitFilter || frontFilter) && (allTxs ?? []).length > 0) {
+        const { data: saldoAllocs } = await supabase
+          .from('transaction_allocations')
+          .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
+          .in('transaction_id', (allTxs ?? []).map((t: any) => t.id));
+        saldoAllocMap = buildAllocationMap(saldoAllocs as any);
+      }
 
       let movimentacaoCalculada = 0;
       (allTxs ?? []).forEach((tx: any) => {
-        const val = txValue(tx);
+        const val = valueForFilters(tx, saldoAllocMap, unitFilter, frontFilter);
+        if (val === 0) return;
         movimentacaoCalculada += tx.type === 'receita' ? val : -val;
       });
 
@@ -372,20 +361,30 @@ export function useDashboard(filters?: DashboardFilters) {
       // Overdue / due-today (snapshot)
       let alertQuery = supabase
         .from('transactions')
-        .select('id, description, net_amount, due_date, type, partner:partners(name)')
+        .select('id, description, net_amount, due_date, type, unit_id, front_id, partner:partners(name)')
         .in('status', ['pendente', 'agendado'] as any)
         .not('due_date', 'is', null)
         .lte('due_date', today)
         .order('due_date', { ascending: true })
-        .limit(100);
-      if (unitFilter && unitFilter !== NO_UNIT_KEY) alertQuery = alertQuery.eq('unit_id', unitFilter);
-      if (frontFilter) alertQuery = alertQuery.eq('front_id', frontFilter);
+        .limit(1000);
       const { data: alertBills } = await alertQuery;
+
+      // Mesma regra de rateio dos KPIs: um lançamento rateado na unidade filtrada
+      // precisa continuar aparecendo nos alertas de vencimento.
+      let alertAllocMap = new Map<string, AllocationRow[]>();
+      if ((unitFilter || frontFilter) && (alertBills ?? []).length > 0) {
+        const { data: alertAllocs } = await supabase
+          .from('transaction_allocations')
+          .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
+          .in('transaction_id', (alertBills ?? []).map((b: any) => b.id));
+        alertAllocMap = buildAllocationMap(alertAllocs as any);
+      }
 
       const overdueBills: OverdueBill[] = [];
       const dueTodayBills: OverdueBill[] = [];
       let vencendoHoje = 0;
       (alertBills ?? []).forEach((b: any) => {
+        if ((unitFilter || frontFilter) && valueForFilters(b, alertAllocMap, unitFilter, frontFilter) === 0) return;
         const bill: OverdueBill = {
           id: b.id, description: b.description, net_amount: b.net_amount,
           due_date: b.due_date, type: b.type, partner_name: b.partner?.name,

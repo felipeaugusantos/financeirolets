@@ -87,11 +87,18 @@ export function allocationValue(alloc: AllocationRow, total: number): number {
   return Number(alloc.amount) || 0;
 }
 
+/** Tolerância padrão para diferenças de centavos/arredondamento. */
+export const CENT_TOLERANCE = 0.005;
+
 /**
  * Distribui o valor do lançamento entre unidades, sempre da mesma forma:
  *  - com rateio  → conforme transaction_allocations (unit_id null vira "Sem unidade");
  *  - com unit_id → tudo na unidade;
  *  - sem nada    → tudo em "Sem unidade" (NUNCA descartado).
+ *
+ * Se o rateio não fechar com o valor do lançamento (percentual < 100%, valores
+ * incompletos), o resíduo vai para "Sem unidade" — assim o consolidado sempre
+ * é igual ao valor original e o DRE bate com o DRE Comparativo.
  */
 export function splitByUnit(
   tx: { id: string; unit_id?: string | null; net_amount?: number | string | null },
@@ -100,10 +107,16 @@ export function splitByUnit(
   const total = txValue(tx);
   const allocs = allocMap.get(tx.id);
   if (allocs && allocs.length > 0) {
-    return allocs.map((a) => ({
+    const parts = allocs.map((a) => ({
       unitKey: a.unit_id || NO_UNIT_KEY,
       value: allocationValue(a, total),
     }));
+    const allocated = parts.reduce((s, p) => s + p.value, 0);
+    const residual = total - allocated;
+    if (Math.abs(residual) > CENT_TOLERANCE) {
+      parts.push({ unitKey: NO_UNIT_KEY, value: residual });
+    }
+    return parts;
   }
   return [{ unitKey: tx.unit_id || NO_UNIT_KEY, value: total }];
 }
@@ -121,6 +134,55 @@ export function valueForUnitFilter(
   return splitByUnit(tx, allocMap)
     .filter((s) => s.unitKey === unitFilter)
     .reduce((sum, s) => sum + s.value, 0);
+}
+
+/**
+ * Valor atribuível à combinação de filtros unidade × frente de negócio.
+ * Usa a interseção real do rateio (mesma linha atende unidade E frente),
+ * nunca o mínimo entre dois totais independentes.
+ */
+export function valueForFilters(
+  tx: {
+    id: string;
+    unit_id?: string | null;
+    front_id?: string | null;
+    net_amount?: number | string | null;
+  },
+  allocMap: Map<string, AllocationRow[]>,
+  unitFilter?: string,
+  frontFilter?: string
+): number {
+  const total = txValue(tx);
+  if (!unitFilter && !frontFilter) return total;
+
+  const txFront = tx.front_id || null;
+  const allocs = allocMap.get(tx.id);
+
+  if (allocs && allocs.length > 0) {
+    let sum = 0;
+    let allocated = 0;
+    allocs.forEach((a) => {
+      const v = allocationValue(a, total);
+      allocated += v;
+      const unitKey = a.unit_id || NO_UNIT_KEY;
+      // Rateio sem frente herda a frente do próprio lançamento.
+      const frontKey = a.front_id ?? txFront;
+      const unitOk = !unitFilter || unitKey === unitFilter;
+      const frontOk = !frontFilter || frontKey === frontFilter;
+      if (unitOk && frontOk) sum += v;
+    });
+    const residual = total - allocated;
+    if (Math.abs(residual) > CENT_TOLERANCE) {
+      const unitOk = !unitFilter || unitFilter === NO_UNIT_KEY;
+      const frontOk = !frontFilter || txFront === frontFilter;
+      if (unitOk && frontOk) sum += residual;
+    }
+    return sum;
+  }
+
+  const unitOk = !unitFilter || (tx.unit_id || NO_UNIT_KEY) === unitFilter;
+  const frontOk = !frontFilter || txFront === frontFilter;
+  return unitOk && frontOk ? total : 0;
 }
 
 // ---------------------------------------------------------------------------
