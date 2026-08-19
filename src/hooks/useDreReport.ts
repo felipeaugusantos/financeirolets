@@ -56,12 +56,26 @@ function computeLineValues(
   const lineValues = new Map<string, number>();
   let unallocTotal = 0;
   let unallocCount = 0;
+  // Lançamentos que não pertencem a nenhuma linha do DRE (sem categoria ou
+  // categoria sem dre_line_id). Antes eram descartados em silêncio.
+  let outOfDreTotal = 0;
+  let outOfDreCount = 0;
 
   transactions.forEach((tx: any) => {
-    if (!tx.category_id) return;
-    const dreLineId = catToDre.get(tx.category_id);
-    if (!dreLineId) return;
     const totalVal = txValue(tx);
+    const dreLineId = tx.category_id ? catToDre.get(tx.category_id) : undefined;
+    if (!dreLineId) {
+      const share = unitFilter
+        ? splitByUnit(tx, allocMap)
+            .filter((s) => s.unitKey === unitFilter)
+            .reduce((sum, s) => sum + s.value, 0)
+        : totalVal;
+      if (share !== 0) {
+        outOfDreTotal += tx.type === 'despesa' ? -share : share;
+        outOfDreCount++;
+      }
+      return;
+    }
     // Regra única de rateio/unidade compartilhada com Dashboard, DRE Comparativo e Fluxo de Caixa.
     const splits = splitByUnit(tx, allocMap);
     const add = (v: number) => lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + v);
@@ -84,7 +98,7 @@ function computeLineValues(
     }
   });
 
-  return { lineValues, unallocTotal, unallocCount };
+  return { lineValues, unallocTotal, unallocCount, outOfDreTotal, outOfDreCount };
 }
 
 function buildSubtotals(allLines: any[], lineValues: Map<string, number>) {
@@ -134,7 +148,7 @@ async function fetchPeriodValues(
   const dateField = dateFieldForRegime(filters.regime);
   let txQuery = supabase
     .from('transactions')
-    .select('id, net_amount, category_id, status, unit_id')
+    .select('id, net_amount, category_id, status, unit_id, type')
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo)
     .limit(10000);
@@ -208,6 +222,8 @@ export function useDreReport() {
   const [lines, setLines] = useState<DreLineResult[]>([]);
   const [unallocatedTotal, setUnallocatedTotal] = useState(0);
   const [unallocatedCount, setUnallocatedCount] = useState(0);
+  const [outOfDreTotal, setOutOfDreTotal] = useState(0);
+  const [outOfDreCount, setOutOfDreCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -287,6 +303,8 @@ export function useDreReport() {
       setLines(result);
       setUnallocatedTotal(current.unallocTotal);
       setUnallocatedCount(current.unallocCount);
+      setOutOfDreTotal(current.outOfDreTotal);
+      setOutOfDreCount(current.outOfDreCount);
     } catch (err: any) {
       toast({ title: 'Erro ao gerar DRE', description: err.message, variant: 'destructive' });
       setLines([]);
@@ -295,5 +313,5 @@ export function useDreReport() {
     }
   }, [toast]);
 
-  return { lines, loading, generate, unallocatedTotal, unallocatedCount };
+  return { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount };
 }
