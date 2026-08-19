@@ -309,6 +309,15 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
+      {generated && outOfDreCount > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+          <span className="text-destructive">
+            <strong>{outOfDreCount} lançamento(s)</strong> fora do DRE ({fmt(Math.abs(outOfDreTotal))} de impacto líquido) porque estão sem categoria ou em categoria sem linha de DRE. Eles existem no caixa, mas não aparecem em nenhuma linha abaixo. Vincule as categorias em Configurações → Categorias.
+          </span>
+        </div>
+      )}
+
       {generated && (
         <Card className="shadow-card rounded-2xl border-border">
           <CardContent className="p-0 overflow-x-auto" ref={reportRef}>
