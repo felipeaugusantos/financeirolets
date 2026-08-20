@@ -1,0 +1,2 @@
+ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS initial_balance_date date;
+COMMENT ON COLUMN public.accounts.initial_balance_date IS 'Data-base do saldo inicial: o saldo vale nesta data e apenas movimentos posteriores sao somados.';
