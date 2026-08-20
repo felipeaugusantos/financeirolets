@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, AlertTriangle, Copy, Tag, Building2, EyeOff, CalendarX, Users, Loader2,
   RefreshCw, FlaskConical, ArrowLeftRight, ExternalLink, ShieldCheck, Split,
@@ -19,6 +19,8 @@ import { Textarea } from '@/components/ui/textarea';
 import ConfirmChangeDialog, { ConfirmChangePayload } from '@/components/quality/ConfirmChangeDialog';
 import AllocationAssistant, { AllocationTarget } from '@/components/quality/AllocationAssistant';
 import PixTriagePanel from '@/components/quality/PixTriagePanel';
+import DreTransfersPanel from '@/components/quality/DreTransfersPanel';
+import { useFinanceSnapshot } from '@/hooks/useFinanceSnapshot';
 import {
   classifyDuplicate, suggestCategory, suggestStatus, suggestUnitLabel, SuggestTx,
 } from '@/lib/reviewSuggestions';
@@ -205,6 +207,33 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
     [q.duplicates]
   );
 
+  // ---- Trava de caixa + histórico da sessão -------------------------------
+  // O caixa de julho já está conciliado com os extratos. Qualquer correção de
+  // DRE feita nesta tela deve manter o líquido do período idêntico.
+  const { snapshot, loading: snapLoading, reload: reloadSnapshot } = useFinanceSnapshot(range);
+  const baselineCash = useRef<number | null>(null);
+  const [sessionLog, setSessionLog] = useState<{ label: string; delta: number; at: string }[]>([]);
+
+  useEffect(() => {
+    baselineCash.current = null;
+  }, [range.from, range.to]);
+
+  useEffect(() => {
+    if (!snapLoading && baselineCash.current === null) baselineCash.current = snapshot.liquido;
+  }, [snapLoading, snapshot.liquido]);
+
+  const cashDrift = baselineCash.current === null ? 0 : snapshot.liquido - baselineCash.current;
+  const cashOk = Math.abs(cashDrift) < 0.005;
+
+  const registerChange = (entry: { label: string; delta: number }) => {
+    setSessionLog((l) => [
+      { ...entry, at: new Date().toLocaleTimeString('pt-BR') },
+      ...l,
+    ]);
+    reloadSnapshot();
+    q.reload();
+  };
+
   const exportTxs = (name: string, items: QualityTx[], problem: string) => {
     const headers = ['ID', 'Competência', 'Descrição', 'Tipo', 'Status', 'Valor Líquido', 'Vencimento', 'Pagamento', 'Problema'];
     const rows: CsvCell[][] = items.map((t) => [
@@ -329,7 +358,62 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
         <p className="text-sm text-muted-foreground">Analisando lançamentos...</p>
       ) : (
         <div className="space-y-3">
-          <PixTriagePanel range={range} />
+          {/* Painel ao vivo: DRE muda, caixa não pode mudar */}
+          <Card className="shadow-card rounded-2xl border-border">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-sm font-heading">
+                Situação do período ({fmtDate(range.from)} a {fmtDate(range.to)})
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={reloadSnapshot} disabled={snapLoading}>
+                {snapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Receita (DRE)', value: snapshot.receita },
+                  { label: 'Despesa (DRE)', value: snapshot.despesa },
+                  { label: 'Resultado (DRE)', value: snapshot.resultado },
+                  { label: 'Caixa líquido', value: snapshot.liquido },
+                ].map((k) => (
+                  <div key={k.label} className="rounded-xl border border-border p-3">
+                    <p className="text-[11px] text-muted-foreground">{k.label}</p>
+                    <p className="text-sm font-semibold">{fmt(k.value)}</p>
+                  </div>
+                ))}
+              </div>
+              <Alert variant={cashOk ? 'default' : 'destructive'}>
+                <ShieldCheck className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  {cashOk ? (
+                    <>
+                      Trava de caixa ativa: o líquido do período segue em{' '}
+                      <strong>{fmt(snapshot.liquido)}</strong>, idêntico ao início desta conferência. As
+                      correções aqui mexem só no DRE.
+                    </>
+                  ) : (
+                    <>
+                      Atenção: o caixa do período mudou em <strong>{fmt(cashDrift)}</strong> desde o início
+                      desta conferência. Revise a última correção antes de continuar — o extrato já estava
+                      conciliado.
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+              {sessionLog.length > 0 && (
+                <div className="rounded-xl border border-border divide-y divide-border">
+                  {sessionLog.map((e, i) => (
+                    <p key={i} className="p-2 text-[11px] text-muted-foreground">
+                      {e.at} • {e.label} • impacto no resultado {fmt(e.delta)}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <PixTriagePanel range={range} snapshot={snapshot} onApplied={registerChange} />
+          <DreTransfersPanel range={range} snapshot={snapshot} onApplied={registerChange} />
           {/* 2 — Lançamentos de teste */}
           <Section
             icon={FlaskConical}
@@ -583,6 +667,12 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                       {g.severity === 'forte' ? 'Duplicidade forte' : g.severity === 'conferir' ? 'Precisa conferir' : 'Provavelmente legítimo'}
                     </Badge>
                     <span className="text-xs text-muted-foreground">{g.items.length} lançamentos</span>
+                    <Button
+                      variant="outline" size="sm" className="h-7 text-xs ml-auto"
+                      onClick={() => g.items.forEach((t) => setReviewStatus(t.id, 'revisado'))}
+                    >
+                      Manter ambos (legítimo)
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">{g.reason}</p>
                   <div className="grid gap-2 md:grid-cols-2">

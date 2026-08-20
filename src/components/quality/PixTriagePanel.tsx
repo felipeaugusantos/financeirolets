@@ -12,23 +12,39 @@ import ConfirmChangeDialog, { ConfirmChangePayload } from '@/components/quality/
 import {
   PIX_NATURES,
   PIX_NATURE_BY_VALUE,
+  PixConfidence,
   PixNature,
   dreImpact,
   patchForNature,
   readNatureTag,
 } from '@/lib/pixTriage';
+import { FinanceSnapshot } from '@/hooks/useFinanceSnapshot';
 
 const fmt = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (d?: string | null) => (d ? d.split('-').reverse().join('/') : '—');
 
+const CONF_LABEL: Record<PixConfidence, string> = {
+  alta: 'Confiança alta',
+  media: 'Confiança média',
+  baixa: 'Confiança baixa',
+};
+
 export default function PixTriagePanel({
   range,
   term = 'Martinho',
+  snapshot,
+  onApplied,
 }: {
   range: { from: string; to: string };
   term?: string;
+  /** Fotografia atual do DRE/Caixa do período — usada no Antes → Depois. */
+  snapshot?: FinanceSnapshot;
+  onApplied?: (entry: { label: string; delta: number }) => void;
 }) {
-  const { rows, pairs, suggestions, classified, accountNameById, loading, reload } = usePixTriage(range, term);
+  const {
+    rows, pairs, partnerById, suggestions, classified,
+    accountNameById, unitNameById, categoryNameById, loading, reload,
+  } = usePixTriage(range, term);
   const { applyPatch, busy } = useReviewActions(reload);
   const [choices, setChoices] = useState<Record<string, PixNature>>({});
   const [confirm, setConfirm] = useState<ConfirmChangePayload | null>(null);
@@ -56,24 +72,30 @@ export default function PixTriagePanel({
   const delta = useMemo(() => dreImpact(pending, effective), [pending, effective]);
   const total = rows.reduce((s, t) => s + (t.type === 'receita' ? t.net_amount : -t.net_amount), 0);
 
-  const pairOf = useMemo(() => {
-    const m = new Map<string, string>();
-    pairs.forEach((p) => {
-      m.set(p.inId, p.outId);
-      m.set(p.outId, p.inId);
-    });
-    return m;
-  }, [pairs]);
-
   const applySelection = (items: typeof rows) => {
     if (items.length === 0) return;
+    const itemDelta = dreImpact(items, effective);
+    const before = snapshot;
+    const after = before
+      ? {
+          receita: before.receita + itemDelta,
+          despesa: before.despesa,
+          resultado: before.resultado + itemDelta,
+        }
+      : null;
     setConfirm({
       title: 'Classificar natureza dos PIX',
       summary: `${items.length} lançamento(s) receberão a natureza escolhida. Nenhum valor, data ou conta é alterado.`,
       impact:
-        delta === 0
-          ? 'Sem mudança no resultado do DRE. O Fluxo de Caixa permanece igual.'
-          : `Resultado do DRE muda em ${fmt(delta)}. O Fluxo de Caixa permanece igual — o dinheiro passou na conta de qualquer forma.`,
+        (itemDelta === 0
+          ? 'Sem mudança no resultado do DRE. '
+          : `Resultado do DRE muda em ${fmt(itemDelta)}. `) +
+        (after && before
+          ? `Receita ${fmt(before.receita)} → ${fmt(after.receita)} • Resultado ${fmt(
+              before.resultado
+            )} → ${fmt(after.resultado)}. `
+          : '') +
+        `Fluxo de Caixa permanece ${before ? fmt(before.liquido) : 'inalterado'} — o dinheiro passou na conta de qualquer forma.`,
       rows: items.map((t) => {
         const nature = effective[t.id];
         return {
@@ -94,6 +116,10 @@ export default function PixTriagePanel({
           await applyPatch([t.id], patchForNature(t, effective[t.id]), 'Natureza classificada');
         }
         setChoices({});
+        onApplied?.({
+          label: `${items.length} PIX classificado(s)`,
+          delta: itemDelta,
+        });
       },
     });
   };
@@ -145,6 +171,12 @@ export default function PixTriagePanel({
                 {pairs.length} par(es) entrada/saída detectado(s)
               </Badge>
             )}
+            {snapshot && (
+              <span className="text-xs text-muted-foreground">
+                DRE hoje: resultado <strong>{fmt(snapshot.resultado)}</strong> → depois{' '}
+                <strong>{fmt(snapshot.resultado + delta)}</strong>
+              </span>
+            )}
             <Button
               size="sm"
               className="ml-auto"
@@ -164,7 +196,11 @@ export default function PixTriagePanel({
                 const nature = effective[t.id];
                 const tagged = readNatureTag(t.notes);
                 const sug = suggestions[t.id];
-                const partner = pairOf.get(t.id);
+                const partner = partnerById.get(t.id);
+                const def = PIX_NATURE_BY_VALUE[nature];
+                const nowInDre = t.affects_dre !== false;
+                const signed = t.type === 'receita' ? t.net_amount : -t.net_amount;
+                const rowDelta = def.affects_dre === nowInDre ? 0 : def.affects_dre ? signed : -signed;
                 return (
                   <div key={t.id} className="p-3 space-y-2">
                     <div className="flex items-start justify-between gap-3">
@@ -177,12 +213,30 @@ export default function PixTriagePanel({
                     <p className="text-[11px] text-muted-foreground">
                       {fmtDate(t.payment_date || t.competence_date)} •{' '}
                       {t.account_id ? accountNameById.get(t.account_id) ?? 'Conta' : 'Sem conta'} •{' '}
-                      {t.affects_dre !== false ? 'hoje no DRE' : 'hoje fora do DRE'} • ID {t.id.slice(0, 8)}
+                      {t.unit_id ? unitNameById.get(t.unit_id) ?? 'Unidade' : 'Sem unidade'} •{' '}
+                      {t.category_id ? categoryNameById.get(t.category_id) ?? 'Categoria' : 'Sem categoria'} •{' '}
+                      {nowInDre ? 'hoje no DRE' : 'hoje fora do DRE'} • natureza atual:{' '}
+                      {tagged ? PIX_NATURE_BY_VALUE[tagged].label : 'não classificada'} • ID {t.id.slice(0, 8)}
                     </p>
                     {partner && (
-                      <p className="text-[11px] text-warning">
-                        Possível transferência: par com o lançamento {partner.slice(0, 8)} de mesmo valor.
-                      </p>
+                      <div className="grid gap-2 md:grid-cols-2 rounded-xl border border-warning/40 bg-warning/5 p-2">
+                        <div className="text-[11px]">
+                          <p className="font-medium text-foreground">Entrada (este lançamento)</p>
+                          <p className="text-muted-foreground">
+                            {fmtDate(t.payment_date || t.competence_date)} •{' '}
+                            {t.account_id ? accountNameById.get(t.account_id) : 'Sem conta'} • {fmt(t.net_amount)}
+                          </p>
+                        </div>
+                        <div className="text-[11px]">
+                          <p className="font-medium text-foreground">Saída correspondente</p>
+                          <p className="text-muted-foreground">
+                            {fmtDate(partner.payment_date || partner.competence_date)} •{' '}
+                            {partner.account_id ? accountNameById.get(partner.account_id) : 'Sem conta'} •{' '}
+                            {fmt(partner.net_amount)} • {partner.description.slice(0, 42)} • ID{' '}
+                            {partner.id.slice(0, 8)}
+                          </p>
+                        </div>
+                      </div>
                     )}
                     <div className="flex items-center gap-2 flex-wrap">
                       <Select
@@ -204,7 +258,17 @@ export default function PixTriagePanel({
                         <Badge variant="secondary" className="text-[11px]">Classificado</Badge>
                       ) : (
                         sug && (
-                          <span className="text-[11px] text-muted-foreground">Sugestão: {sug.reason}</span>
+                          <>
+                            <Badge
+                              variant={sug.confidence === 'alta' ? 'default' : sug.confidence === 'media' ? 'outline' : 'secondary'}
+                              className="text-[11px]"
+                            >
+                              {CONF_LABEL[sug.confidence]}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground">
+                              Sugestão: {PIX_NATURE_BY_VALUE[sug.nature].label} — {sug.reason}
+                            </span>
+                          </>
                         )
                       )}
                       <Button
@@ -232,7 +296,13 @@ export default function PixTriagePanel({
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      {PIX_NATURE_BY_VALUE[nature].hint}
+                      {def.hint}{' '}
+                      <strong className={rowDelta === 0 ? '' : 'text-destructive'}>
+                        Impacto no resultado se aplicar: {fmt(rowDelta)}
+                      </strong>
+                      {snapshot && rowDelta !== 0 && (
+                        <> • Resultado {fmt(snapshot.resultado)} → {fmt(snapshot.resultado + rowDelta)}</>
+                      )}
                     </p>
                   </div>
                 );
