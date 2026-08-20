@@ -10,10 +10,12 @@ import React, { useState, useEffect } from 'react';
 export interface FieldConfig {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'select' | 'textarea';
+  type?: 'text' | 'number' | 'select' | 'textarea' | 'date';
   options?: { value: string; label: string }[];
   required?: boolean;
   placeholder?: string;
+  /** Texto de apoio exibido abaixo do campo. */
+  hint?: string;
 }
 
 interface CrudDialogProps {
@@ -79,13 +81,14 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
                 />
               ) : (
                 <Input
-                  type={f.type === 'number' ? 'number' : 'text'}
+                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
                   value={form[f.name] || ''}
                   onChange={e => setForm(p => ({ ...p, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value }))}
                   placeholder={f.placeholder}
                   className="rounded-xl"
                 />
               )}
+              {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
             </div>
           ))}
         </div>
