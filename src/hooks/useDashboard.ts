@@ -7,6 +7,10 @@ import {
   txValue,
   valueForFilters,
   NO_UNIT_KEY,
+  buildOpeningMap,
+  openingBalanceTotal,
+  hasOpeningBalance,
+  isAfterOpening,
   type AllocationRow,
 } from '@/lib/finance';
 
