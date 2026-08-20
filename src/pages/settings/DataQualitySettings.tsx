@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Textarea } from '@/components/ui/textarea';
 import ConfirmChangeDialog, { ConfirmChangePayload } from '@/components/quality/ConfirmChangeDialog';
 import AllocationAssistant, { AllocationTarget } from '@/components/quality/AllocationAssistant';
+import PixTriagePanel from '@/components/quality/PixTriagePanel';
 import {
   classifyDuplicate, suggestCategory, suggestStatus, suggestUnitLabel, SuggestTx,
 } from '@/lib/reviewSuggestions';
@@ -328,6 +329,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
         <p className="text-sm text-muted-foreground">Analisando lançamentos...</p>
       ) : (
         <div className="space-y-3">
+          <PixTriagePanel range={range} />
           {/* 2 — Lançamentos de teste */}
           <Section
             icon={FlaskConical}
