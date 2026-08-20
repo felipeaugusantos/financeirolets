@@ -10,6 +10,11 @@ const columns: ColumnConfig[] = [
   { key: 'name', label: 'Nome' },
   { key: 'type', label: 'Tipo' },
   { key: 'initial_balance', label: 'Saldo Inicial', render: (v: number) => `R$ ${(v ?? 0).toFixed(2)}` },
+  {
+    key: 'initial_balance_date',
+    label: 'Data-base',
+    render: (v: string | null) => (v ? v.split('-').reverse().join('/') : '—'),
+  },
 ];
 
 const fields: FieldConfig[] = [
@@ -22,6 +27,12 @@ const fields: FieldConfig[] = [
     { value: 'outro', label: 'Outro' },
   ]},
   { name: 'initial_balance', label: 'Saldo Inicial', type: 'number', placeholder: '0.00' },
+  {
+    name: 'initial_balance_date',
+    label: 'Data-base do saldo inicial',
+    type: 'date',
+    hint: 'Dia em que esse saldo foi apurado no extrato. Só movimentos posteriores a esta data são somados ao saldo — alterá-la muda o saldo exibido em todos os relatórios.',
+  },
 ];
 
 export default function AccountsSettings({ onBack }: { onBack: () => void }) {
