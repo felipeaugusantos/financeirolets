@@ -226,6 +226,74 @@ export function applyCategoryFilter(query: any, categoryId?: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Saldo inicial das contas (com data-base)
+// ---------------------------------------------------------------------------
+
+export interface AccountOpeningRow {
+  id: string;
+  initial_balance?: number | string | null;
+  initial_balance_date?: string | null;
+}
+
+export interface AccountOpening {
+  balance: number;
+  /** Data-base: o saldo vale NESTE dia; só movimentos POSTERIORES somam. */
+  date: string | null;
+}
+
+export function buildOpeningMap(rows: AccountOpeningRow[] | null | undefined) {
+  const map = new Map<string, AccountOpening>();
+  (rows ?? []).forEach((a) => {
+    map.set(a.id, {
+      balance: Number(a.initial_balance) || 0,
+      date: a.initial_balance_date || null,
+    });
+  });
+  return map;
+}
+
+/**
+ * Soma dos saldos iniciais válidos até `asOf` (YYYY-MM-DD).
+ * Conta sem data-base entra sempre (comportamento antigo preservado);
+ * conta com data-base posterior a `asOf` ainda não vale e fica de fora.
+ */
+export function openingBalanceTotal(map: Map<string, AccountOpening>, asOf?: string): number {
+  let total = 0;
+  map.forEach((o) => {
+    if (o.balance === 0) return;
+    if (o.date && asOf && o.date > asOf) return;
+    total += o.balance;
+  });
+  return total;
+}
+
+/** Alguma conta tem saldo inicial diferente de zero configurado? */
+export function hasOpeningBalance(map: Map<string, AccountOpening>, asOf?: string): boolean {
+  let found = false;
+  map.forEach((o) => {
+    if (o.balance === 0) return;
+    if (o.date && asOf && o.date > asOf) return;
+    found = true;
+  });
+  return found;
+}
+
+/**
+ * O movimento deve ser somado por cima do saldo inicial?
+ * Movimento na data-base ou antes dela JÁ está embutido no saldo informado —
+ * contá-lo de novo duplicaria o dinheiro.
+ */
+export function isAfterOpening(
+  tx: { account_id?: string | null; payment_date?: string | null },
+  map: Map<string, AccountOpening>
+): boolean {
+  const acc = tx.account_id ? map.get(tx.account_id) : undefined;
+  if (!acc || !acc.date) return true;
+  if (!tx.payment_date) return true;
+  return tx.payment_date > acc.date;
+}
+
+// ---------------------------------------------------------------------------
 // Identidade de lançamento (prevenção de duplicidade em importações)
 // ---------------------------------------------------------------------------
 

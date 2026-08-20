@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           id: string
           initial_balance: number
+          initial_balance_date: string | null
           name: string
           type: string
           updated_at: string
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           id?: string
           initial_balance?: number
+          initial_balance_date?: string | null
           name: string
           type?: string
           updated_at?: string
@@ -38,6 +40,7 @@ export type Database = {
           created_at?: string
           id?: string
           initial_balance?: number
+          initial_balance_date?: string | null
           name?: string
           type?: string
           updated_at?: string

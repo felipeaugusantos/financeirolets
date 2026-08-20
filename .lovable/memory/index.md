@@ -35,6 +35,7 @@ Updated: now
 - [Relatórios: Itens Sem Unidade](mem://features/relatorios/tratamento-itens-sem-unidade) — Filtro e alerta visual de transações não categorizadas.
 - [Exportação: PDF](mem://features/exportacao-pdf) — Geração de alta fidelidade via html2canvas e jspdf.
 - [Exportação: CSV](mem://features/relatorios/exportacao-csv) — UTF-8 com BOM para garantir compatibilidade no Excel.
+- [Saldo inicial e PIX](mem://features/saldo-inicial-e-pix) — Data-base do saldo das contas e naturezas dos PIX Martinho & Souza.
 - [Orçamento (Budgets)](mem://features/orcamento) — Planejamento anual por linha do DRE, integrado ao DRE como Orçado vs Realizado + Análise Vertical/Horizontal.
 - [Fluxo Projetado](mem://features/fluxo-projetado) — Tabs Realizado/Projetado/Comparativo no Fluxo de Caixa.
 - [Invariantes Financeiras](mem://features/invariantes-financeiras) — Rateio residual, filtro unidade×frente e bloco "fora do DRE".

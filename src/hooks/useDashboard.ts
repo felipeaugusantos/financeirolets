@@ -7,6 +7,10 @@ import {
   txValue,
   valueForFilters,
   NO_UNIT_KEY,
+  buildOpeningMap,
+  openingBalanceTotal,
+  hasOpeningBalance,
+  isAfterOpening,
   type AllocationRow,
 } from '@/lib/finance';
 
@@ -321,7 +325,7 @@ export function useDashboard(filters?: DashboardFilters) {
       // Saldo total (snapshot, independente do período)
       let saldoQuery = supabase
         .from('transactions')
-        .select('id, type, net_amount, status, unit_id, front_id')
+        .select('id, type, net_amount, status, unit_id, front_id, account_id, payment_date')
         .in('status', ['pago', 'recebido'] as any)
         .eq('affects_cashflow', true)
         .limit(10000);
@@ -338,23 +342,27 @@ export function useDashboard(filters?: DashboardFilters) {
         saldoAllocMap = buildAllocationMap(saldoAllocs as any);
       }
 
+      // Saldo inicial: nunca inventar. Só soma o que estiver configurado.
+      const { data: accountRows } = await supabase
+        .from('accounts')
+        .select('id, initial_balance, initial_balance_date')
+        .eq('active', true);
+      const openingMap = buildOpeningMap(accountRows as any);
+
       let movimentacaoCalculada = 0;
       (allTxs ?? []).forEach((tx: any) => {
+        // Movimento até a data-base já está embutido no saldo inicial informado.
+        if (!isAfterOpening(tx, openingMap)) return;
         const val = valueForFilters(tx, saldoAllocMap, unitFilter, frontFilter);
         if (val === 0) return;
         movimentacaoCalculada += tx.type === 'receita' ? val : -val;
       });
 
-      // Saldo inicial: nunca inventar. Só soma o que estiver configurado.
       let saldoInicialTotal = 0;
       let saldoInicialConfigurado = false;
       if (!unitFilter && !frontFilter) {
-        const { data: accounts } = await supabase.from('accounts').select('initial_balance').eq('active', true);
-        (accounts ?? []).forEach((a: any) => {
-          const ib = Number(a.initial_balance) || 0;
-          if (ib !== 0) saldoInicialConfigurado = true;
-          saldoInicialTotal += ib;
-        });
+        saldoInicialTotal = openingBalanceTotal(openingMap, today);
+        saldoInicialConfigurado = hasOpeningBalance(openingMap, today);
       }
       const saldoTotal = movimentacaoCalculada + saldoInicialTotal;
 

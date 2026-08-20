@@ -8,6 +8,9 @@ import {
   buildAllocationMap,
   valueForUnitFilter,
   txValue,
+  buildOpeningMap,
+  openingBalanceTotal,
+  isAfterOpening,
   type AllocationRow,
 } from '@/lib/finance';
 
@@ -37,7 +40,7 @@ export function useCashFlowReport() {
     try {
       let query = supabase
         .from('transactions')
-        .select('id, type, net_amount, payment_date, status, unit_id, category_id')
+        .select('id, type, net_amount, payment_date, status, unit_id, category_id, account_id')
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo)
         .limit(10000);
@@ -47,6 +50,14 @@ export function useCashFlowReport() {
 
       const { data: rows, error } = await query;
       if (error) throw error;
+
+      // Saldo inicial das contas: vale na data-base e só movimentos posteriores somam.
+      const { data: accountRows } = await supabase
+        .from('accounts')
+        .select('id, initial_balance, initial_balance_date')
+        .eq('active', true);
+      const openingMap = buildOpeningMap(accountRows as any);
+      const saldoInicial = openingBalanceTotal(openingMap, filters.dateFrom);
 
       // Fetch allocations if filtering by unit
       let allocMap = new Map<string, AllocationRow[]>();
@@ -64,6 +75,8 @@ export function useCashFlowReport() {
       const monthMap = new Map<string, { receitas: number; despesas: number }>();
 
       (rows ?? []).forEach((tx: any) => {
+        // Movimento até a data-base do saldo inicial já está embutido nele.
+        if (!isAfterOpening(tx, openingMap)) return;
         const m = tx.payment_date.substring(0, 7);
         const entry = monthMap.get(m) || { receitas: 0, despesas: 0 };
         void txValue(tx);
@@ -89,7 +102,8 @@ export function useCashFlowReport() {
       }
 
       const shortMonth = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      let acumulado = 0;
+      // O acumulado parte do saldo bancário informado, não de zero.
+      let acumulado = filters.unit_id ? 0 : saldoInicial;
 
       const result: CashFlowMonth[] = months.map(m => {
         const entry = monthMap.get(m) || { receitas: 0, despesas: 0 };
