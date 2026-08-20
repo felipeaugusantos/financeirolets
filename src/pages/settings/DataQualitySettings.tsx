@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, AlertTriangle, Copy, Tag, Building2, EyeOff, CalendarX, Users, Loader2,
   RefreshCw, FlaskConical, ArrowLeftRight, ExternalLink, ShieldCheck, Split,
@@ -19,6 +19,8 @@ import { Textarea } from '@/components/ui/textarea';
 import ConfirmChangeDialog, { ConfirmChangePayload } from '@/components/quality/ConfirmChangeDialog';
 import AllocationAssistant, { AllocationTarget } from '@/components/quality/AllocationAssistant';
 import PixTriagePanel from '@/components/quality/PixTriagePanel';
+import DreTransfersPanel from '@/components/quality/DreTransfersPanel';
+import { useFinanceSnapshot } from '@/hooks/useFinanceSnapshot';
 import {
   classifyDuplicate, suggestCategory, suggestStatus, suggestUnitLabel, SuggestTx,
 } from '@/lib/reviewSuggestions';
