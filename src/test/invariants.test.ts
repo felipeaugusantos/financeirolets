@@ -121,3 +121,74 @@ describe('invariantes financeiras', () => {
     expect(subtotal).toBeCloseTo(-353.75, 2);
   });
 });
+
+describe('saldo inicial com data-base', () => {
+  const map = buildOpeningMap([
+    { id: 'a1', initial_balance: 23983.72, initial_balance_date: '2026-06-30' },
+    { id: 'a2', initial_balance: 0, initial_balance_date: '2026-06-30' },
+    { id: 'a3', initial_balance: 1362.41, initial_balance_date: null },
+  ]);
+
+  it('soma apenas saldos já válidos na data de referência', () => {
+    expect(openingBalanceTotal(map, '2026-07-01')).toBeCloseTo(25346.13, 2);
+    // Antes da data-base, só a conta sem data-base entra.
+    expect(openingBalanceTotal(map, '2026-06-01')).toBeCloseTo(1362.41, 2);
+    expect(hasOpeningBalance(map, '2026-07-01')).toBe(true);
+  });
+
+  it('movimento até a data-base não é somado de novo', () => {
+    expect(isAfterOpening({ account_id: 'a1', payment_date: '2026-06-30' }, map)).toBe(false);
+    expect(isAfterOpening({ account_id: 'a1', payment_date: '2026-06-15' }, map)).toBe(false);
+    expect(isAfterOpening({ account_id: 'a1', payment_date: '2026-07-01' }, map)).toBe(true);
+  });
+
+  it('conta sem data-base mantém o comportamento antigo', () => {
+    expect(isAfterOpening({ account_id: 'a3', payment_date: '2026-01-01' }, map)).toBe(true);
+    expect(isAfterOpening({ account_id: null, payment_date: '2026-01-01' }, map)).toBe(true);
+  });
+});
+
+describe('triagem de PIX', () => {
+  const base = {
+    id: 'p1', description: 'PIX MARTINHO & SOUZA', notes: null as string | null,
+    net_amount: 1200, type: 'receita', account_id: 'a1',
+    payment_date: '2026-07-10', competence_date: '2026-07-10', affects_dre: true,
+  };
+
+  it('só a natureza venda permanece no DRE; todas seguem no caixa', () => {
+    expect(PIX_NATURE_BY_VALUE.venda.affects_dre).toBe(true);
+    (['transferencia', 'stone', 'ifood', 'app_caixa'] as const).forEach((n) => {
+      expect(PIX_NATURE_BY_VALUE[n].affects_dre).toBe(false);
+      expect(PIX_NATURE_BY_VALUE[n].affects_cashflow).toBe(true);
+    });
+  });
+
+  it('sugere Stone e iFood pelo histórico', () => {
+    expect(suggestNature({ ...base, description: 'Repasse STONE Boulevard' }).nature).toBe('stone');
+    expect(suggestNature({ ...base, description: 'Recebivel iFood Cafe' }).nature).toBe('ifood');
+    expect(suggestNature(base).nature).toBe('venda');
+  });
+
+  it('marca a natureza em notes sem duplicar a tag', () => {
+    const once = writeNatureTag('conferido com extrato', 'transferencia');
+    const twice = writeNatureTag(once, 'venda');
+    expect(readNatureTag(twice)).toBe('venda');
+    expect(twice.match(/\[natureza:/g)?.length).toBe(1);
+    expect(twice).toContain('conferido com extrato');
+  });
+
+  it('detecta par de transferência de mesmo valor em contas diferentes', () => {
+    const pairs = detectTransferPairs([
+      base,
+      { ...base, id: 'p2', type: 'despesa', account_id: 'a2', payment_date: '2026-07-11', competence_date: '2026-07-11' },
+    ]);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].amount).toBeCloseTo(1200, 2);
+  });
+
+  it('tirar uma receita do DRE reduz o resultado no valor do lançamento', () => {
+    expect(dreImpact([base], { p1: 'transferencia' })).toBeCloseTo(-1200, 2);
+    expect(dreImpact([base], { p1: 'venda' })).toBeCloseTo(0, 2);
+    expect(patchForNature(base, 'transferencia')).toMatchObject({ affects_dre: false, affects_cashflow: true });
+  });
+});
