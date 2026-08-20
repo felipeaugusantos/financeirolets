@@ -87,6 +87,9 @@ export interface PixTx {
   competence_date: string;
   affects_dre?: boolean | null;
   affects_cashflow?: boolean | null;
+  unit_id?: string | null;
+  category_id?: string | null;
+  status?: string | null;
 }
 
 const norm = (s?: string | null) =>
@@ -95,33 +98,66 @@ const norm = (s?: string | null) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+/** Confiança da sugestão — o usuário decide de qualquer forma. */
+export type PixConfidence = 'alta' | 'media' | 'baixa';
+
+export interface PixSuggestion {
+  nature: PixNature;
+  reason: string;
+  confidence: PixConfidence;
+}
+
 /**
  * Sugestão de natureza — sempre editável pelo usuário. A ordem importa:
- * marcas explícitas primeiro, heurística de valor por último.
+ * decisão já registrada, depois par de transferência, depois marcas
+ * explícitas no histórico e, por último, heurística de valor.
  */
-export function suggestNature(tx: PixTx): { nature: PixNature; reason: string } {
+export function suggestNature(tx: PixTx, hasPair = false): PixSuggestion {
   const tagged = readNatureTag(tx.notes);
   if (tagged) {
-    return { nature: tagged, reason: 'Já classificado anteriormente.' };
+    return { nature: tagged, reason: 'Já classificado anteriormente.', confidence: 'alta' };
   }
   const text = `${norm(tx.description)} ${norm(tx.notes)}`;
+  if (hasPair) {
+    return {
+      nature: 'transferencia',
+      reason: 'Existe saída de mesmo valor em outra conta do grupo na mesma data.',
+      confidence: 'alta',
+    };
+  }
   if (text.includes('stone')) {
-    return { nature: 'stone', reason: 'Histórico menciona Stone.' };
+    return { nature: 'stone', reason: 'Histórico menciona Stone.', confidence: 'alta' };
   }
   if (text.includes('ifood') || text.includes('i food')) {
-    return { nature: 'ifood', reason: 'Histórico menciona iFood.' };
+    return { nature: 'ifood', reason: 'Histórico menciona iFood.', confidence: 'alta' };
   }
   if (text.includes('transfer') || text.includes('remanej') || text.includes('aporte')) {
-    return { nature: 'transferencia', reason: 'Histórico indica remanejo entre contas.' };
+    return {
+      nature: 'transferencia',
+      reason: 'Histórico indica remanejo entre contas, mas sem par localizado.',
+      confidence: 'media',
+    };
   }
   if (text.includes(' app') || text.includes('caixa')) {
-    return { nature: 'app_caixa', reason: 'Histórico indica acúmulo do app/conta Caixa.' };
+    return {
+      nature: 'app_caixa',
+      reason: 'Histórico indica acúmulo do app/conta Caixa.',
+      confidence: 'media',
+    };
   }
   const v = Math.abs(Number(tx.net_amount) || 0);
   if (v >= 1000 && v % 500 === 0) {
-    return { nature: 'transferencia', reason: 'Valor redondo e alto — padrão de remanejo.' };
+    return {
+      nature: 'transferencia',
+      reason: 'Valor redondo e alto — padrão de remanejo, sem par localizado.',
+      confidence: 'baixa',
+    };
   }
-  return { nature: 'venda', reason: 'Sem indício de repasse: tratado como venda.' };
+  return {
+    nature: 'venda',
+    reason: 'Sem indício de repasse no histórico: fica como venda até você decidir.',
+    confidence: 'baixa',
+  };
 }
 
 /** Patch aplicado ao lançamento quando a natureza é confirmada. */
@@ -145,10 +181,12 @@ export interface TransferPair {
  * Pares candidatos a transferência: mesma quantia, contas diferentes,
  * entrada e saída em até `maxDays` dias. Apenas uma SUGESTÃO.
  */
-export function detectTransferPairs(txs: PixTx[], maxDays = 3): TransferPair[] {
+export function detectTransferPairs(txs: PixTx[], maxDays = 3, candidates?: PixTx[]): TransferPair[] {
   const dateOf = (t: PixTx) => t.payment_date || t.competence_date;
   const receitas = txs.filter((t) => t.type === 'receita');
-  const despesas = txs.filter((t) => t.type === 'despesa');
+  const pool = candidates && candidates.length > 0 ? candidates : txs;
+  const inScope = new Set(txs.map((t) => t.id));
+  const despesas = pool.filter((t) => t.type === 'despesa');
   const used = new Set<string>();
   const pairs: TransferPair[] = [];
 
@@ -156,7 +194,8 @@ export function detectTransferPairs(txs: PixTx[], maxDays = 3): TransferPair[] {
     const rv = Math.round((Number(r.net_amount) || 0) * 100);
     const rd = new Date(`${dateOf(r)}T12:00:00`).getTime();
     const match = despesas.find((d) => {
-      if (used.has(d.id)) return false;
+      if (used.has(d.id) || d.id === r.id) return false;
+      if (d.status === 'cancelado') return false;
       if (Math.round((Number(d.net_amount) || 0) * 100) !== rv) return false;
       if ((d.account_id || '') === (r.account_id || '')) return false;
       const dd = new Date(`${dateOf(d)}T12:00:00`).getTime();
@@ -175,7 +214,8 @@ export function detectTransferPairs(txs: PixTx[], maxDays = 3): TransferPair[] {
     }
   });
 
-  return pairs;
+  // Só interessam pares em que a entrada está na lista em triagem.
+  return pairs.filter((p) => inScope.has(p.inId));
 }
 
 /** Impacto no DRE se as escolhas atuais forem aplicadas (receitas que saem). */
