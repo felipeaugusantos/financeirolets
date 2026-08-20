@@ -61,7 +61,11 @@ export default function AccountsSettings({ onBack }: { onBack: () => void }) {
         title={editing ? 'Editar Conta' : 'Nova Conta'}
         fields={fields}
         initialData={editing}
-        onSave={data => editing ? update(editing.id, data) : create(data)}
+        onSave={data => {
+          // Data-base vazia precisa virar nulo (string vazia não é data válida).
+          const payload = { ...data, initial_balance_date: data.initial_balance_date || null };
+          return editing ? update(editing.id, payload) : create(payload);
+        }}
       />
     </div>
   );
