@@ -207,6 +207,33 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
     [q.duplicates]
   );
 
+  // ---- Trava de caixa + histórico da sessão -------------------------------
+  // O caixa de julho já está conciliado com os extratos. Qualquer correção de
+  // DRE feita nesta tela deve manter o líquido do período idêntico.
+  const { snapshot, loading: snapLoading, reload: reloadSnapshot } = useFinanceSnapshot(range);
+  const baselineCash = useRef<number | null>(null);
+  const [sessionLog, setSessionLog] = useState<{ label: string; delta: number; at: string }[]>([]);
+
+  useEffect(() => {
+    baselineCash.current = null;
+  }, [range.from, range.to]);
+
+  useEffect(() => {
+    if (!snapLoading && baselineCash.current === null) baselineCash.current = snapshot.liquido;
+  }, [snapLoading, snapshot.liquido]);
+
+  const cashDrift = baselineCash.current === null ? 0 : snapshot.liquido - baselineCash.current;
+  const cashOk = Math.abs(cashDrift) < 0.005;
+
+  const registerChange = (entry: { label: string; delta: number }) => {
+    setSessionLog((l) => [
+      { ...entry, at: new Date().toLocaleTimeString('pt-BR') },
+      ...l,
+    ]);
+    reloadSnapshot();
+    q.reload();
+  };
+
   const exportTxs = (name: string, items: QualityTx[], problem: string) => {
     const headers = ['ID', 'Competência', 'Descrição', 'Tipo', 'Status', 'Valor Líquido', 'Vencimento', 'Pagamento', 'Problema'];
     const rows: CsvCell[][] = items.map((t) => [
