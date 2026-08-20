@@ -8,8 +8,13 @@ import {
   affectsDre,
   affectsCashflow,
   NO_UNIT_KEY,
+  buildOpeningMap,
+  openingBalanceTotal,
+  hasOpeningBalance,
+  isAfterOpening,
   type AllocationRow,
 } from '@/lib/finance';
+import { PIX_NATURE_BY_VALUE, detectTransferPairs, dreImpact, patchForNature, readNatureTag, suggestNature, writeNatureTag } from '@/lib/pixTriage';
 
 const U1 = 'unit-1';
 const U2 = 'unit-2';
