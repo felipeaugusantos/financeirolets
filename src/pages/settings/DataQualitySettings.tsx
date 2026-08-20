@@ -667,6 +667,12 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
                       {g.severity === 'forte' ? 'Duplicidade forte' : g.severity === 'conferir' ? 'Precisa conferir' : 'Provavelmente legítimo'}
                     </Badge>
                     <span className="text-xs text-muted-foreground">{g.items.length} lançamentos</span>
+                    <Button
+                      variant="outline" size="sm" className="h-7 text-xs ml-auto"
+                      onClick={() => g.items.forEach((t) => setReviewStatus(t.id, 'revisado'))}
+                    >
+                      Manter ambos (legítimo)
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">{g.reason}</p>
                   <div className="grid gap-2 md:grid-cols-2">
