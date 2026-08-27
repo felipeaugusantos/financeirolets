@@ -378,13 +378,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     } catch (e) {
       console.warn('Audit log failed', e);
     }
-    // Recalculate totals from current state
-    setData(prev => {
-      const receitas = prev.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
-      const despesas = prev.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.net_amount), 0);
-      setTotals({ receitas, despesas, saldo: receitas - despesas });
-      return prev;
-    });
+    // Totais vêm sempre da agregação no banco — nunca das linhas em memória.
+    await fetchData();
     return { row: rowFull, allocations: allocs ?? [] };
   };
 
