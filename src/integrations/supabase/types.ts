@@ -136,8 +136,11 @@ export type Database = {
           amount: number
           check_number: string | null
           created_at: string
+          decided_at: string | null
+          decided_by: string | null
           fitid: string
           id: string
+          ignore_reason: string | null
           imported_by: string | null
           match_note: string | null
           memo: string | null
@@ -154,8 +157,11 @@ export type Database = {
           amount: number
           check_number?: string | null
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
           fitid: string
           id?: string
+          ignore_reason?: string | null
           imported_by?: string | null
           match_note?: string | null
           memo?: string | null
@@ -172,8 +178,11 @@ export type Database = {
           amount?: number
           check_number?: string | null
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
           fitid?: string
           id?: string
+          ignore_reason?: string | null
           imported_by?: string | null
           match_note?: string | null
           memo?: string | null

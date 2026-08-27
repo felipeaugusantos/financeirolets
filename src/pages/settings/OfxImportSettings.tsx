@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle, Zap, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOfxImport, EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
+import { pickAutoLinkable } from '@/lib/ofxMatch';
 import OfxRulesPanel, { OptionList } from '@/components/ofx/OfxRulesPanel';
 import { todayLocalISO } from '@/lib/utils';
 
@@ -29,6 +32,15 @@ const confidenceStyle: Record<string, string> = {
   baixa: 'bg-muted text-muted-foreground border-border',
 };
 
+const basisLabel: Record<string, string> = {
+  exato: 'valor exato',
+  liquido: 'líquido/impostos',
+  taxa: 'taxa de adquirente',
+  juros: 'juros ou multa',
+  aproximado: 'arredondamento',
+  bruto: 'valor bruto',
+};
+
 export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,11 +53,16 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
   const [createFor, setCreateFor] = useState<EnrichedEntry | null>(null);
   const [createForm, setCreateForm] = useState<any>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ignoreOpen, setIgnoreOpen] = useState(false);
+  const [ignoreReason, setIgnoreReason] = useState('');
 
   const {
-    enriched, rules, loading, importing, lastImport, stats,
-    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry, reloadRules,
+    enriched, rules, loading, importing, batchRunning, lastImport, stats,
+    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    linkMany, ignoreMany, createMany, reloadRules,
   } = useOfxImport(accountId || null, from, to);
+
 
   useEffect(() => {
     (async () => {
@@ -74,6 +91,82 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     () => enriched.filter(e => statusFilter === 'todos' || e.entry.status === statusFilter),
     [enriched, statusFilter]
   );
+
+  // Só linhas pendentes entram em ação de lote.
+  const selectableIds = useMemo(
+    () => visible.filter(v => v.entry.status === 'pendente').map(v => v.entry.id),
+    [visible]
+  );
+  const selectedItems = useMemo(
+    () => visible.filter(v => selected.has(v.entry.id) && v.entry.status === 'pendente'),
+    [visible, selected]
+  );
+  const selectedWithSuggestion = useMemo(
+    () => selectedItems.filter(v => v.suggestions.length > 0),
+    [selectedItems]
+  );
+  /** Linhas pendentes que podem ser vinculadas sem ambiguidade. */
+  const autoLinkable = useMemo(
+    () => pickAutoLinkable(
+      enriched
+        .filter(v => v.entry.status === 'pendente')
+        .map(v => ({ key: v.entry.id, suggestions: v.suggestions }))
+    ),
+    [enriched]
+  );
+
+  const toggle = (id: string) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const allVisibleSelected = selectableIds.length > 0 && selectableIds.every(id => selected.has(id));
+  const toggleAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(selectableIds));
+
+  const clearSelection = () => setSelected(new Set());
+
+  const runAutoLink = async () => {
+    await linkMany(autoLinkable.map(a => ({
+      entryId: a.key, transactionId: a.transactionId, note: `Lote automático — ${a.reasons.join('; ')}`,
+    })));
+    clearSelection();
+  };
+
+  const runLinkSelected = async () => {
+    await linkMany(selectedWithSuggestion.map(v => ({
+      entryId: v.entry.id,
+      transactionId: v.suggestions[0].transaction.id,
+      note: `Lote manual — ${v.suggestions[0].reasons.join('; ')}`,
+    })));
+    clearSelection();
+  };
+
+  const runCreateSelected = async () => {
+    await createMany(selectedItems.map(v => ({
+      entry: v.entry as StatementEntry,
+      patch: {
+        description: v.entry.memo || 'Lançamento do extrato',
+        category_id: v.ruleCategoryId,
+        unit_id: v.ruleUnitId,
+        front_id: v.ruleFrontId,
+        partner_id: v.rulePartnerId,
+      },
+    })));
+    clearSelection();
+  };
+
+  const runIgnoreSelected = async () => {
+    const res = await ignoreMany(selectedItems.map(v => v.entry.id), ignoreReason);
+    if (res.ok > 0) {
+      setIgnoreOpen(false);
+      setIgnoreReason('');
+      clearSelection();
+    }
+  };
+
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -232,9 +325,74 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       )}
 
       <Card className="shadow-card rounded-2xl border-border">
-        <CardHeader>
+        <CardHeader className="space-y-3">
           <CardTitle className="text-sm font-heading">Linhas do extrato</CardTitle>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 rounded-xl h-8"
+              disabled={selectableIds.length === 0}
+              onClick={toggleAll}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              {allVisibleSelected ? 'Limpar seleção' : `Selecionar pendentes (${selectableIds.length})`}
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              className="gap-1.5 rounded-xl h-8"
+              disabled={autoLinkable.length === 0 || batchRunning}
+              onClick={runAutoLink}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Vincular automático ({autoLinkable.length})
+            </Button>
+
+            {selectedItems.length > 0 && (
+              <>
+                <Badge variant="outline" className="text-[11px]">{selectedItems.length} selecionada(s)</Badge>
+                <Button
+                  size="sm"
+                  className="gap-1.5 rounded-xl h-8"
+                  disabled={selectedWithSuggestion.length === 0 || batchRunning}
+                  onClick={runLinkSelected}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Vincular à melhor sugestão ({selectedWithSuggestion.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 rounded-xl h-8"
+                  disabled={batchRunning}
+                  onClick={runCreateSelected}
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Criar lançamentos
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 rounded-xl h-8"
+                  disabled={batchRunning}
+                  onClick={() => setIgnoreOpen(true)}
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Ignorar selecionadas
+                </Button>
+              </>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            "Vincular automático" só usa linhas de confiança alta, com um único candidato e sem disputa pelo mesmo
+            lançamento. Ignorar em lote exige justificativa, gravada em cada linha com autor e data.
+          </p>
         </CardHeader>
+
         <CardContent className="space-y-3">
           {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
           {!loading && visible.length === 0 && (
@@ -245,11 +403,21 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             return (
               <div key={e.id} className="rounded-2xl border border-border p-3 space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{e.memo || '(sem descrição)'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {br(e.posted_at)} · {e.trn_type} · FITID {e.fitid}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-2">
+                    {e.status === 'pendente' && (
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={selected.has(e.id)}
+                        onCheckedChange={() => toggle(e.id)}
+                        aria-label={`Selecionar linha de ${br(e.posted_at)}`}
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{e.memo || '(sem descrição)'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {br(e.posted_at)} · {e.trn_type} · FITID {e.fitid}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-heading font-bold ${e.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
@@ -258,6 +426,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                     <Badge variant="outline" className="text-[10px] capitalize">{e.status}</Badge>
                   </div>
                 </div>
+
 
                 {item.ruleLabel && e.status === 'pendente' && (
                   <p className="text-xs text-accent">Regra "{item.ruleLabel}" aplicada — sugestão preenchida ao criar.</p>
@@ -278,7 +447,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className={`text-[10px] ${confidenceStyle[s.confidence]}`}>
-                                confiança {s.confidence}
+                                {basisLabel[s.basis] ?? s.basis} · confiança {s.confidence}
                               </Badge>
                               <Button size="sm" className="gap-1.5 rounded-xl h-8" onClick={() => linkEntry(e.id, s.transaction.id, s.reasons.join('; '))}>
                                 <Link2 className="h-3.5 w-3.5" /> Vincular
@@ -288,8 +457,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">Nenhum lançamento compatível encontrado na janela de 5 dias.</p>
+                      <p className="text-xs text-muted-foreground">Nenhum lançamento compatível encontrado na janela de 7 dias, nem considerando taxas ou juros.</p>
                     )}
+
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button size="sm" variant="outline" className="gap-1.5 rounded-xl h-8" onClick={() => openCreate(item)}>
                         <PlusCircle className="h-3.5 w-3.5" /> Criar lançamento
@@ -303,7 +473,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
                 {e.status !== 'pendente' && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">{e.match_note || '—'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {e.ignore_reason ? `Justificativa: ${e.ignore_reason}` : (e.match_note || '—')}
+                      {e.decided_at && ` · ${new Date(e.decided_at).toLocaleString('pt-BR')}`}
+                    </p>
                     <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-8" onClick={() => unlinkEntry(e.id)}>
                       <Link2Off className="h-3.5 w-3.5" /> Reabrir
                     </Button>
@@ -316,6 +489,48 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       </Card>
 
       <OfxRulesPanel rules={rules} options={options} onChanged={reloadRules} />
+
+      <Dialog open={ignoreOpen} onOpenChange={o => { setIgnoreOpen(o); if (!o) setIgnoreReason(''); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-heading">Ignorar {selectedItems.length} linha(s)</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-xl bg-muted/40 p-3 text-xs space-y-1 max-h-40 overflow-auto">
+              {selectedItems.slice(0, 8).map(v => (
+                <p key={v.entry.id} className="truncate">
+                  {br(v.entry.posted_at)} · {brl(v.entry.amount)} · {v.entry.memo}
+                </p>
+              ))}
+              {selectedItems.length > 8 && <p>... e mais {selectedItems.length - 8}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Justificativa (obrigatória)</Label>
+              <Textarea
+                value={ignoreReason}
+                onChange={ev => setIgnoreReason(ev.target.value)}
+                placeholder="Ex.: transferência entre contas próprias, já registrada na conta de destino."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                A mesma justificativa é gravada em cada linha, junto com seu usuário e a data/hora.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['Transferência entre contas próprias', 'Estorno/duplicidade do banco', 'Movimento não financeiro'].map(s => (
+                <Button key={s} size="sm" variant="outline" className="rounded-xl h-7 text-xs" onClick={() => setIgnoreReason(s)}>
+                  {s}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIgnoreOpen(false)}>Cancelar</Button>
+            <Button onClick={runIgnoreSelected} disabled={!ignoreReason.trim() || batchRunning}>
+              Ignorar com justificativa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={!!createFor} onOpenChange={o => !o && setCreateFor(null)}>
         <DialogContent className="max-w-md">
