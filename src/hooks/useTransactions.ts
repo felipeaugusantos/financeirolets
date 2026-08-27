@@ -129,19 +129,57 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
     }
 
-    const { data: rows, error } = await query;
-    if (error) {
-      toast({ title: 'Erro ao carregar lançamentos', description: error.message, variant: 'destructive' });
+    return query;
+  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+
+    // 1) Lista exibida — limitada a uma página do backend.
+    const listQuery = applyFilters(
+      supabase
+        .from('transactions')
+        .select(`
+          *,
+          category:categories(name, type),
+          account:accounts(name),
+          partner:partners(name),
+          unit:units(name),
+          front:business_fronts(name)
+        `)
+    ).order('competence_date', { ascending: false }).range(0, PAGE_SIZE - 1);
+
+    // 2) Totais — agregação de TODAS as linhas do filtro, em páginas.
+    const totalsPromise = sumAllPages(async (fromIdx, toIdx) => {
+      const { data: rows, error } = await applyFilters(
+        supabase.from('transactions').select('type, net_amount, status')
+      ).order('competence_date', { ascending: false }).range(fromIdx, toIdx);
+      if (error) throw error;
+      return (rows ?? []) as any[];
+    });
+
+    const [listRes, aggregated] = await Promise.all([
+      listQuery,
+      totalsPromise.catch((err: any) => {
+        toast({ title: 'Erro ao somar os totais', description: err.message, variant: 'destructive' });
+        return null;
+      }),
+    ]);
+
+    if (listRes.error) {
+      toast({ title: 'Erro ao carregar lançamentos', description: listRes.error.message, variant: 'destructive' });
       setData([]);
+      setTotals(EMPTY_TOTALS);
+      setListComplete(true);
     } else {
-      const typed = (rows ?? []) as unknown as TransactionRow[];
+      const typed = (listRes.data ?? []) as unknown as TransactionRow[];
       setData(typed);
-      const receitas = typed.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
-      const despesas = typed.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.net_amount), 0);
-      setTotals({ receitas, despesas, saldo: receitas - despesas });
+      const complete = typed.length < PAGE_SIZE;
+      setListComplete(complete);
+      setTotals(aggregated ?? sumTotals(typed as any));
     }
     setLoading(false);
-  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
+  }, [applyFilters, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
