@@ -17,6 +17,8 @@ import Accounts from "./pages/Accounts";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/SettingsPage";
 import AuditPage from "./pages/AuditPage";
+import BankRegistration from "./pages/BankRegistration";
+import BankReconciliation from "./pages/BankReconciliation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +53,9 @@ const App = () => (
               <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
               <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              <Route path="/conciliacao" element={<Navigate to="/conciliacao/conciliar" replace />} />
+              <Route path="/conciliacao/bancos" element={<ProtectedRoute><BankRegistration /></ProtectedRoute>} />
+              <Route path="/conciliacao/conciliar" element={<ProtectedRoute><BankReconciliation /></ProtectedRoute>} />
               <Route path="/auditoria" element={<ProtectedRoute><AuditPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
