@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOfxImport, EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
 import { pickAutoLinkable } from '@/lib/ofxMatch';
 import OfxRulesPanel, { OptionList } from '@/components/ofx/OfxRulesPanel';
+import OfxPeriodReport from '@/components/ofx/OfxPeriodReport';
 import { todayLocalISO } from '@/lib/utils';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
