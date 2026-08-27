@@ -28,7 +28,7 @@ export default function Transactions() {
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
 
   const appliedFilters = { ...filters, search: search || undefined };
-  const { data, loading, totals, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
+  const { data, loading, totals, listComplete, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
   const { toast } = useToast();
   const history = useDeleteHistory();
 
