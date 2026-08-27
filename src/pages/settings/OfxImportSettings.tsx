@@ -325,6 +325,15 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         </Alert>
       )}
 
+      {accountId && (
+        <OfxPeriodReport
+          entries={entries}
+          accountName={account?.name ?? 'Conta'}
+          from={from}
+          to={to}
+        />
+      )}
+
       <Card className="shadow-card rounded-2xl border-border">
         <CardHeader className="space-y-3">
           <CardTitle className="text-sm font-heading">Linhas do extrato</CardTitle>
