@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target, ClipboardCheck } from 'lucide-react';
+import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target, ClipboardCheck, Landmark } from 'lucide-react';
 import UnitsSettings from './settings/UnitsSettings';
 import FrontsSettings from './settings/FrontsSettings';
 import AccountsSettings from './settings/AccountsSettings';
@@ -9,11 +9,13 @@ import CategoriesSettings from './settings/CategoriesSettings';
 import PartnersSettings from './settings/PartnersSettings';
 import DreSettings from './settings/DreSettings';
 import ImportExportSettings from './settings/ImportExportSettings';
+import OfxImportSettings from './settings/OfxImportSettings';
 import UsersSettings from './settings/UsersSettings';
 import AuditSettings from './settings/AuditSettings';
 import BudgetSettings from './settings/BudgetSettings';
 import DataQualitySettings from './settings/DataQualitySettings';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
+
 
 const baseSections = [
   { key: 'units', title: 'Unidades', desc: 'Let\'s Café, Boulevard, Fábrica...', icon: Building2 },
