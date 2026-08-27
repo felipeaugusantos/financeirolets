@@ -33,7 +33,15 @@ const fields: FieldConfig[] = [
     type: 'date',
     hint: 'Dia em que esse saldo foi apurado no extrato. Só movimentos posteriores a esta data são somados ao saldo — alterá-la muda o saldo exibido em todos os relatórios.',
   },
+  {
+    name: 'ofx_acctid',
+    label: 'Nº da conta no OFX (ACCTID)',
+    placeholder: 'Preenchido automaticamente na 1ª importação',
+    hint: 'Usado para conferir se o arquivo OFX importado pertence mesmo a esta conta.',
+  },
+  { name: 'ofx_bankid', label: 'Código do banco no OFX (BANKID)', placeholder: 'Ex: 237 (Bradesco)' },
 ];
+
 
 export default function AccountsSettings({ onBack }: { onBack: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('accounts');
