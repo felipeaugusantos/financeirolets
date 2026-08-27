@@ -473,7 +473,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
                 {e.status !== 'pendente' && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">{e.match_note || '—'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {e.ignore_reason ? `Justificativa: ${e.ignore_reason}` : (e.match_note || '—')}
+                      {e.decided_at && ` · ${new Date(e.decided_at).toLocaleString('pt-BR')}`}
+                    </p>
                     <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-8" onClick={() => unlinkEntry(e.id)}>
                       <Link2Off className="h-3.5 w-3.5" /> Reabrir
                     </Button>
@@ -486,6 +489,48 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       </Card>
 
       <OfxRulesPanel rules={rules} options={options} onChanged={reloadRules} />
+
+      <Dialog open={ignoreOpen} onOpenChange={o => { setIgnoreOpen(o); if (!o) setIgnoreReason(''); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-heading">Ignorar {selectedItems.length} linha(s)</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-xl bg-muted/40 p-3 text-xs space-y-1 max-h-40 overflow-auto">
+              {selectedItems.slice(0, 8).map(v => (
+                <p key={v.entry.id} className="truncate">
+                  {br(v.entry.posted_at)} · {brl(v.entry.amount)} · {v.entry.memo}
+                </p>
+              ))}
+              {selectedItems.length > 8 && <p>... e mais {selectedItems.length - 8}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Justificativa (obrigatória)</Label>
+              <Textarea
+                value={ignoreReason}
+                onChange={ev => setIgnoreReason(ev.target.value)}
+                placeholder="Ex.: transferência entre contas próprias, já registrada na conta de destino."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                A mesma justificativa é gravada em cada linha, junto com seu usuário e a data/hora.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['Transferência entre contas próprias', 'Estorno/duplicidade do banco', 'Movimento não financeiro'].map(s => (
+                <Button key={s} size="sm" variant="outline" className="rounded-xl h-7 text-xs" onClick={() => setIgnoreReason(s)}>
+                  {s}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIgnoreOpen(false)}>Cancelar</Button>
+            <Button onClick={runIgnoreSelected} disabled={!ignoreReason.trim() || batchRunning}>
+              Ignorar com justificativa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={!!createFor} onOpenChange={o => !o && setCreateFor(null)}>
         <DialogContent className="max-w-md">
