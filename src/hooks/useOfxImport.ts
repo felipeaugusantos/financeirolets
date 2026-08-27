@@ -94,7 +94,11 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       toast({ title: 'Erro ao carregar extrato', description: entriesRes.error.message, variant: 'destructive' });
     }
     setEntries((entriesRes.data ?? []) as StatementEntry[]);
-    setCandidates((txRes.data ?? []) as unknown as CandidateTransaction[]);
+    setCandidates(((txRes.data ?? []) as any[]).map(t => ({
+      ...t,
+      partner_name: t.partner?.name ?? null,
+    })) as CandidateTransaction[]);
+
     setLoading(false);
   }, [accountId, from, to, toast]);
 
