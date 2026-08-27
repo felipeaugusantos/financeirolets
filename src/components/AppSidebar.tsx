@@ -94,7 +94,8 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
+
+
 
               <Collapsible defaultOpen={reconciliationActive} className="group/collapsible">
                 <SidebarMenuItem>
