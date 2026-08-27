@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle, Zap, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOfxImport, EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
+import { pickAutoLinkable } from '@/lib/ofxMatch';
 import OfxRulesPanel, { OptionList } from '@/components/ofx/OfxRulesPanel';
 import { todayLocalISO } from '@/lib/utils';
 
@@ -29,6 +32,15 @@ const confidenceStyle: Record<string, string> = {
   baixa: 'bg-muted text-muted-foreground border-border',
 };
 
+const basisLabel: Record<string, string> = {
+  exato: 'valor exato',
+  liquido: 'líquido/impostos',
+  taxa: 'taxa de adquirente',
+  juros: 'juros ou multa',
+  aproximado: 'arredondamento',
+  bruto: 'valor bruto',
+};
+
 export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,11 +53,16 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
   const [createFor, setCreateFor] = useState<EnrichedEntry | null>(null);
   const [createForm, setCreateForm] = useState<any>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ignoreOpen, setIgnoreOpen] = useState(false);
+  const [ignoreReason, setIgnoreReason] = useState('');
 
   const {
-    enriched, rules, loading, importing, lastImport, stats,
-    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry, reloadRules,
+    enriched, rules, loading, importing, batchRunning, lastImport, stats,
+    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    linkMany, ignoreMany, createMany, reloadRules,
   } = useOfxImport(accountId || null, from, to);
+
 
   useEffect(() => {
     (async () => {
