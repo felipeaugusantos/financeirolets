@@ -96,7 +96,9 @@ export interface TransactionInput {
 export function useTransactions(filters: TransactionFilters = {}) {
   const [data, setData] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totals, setTotals] = useState({ receitas: 0, despesas: 0, saldo: 0 });
+  const [totals, setTotals] = useState<Totals>(EMPTY_TOTALS);
+  /** false quando a lista exibida é apenas a primeira página do resultado. */
+  const [listComplete, setListComplete] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
 
