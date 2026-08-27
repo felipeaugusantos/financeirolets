@@ -83,7 +83,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         .limit(2000),
       supabase
         .from('transactions')
-        .select('id, type, description, amount, net_amount, competence_date, due_date, payment_date, status, account_id, category_id, unit_id')
+        .select('id, type, description, amount, net_amount, tax_amount, competence_date, due_date, payment_date, status, account_id, category_id, unit_id, partner_id, partner:partners(name)')
         .gte('competence_date', pad(from, -35))
         .lte('competence_date', pad(to, 35))
         .neq('status', 'cancelado')
