@@ -3,6 +3,7 @@ import { todayLocalISO, toLocalISODate } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { EMPTY_TOTALS, PAGE_SIZE, sumAllPages, sumTotals, Totals } from '@/lib/transactionTotals';
 
 export interface TransactionRow {
   id: string;
