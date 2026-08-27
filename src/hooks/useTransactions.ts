@@ -150,13 +150,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
           unit:units(name),
           front:business_fronts(name)
         `)
-    ).order('competence_date', { ascending: false }).range(0, PAGE_SIZE - 1);
+    )
+      .order('competence_date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(0, PAGE_SIZE - 1);
 
     // 2) Totais — agregação de TODAS as linhas do filtro, em páginas.
+    // A ordenação precisa ser ESTÁVEL (id como desempate): sem isso, linhas com
+    // a mesma data trocam de lugar entre uma página e outra, e a soma duplica
+    // ou perde lançamentos nas bordas.
     const totalsPromise = sumAllPages(async (fromIdx, toIdx) => {
       const { data: rows, error } = await applyFilters(
-        supabase.from('transactions').select('type, net_amount, status')
-      ).order('competence_date', { ascending: false }).range(fromIdx, toIdx);
+        supabase.from('transactions').select('id, type, net_amount, status')
+      )
+        .order('competence_date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(fromIdx, toIdx);
       if (error) throw error;
       return (rows ?? []) as any[];
     });

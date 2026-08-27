@@ -36,6 +36,16 @@ describe('totais de lançamentos', () => {
     expect(t.truncated).toBe(false);
   });
 
+  it('não soma duas vezes uma linha repetida entre páginas', async () => {
+    const mk = (i: number) => ({ id: `id-${i}`, type: 'receita', net_amount: 10, status: 'pago' });
+    const page0 = Array.from({ length: PAGE_SIZE }, (_, i) => mk(i));
+    // A última linha da página 0 reaparece no topo da página 1 (ordem instável).
+    const page1 = [mk(PAGE_SIZE - 1), mk(PAGE_SIZE), mk(PAGE_SIZE + 1)];
+    const t = await sumAllPages(async from => (from === 0 ? page0 : page1));
+    expect(t.count).toBe(PAGE_SIZE + 2);
+    expect(t.receitas).toBe((PAGE_SIZE + 2) * 10);
+  });
+
   it('para exatamente no fim quando o total é múltiplo da página', async () => {
     const all = Array.from({ length: PAGE_SIZE * 2 }, () => row('despesa', 1));
     const t = await sumAllPages(async (from, to) => all.slice(from, to + 1));
