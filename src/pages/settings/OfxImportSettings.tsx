@@ -325,9 +325,74 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       )}
 
       <Card className="shadow-card rounded-2xl border-border">
-        <CardHeader>
+        <CardHeader className="space-y-3">
           <CardTitle className="text-sm font-heading">Linhas do extrato</CardTitle>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 rounded-xl h-8"
+              disabled={selectableIds.length === 0}
+              onClick={toggleAll}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              {allVisibleSelected ? 'Limpar seleção' : `Selecionar pendentes (${selectableIds.length})`}
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              className="gap-1.5 rounded-xl h-8"
+              disabled={autoLinkable.length === 0 || batchRunning}
+              onClick={runAutoLink}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Vincular automático ({autoLinkable.length})
+            </Button>
+
+            {selectedItems.length > 0 && (
+              <>
+                <Badge variant="outline" className="text-[11px]">{selectedItems.length} selecionada(s)</Badge>
+                <Button
+                  size="sm"
+                  className="gap-1.5 rounded-xl h-8"
+                  disabled={selectedWithSuggestion.length === 0 || batchRunning}
+                  onClick={runLinkSelected}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Vincular à melhor sugestão ({selectedWithSuggestion.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 rounded-xl h-8"
+                  disabled={batchRunning}
+                  onClick={runCreateSelected}
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Criar lançamentos
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 rounded-xl h-8"
+                  disabled={batchRunning}
+                  onClick={() => setIgnoreOpen(true)}
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Ignorar selecionadas
+                </Button>
+              </>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            "Vincular automático" só usa linhas de confiança alta, com um único candidato e sem disputa pelo mesmo
+            lançamento. Ignorar em lote exige justificativa, gravada em cada linha com autor e data.
+          </p>
         </CardHeader>
+
         <CardContent className="space-y-3">
           {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
           {!loading && visible.length === 0 && (
