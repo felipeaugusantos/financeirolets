@@ -3,6 +3,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { BottomTabs } from '@/components/BottomTabs';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { APP_VERSION, IS_HOMOLOG } from '@/lib/appEnv';
 
 interface AppLayoutProps {
   children: React.ReactNode;
