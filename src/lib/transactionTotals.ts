@@ -15,6 +15,7 @@ export const PAGE_SIZE = 1000;
 export const MAX_PAGES = 100;
 
 export interface TotalsRow {
+  id?: string;
   type: 'receita' | 'despesa' | string;
   net_amount: number | string | null;
   status?: string | null;
