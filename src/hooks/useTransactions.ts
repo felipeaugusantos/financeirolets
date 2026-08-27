@@ -100,20 +100,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    let query = supabase
-      .from('transactions')
-      .select(`
-        *,
-        category:categories(name, type),
-        account:accounts(name),
-        partner:partners(name),
-        unit:units(name),
-        front:business_fronts(name)
-      `)
-      .order('competence_date', { ascending: false });
-
+  /** Aplica exatamente os mesmos filtros na listagem e na agregação de totais. */
+  const applyFilters = useCallback((q: any) => {
+    let query = q;
     if (filters.type) query = query.eq('type', filters.type as any);
     if (filters.status) query = query.eq('status', filters.status as any);
     if (filters.category_id) query = filters.category_id === '__null__' ? query.is('category_id', null) : query.eq('category_id', filters.category_id);
