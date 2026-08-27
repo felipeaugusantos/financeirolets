@@ -441,5 +441,5 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return count;
   };
 
-  return { data, loading, totals, fetchData, create, update, remove, restore, markAs, generateRecurring };
+  return { data, loading, totals, listComplete, fetchData, create, update, remove, restore, markAs, generateRecurring };
 }
