@@ -25,10 +25,22 @@ export function AppLayout({ children }: AppLayoutProps) {
               <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
             )}
             <h2 className="font-heading text-base font-semibold text-card-foreground">Let's Finance</h2>
-            <div className="ml-auto">
+            {IS_HOMOLOG && (
+              <span className="rounded-full bg-warning/15 text-warning px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                Homologação
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-3">
+              <span className="hidden sm:inline text-[10px] text-muted-foreground">v{APP_VERSION}</span>
               <ThemeToggle />
             </div>
           </header>
+
+          {IS_HOMOLOG && (
+            <div className="bg-warning/10 border-b border-warning/40 px-4 py-1.5 text-center text-[11px] text-warning">
+              Ambiente de homologação com dados fictícios — nada aqui afeta o financeiro real do cliente.
+            </div>
+          )}
 
           {/* Main content */}
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-auto min-w-0">
