@@ -43,16 +43,19 @@ const fields: FieldConfig[] = [
 ];
 
 
-export default function AccountsSettings({ onBack }: { onBack: () => void }) {
+export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('accounts');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
-        <ArrowLeft className="h-4 w-4" /> Voltar
-      </Button>
+      {onBack && (
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
+      )}
+
       <CrudTable
         title="Contas Financeiras"
         columns={columns}
