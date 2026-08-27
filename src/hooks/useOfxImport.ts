@@ -199,38 +199,49 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     }
   }, [load, toast, user]);
 
-  const linkEntry = useCallback(async (entryId: string, transactionId: string, note?: string) => {
+  /** Campos de rastreabilidade gravados em toda decisão (individual ou em lote). */
+  const decisionStamp = useCallback(() => ({
+    decided_by: user?.id ?? null,
+    decided_at: new Date().toISOString(),
+  }), [user]);
+
+  const updateEntry = useCallback(async (entryId: string, patch: Record<string, unknown>) => {
     const { error } = await (supabase as any)
       .from('bank_statement_entries')
-      .update({ transaction_id: transactionId, status: 'vinculado', match_note: note ?? null })
+      .update(patch)
       .eq('id', entryId);
-    if (error) { toast({ title: 'Erro ao vincular', description: error.message, variant: 'destructive' }); return false; }
+    return error?.message ?? null;
+  }, []);
+
+  const linkEntry = useCallback(async (entryId: string, transactionId: string, note?: string) => {
+    const err = await updateEntry(entryId, {
+      transaction_id: transactionId, status: 'vinculado', match_note: note ?? null, ...decisionStamp(),
+    });
+    if (err) { toast({ title: 'Erro ao vincular', description: err, variant: 'destructive' }); return false; }
     await load();
     return true;
-  }, [load, toast]);
+  }, [updateEntry, decisionStamp, load, toast]);
 
   const unlinkEntry = useCallback(async (entryId: string) => {
-    const { error } = await (supabase as any)
-      .from('bank_statement_entries')
-      .update({ transaction_id: null, status: 'pendente', match_note: null })
-      .eq('id', entryId);
-    if (error) { toast({ title: 'Erro ao desvincular', description: error.message, variant: 'destructive' }); return false; }
+    const err = await updateEntry(entryId, {
+      transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
+    });
+    if (err) { toast({ title: 'Erro ao desvincular', description: err, variant: 'destructive' }); return false; }
     await load();
     return true;
-  }, [load, toast]);
+  }, [updateEntry, decisionStamp, load, toast]);
 
   const ignoreEntry = useCallback(async (entryId: string, note: string) => {
-    const { error } = await (supabase as any)
-      .from('bank_statement_entries')
-      .update({ status: 'ignorado', match_note: note })
-      .eq('id', entryId);
-    if (error) { toast({ title: 'Erro ao ignorar', description: error.message, variant: 'destructive' }); return false; }
+    const err = await updateEntry(entryId, {
+      status: 'ignorado', match_note: note, ignore_reason: note, ...decisionStamp(),
+    });
+    if (err) { toast({ title: 'Erro ao ignorar', description: err, variant: 'destructive' }); return false; }
     await load();
     return true;
-  }, [load, toast]);
+  }, [updateEntry, decisionStamp, load, toast]);
 
-  /** Cria o lançamento a partir da linha do extrato e já o vincula. */
-  const createFromEntry = useCallback(async (
+  /** Cria o lançamento correspondente a uma linha. Não recarrega nem vincula. */
+  const insertTransactionFor = useCallback(async (
     entry: StatementEntry,
     patch: {
       description: string;
@@ -239,7 +250,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       front_id: string | null;
       partner_id: string | null;
     }
-  ) => {
+  ): Promise<{ id: string } | { error: string }> => {
     const amount = Math.abs(entry.amount);
     const type = entry.amount >= 0 ? 'receita' : 'despesa';
     const { data: created, error } = await supabase
@@ -264,13 +275,84 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       })
       .select('id')
       .single();
+    if (error || !created) return { error: error?.message ?? 'Falha ao criar lançamento' };
+    return { id: created.id };
+  }, [user]);
 
-    if (error || !created) {
-      toast({ title: 'Erro ao criar lançamento', description: error?.message, variant: 'destructive' });
+  /** Cria o lançamento a partir da linha do extrato e já o vincula. */
+  const createFromEntry = useCallback(async (
+    entry: StatementEntry,
+    patch: Parameters<typeof insertTransactionFor>[1]
+  ) => {
+    const res = await insertTransactionFor(entry, patch);
+    if ('error' in res) {
+      toast({ title: 'Erro ao criar lançamento', description: res.error, variant: 'destructive' });
       return false;
     }
-    return linkEntry(entry.id, created.id, 'Criado a partir do extrato');
-  }, [linkEntry, toast, user]);
+    return linkEntry(entry.id, res.id, 'Criado a partir do extrato');
+  }, [insertTransactionFor, linkEntry, toast]);
+
+  // -------------------------------------------------------------------------
+  // Ações em lote — um único recarregamento no fim, com resumo de erros.
+  // -------------------------------------------------------------------------
+
+  const [batchRunning, setBatchRunning] = useState(false);
+
+  const runBatch = useCallback(async (
+    label: string,
+    tasks: (() => Promise<string | null>)[]
+  ) => {
+    if (tasks.length === 0) return { ok: 0, failed: 0 };
+    setBatchRunning(true);
+    let ok = 0;
+    const failures: string[] = [];
+    for (const task of tasks) {
+      const err = await task();
+      if (err) failures.push(err); else ok++;
+    }
+    await load();
+    setBatchRunning(false);
+    toast({
+      title: `${label}: ${ok} linha(s)`,
+      description: failures.length ? `${failures.length} falha(s): ${failures[0]}` : undefined,
+      variant: failures.length ? 'destructive' : undefined,
+    });
+    return { ok, failed: failures.length };
+  }, [load, toast]);
+
+  /** Vincula várias linhas de uma vez aos lançamentos indicados. */
+  const linkMany = useCallback((pairs: { entryId: string; transactionId: string; note?: string }[]) =>
+    runBatch('Vinculadas', pairs.map(p => () => updateEntry(p.entryId, {
+      transaction_id: p.transactionId, status: 'vinculado', match_note: p.note ?? null, ...decisionStamp(),
+    })))
+  , [runBatch, updateEntry, decisionStamp]);
+
+  /**
+   * Ignora várias linhas com UMA justificativa obrigatória, gravada em cada
+   * linha (ignore_reason) junto com autor e data — a auditoria é preservada.
+   */
+  const ignoreMany = useCallback((entryIds: string[], reason: string) => {
+    const note = reason.trim();
+    if (!note) {
+      toast({ title: 'Informe a justificativa para ignorar', variant: 'destructive' });
+      return Promise.resolve({ ok: 0, failed: entryIds.length });
+    }
+    return runBatch('Ignoradas', entryIds.map(id => () => updateEntry(id, {
+      status: 'ignorado', match_note: note, ignore_reason: note, ...decisionStamp(),
+    })));
+  }, [runBatch, updateEntry, decisionStamp, toast]);
+
+  /** Cria e vincula um lançamento para cada linha selecionada. */
+  const createMany = useCallback((
+    items: { entry: StatementEntry; patch: Parameters<typeof insertTransactionFor>[1] }[]
+  ) => runBatch('Lançamentos criados', items.map(item => async () => {
+    const res = await insertTransactionFor(item.entry, item.patch);
+    if ('error' in res) return res.error;
+    return updateEntry(item.entry.id, {
+      transaction_id: res.id, status: 'vinculado',
+      match_note: 'Criado a partir do extrato (lote)', ...decisionStamp(),
+    });
+  })), [runBatch, insertTransactionFor, updateEntry, decisionStamp]);
 
   const stats = useMemo(() => {
     const pend = entries.filter(e => e.status === 'pendente');
@@ -287,7 +369,10 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   }, [entries]);
 
   return {
-    enriched, entries, rules, loading, importing, lastImport, stats,
-    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry, reload: load, reloadRules: loadRules,
+    enriched, entries, rules, loading, importing, batchRunning, lastImport, stats,
+    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    linkMany, ignoreMany, createMany,
+    reload: load, reloadRules: loadRules,
   };
 }
+
