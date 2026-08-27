@@ -56,7 +56,10 @@ export function AppSidebar() {
   const location = useLocation();
   const { signOut, user } = useAuth();
   const { isAdmin } = useCurrentUserRoles();
-  const items = isAdmin ? [...navItems, ...adminNavItems] : navItems;
+  const items = isAdmin ? [...navItems] : [...navItems];
+  const tailItems = isAdmin ? [settingsItem, ...adminNavItems] : [settingsItem];
+  const reconciliationActive = location.pathname.startsWith('/conciliacao');
+
 
   return (
     <Sidebar collapsible="icon">
