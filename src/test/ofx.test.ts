@@ -141,7 +141,7 @@ describe('vinculação em lote', () => {
   });
 });
 
-
+describe('regras por memo', () => {
   it('aplica a regra de maior prioridade e ignora regex inválida', () => {
     const rules: OfxRule[] = [
       { id: 'r0', pattern: '([', match_type: 'regex', applies_to: 'ambos', category_id: 'x', unit_id: null, front_id: null, partner_id: null, priority: 1, active: true },
@@ -152,3 +152,4 @@ describe('vinculação em lote', () => {
     expect(applyRules('PIX RECEBIDO IFOOD', -1500, rules)).toBeNull();
   });
 });
+
