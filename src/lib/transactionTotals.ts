@@ -69,11 +69,20 @@ export async function sumAllPages(
   fetchPage: (from: number, to: number) => Promise<TotalsRow[]>
 ): Promise<Totals> {
   const rows: TotalsRow[] = [];
+  // Rede de proteção: se a mesma linha reaparecer em duas páginas (ordenação
+  // instável no backend), ela é somada uma única vez.
+  const seen = new Set<string>();
   let page = 0;
   let truncated = false;
   for (;;) {
     const chunk = await fetchPage(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-    rows.push(...chunk);
+    for (const r of chunk) {
+      if (r.id) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+      }
+      rows.push(r);
+    }
     if (chunk.length < PAGE_SIZE) break;
     page++;
     if (page >= MAX_PAGES) { truncated = true; break; }
