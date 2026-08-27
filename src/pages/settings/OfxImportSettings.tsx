@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOfxImport, EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
 import { pickAutoLinkable } from '@/lib/ofxMatch';
 import OfxRulesPanel, { OptionList } from '@/components/ofx/OfxRulesPanel';
+import OfxPeriodReport from '@/components/ofx/OfxPeriodReport';
 import { todayLocalISO } from '@/lib/utils';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -58,7 +59,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [ignoreReason, setIgnoreReason] = useState('');
 
   const {
-    enriched, rules, loading, importing, batchRunning, lastImport, stats,
+    enriched, entries, rules, loading, importing, batchRunning, lastImport, stats,
     importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
     linkMany, ignoreMany, createMany, reloadRules,
   } = useOfxImport(accountId || null, from, to);
@@ -322,6 +323,15 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             Enquanto houver pendências, a conciliação bancária do período não pode ser considerada fechada.
           </AlertDescription>
         </Alert>
+      )}
+
+      {accountId && (
+        <OfxPeriodReport
+          entries={entries}
+          accountName={account?.name ?? 'Conta'}
+          from={from}
+          to={to}
+        />
       )}
 
       <Card className="shadow-card rounded-2xl border-border">
