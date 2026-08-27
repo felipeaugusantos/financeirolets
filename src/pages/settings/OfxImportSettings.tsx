@@ -29,7 +29,7 @@ const confidenceStyle: Record<string, string> = {
   baixa: 'bg-muted text-muted-foreground border-border',
 };
 
-export default function OfxImportSettings({ onBack }: { onBack: () => void }) {
+export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -125,12 +125,15 @@ export default function OfxImportSettings({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
-        <ArrowLeft className="h-4 w-4" /> Voltar
-      </Button>
+      {onBack && (
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
+      )}
 
       <div>
-        <h2 className="font-heading text-xl font-bold text-card-foreground">Importar extrato (OFX)</h2>
+        <h2 className="font-heading text-xl font-bold text-card-foreground">Conciliação bancária (OFX)</h2>
+
         <p className="text-sm text-muted-foreground">
           Bradesco e Stone. O extrato nunca cria lançamento sozinho — cada linha é vinculada, criada ou ignorada por você.
         </p>

@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target, ClipboardCheck, Landmark } from 'lucide-react';
+import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target, ClipboardCheck } from 'lucide-react';
 import UnitsSettings from './settings/UnitsSettings';
 import FrontsSettings from './settings/FrontsSettings';
 import AccountsSettings from './settings/AccountsSettings';
@@ -9,7 +9,6 @@ import CategoriesSettings from './settings/CategoriesSettings';
 import PartnersSettings from './settings/PartnersSettings';
 import DreSettings from './settings/DreSettings';
 import ImportExportSettings from './settings/ImportExportSettings';
-import OfxImportSettings from './settings/OfxImportSettings';
 import UsersSettings from './settings/UsersSettings';
 import AuditSettings from './settings/AuditSettings';
 import BudgetSettings from './settings/BudgetSettings';
@@ -26,7 +25,6 @@ const baseSections = [
   { key: 'budget', title: 'Orçamento', desc: 'Planejamento anual por linha do DRE', icon: Target },
   { key: 'partners', title: 'Parceiros', desc: 'Fornecedores, clientes e contatos', icon: Users },
   { key: 'export', title: 'Importar / Exportar', desc: 'CSV e backup de dados', icon: FileDown },
-  { key: 'ofx', title: 'Importar extrato (OFX)', desc: 'Bradesco e Stone com conciliação linha a linha', icon: Landmark },
   { key: 'quality', title: 'Conferência de lançamentos', desc: 'Duplicados, sem categoria, sem unidade...', icon: ClipboardCheck },
 ];
 
@@ -48,7 +46,6 @@ export default function SettingsPage() {
   if (active === 'budget') return <BudgetSettings onBack={() => setActive(null)} />;
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
   if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
-  if (active === 'ofx') return <OfxImportSettings onBack={() => setActive(null)} />;
   if (active === 'quality') return <DataQualitySettings onBack={() => setActive(null)} />;
 
   if (active === 'users') return <UsersSettings onBack={() => setActive(null)} />;
