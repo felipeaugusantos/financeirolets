@@ -92,6 +92,82 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     [enriched, statusFilter]
   );
 
+  // Só linhas pendentes entram em ação de lote.
+  const selectableIds = useMemo(
+    () => visible.filter(v => v.entry.status === 'pendente').map(v => v.entry.id),
+    [visible]
+  );
+  const selectedItems = useMemo(
+    () => visible.filter(v => selected.has(v.entry.id) && v.entry.status === 'pendente'),
+    [visible, selected]
+  );
+  const selectedWithSuggestion = useMemo(
+    () => selectedItems.filter(v => v.suggestions.length > 0),
+    [selectedItems]
+  );
+  /** Linhas pendentes que podem ser vinculadas sem ambiguidade. */
+  const autoLinkable = useMemo(
+    () => pickAutoLinkable(
+      enriched
+        .filter(v => v.entry.status === 'pendente')
+        .map(v => ({ key: v.entry.id, suggestions: v.suggestions }))
+    ),
+    [enriched]
+  );
+
+  const toggle = (id: string) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const allVisibleSelected = selectableIds.length > 0 && selectableIds.every(id => selected.has(id));
+  const toggleAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(selectableIds));
+
+  const clearSelection = () => setSelected(new Set());
+
+  const runAutoLink = async () => {
+    await linkMany(autoLinkable.map(a => ({
+      entryId: a.key, transactionId: a.transactionId, note: `Lote automático — ${a.reasons.join('; ')}`,
+    })));
+    clearSelection();
+  };
+
+  const runLinkSelected = async () => {
+    await linkMany(selectedWithSuggestion.map(v => ({
+      entryId: v.entry.id,
+      transactionId: v.suggestions[0].transaction.id,
+      note: `Lote manual — ${v.suggestions[0].reasons.join('; ')}`,
+    })));
+    clearSelection();
+  };
+
+  const runCreateSelected = async () => {
+    await createMany(selectedItems.map(v => ({
+      entry: v.entry as StatementEntry,
+      patch: {
+        description: v.entry.memo || 'Lançamento do extrato',
+        category_id: v.ruleCategoryId,
+        unit_id: v.ruleUnitId,
+        front_id: v.ruleFrontId,
+        partner_id: v.rulePartnerId,
+      },
+    })));
+    clearSelection();
+  };
+
+  const runIgnoreSelected = async () => {
+    const res = await ignoreMany(selectedItems.map(v => v.entry.id), ignoreReason);
+    if (res.ok > 0) {
+      setIgnoreOpen(false);
+      setIgnoreReason('');
+      clearSelection();
+    }
+  };
+
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !accountId) return;
