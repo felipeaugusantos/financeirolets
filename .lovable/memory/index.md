@@ -39,3 +39,5 @@ Updated: now
 - [Orçamento (Budgets)](mem://features/orcamento) — Planejamento anual por linha do DRE, integrado ao DRE como Orçado vs Realizado + Análise Vertical/Horizontal.
 - [Fluxo Projetado](mem://features/fluxo-projetado) — Tabs Realizado/Projetado/Comparativo no Fluxo de Caixa.
 - [Invariantes Financeiras](mem://features/invariantes-financeiras) — Rateio residual, filtro unidade×frente e bloco "fora do DRE".
+- [Importação OFX](mem://features/importacao-ofx) — Extratos Bradesco/Stone com FITID único, conciliação linha a linha e regras por memo.
+

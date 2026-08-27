@@ -22,6 +22,8 @@ export type Database = {
           initial_balance: number
           initial_balance_date: string | null
           name: string
+          ofx_acctid: string | null
+          ofx_bankid: string | null
           type: string
           updated_at: string
         }
@@ -32,6 +34,8 @@ export type Database = {
           initial_balance?: number
           initial_balance_date?: string | null
           name: string
+          ofx_acctid?: string | null
+          ofx_bankid?: string | null
           type?: string
           updated_at?: string
         }
@@ -42,6 +46,8 @@ export type Database = {
           initial_balance?: number
           initial_balance_date?: string | null
           name?: string
+          ofx_acctid?: string | null
+          ofx_bankid?: string | null
           type?: string
           updated_at?: string
         }
@@ -123,6 +129,78 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      bank_statement_entries: {
+        Row: {
+          account_id: string
+          amount: number
+          check_number: string | null
+          created_at: string
+          fitid: string
+          id: string
+          imported_by: string | null
+          match_note: string | null
+          memo: string | null
+          posted_at: string
+          raw: Json | null
+          source_file: string | null
+          status: string
+          transaction_id: string | null
+          trn_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          check_number?: string | null
+          created_at?: string
+          fitid: string
+          id?: string
+          imported_by?: string | null
+          match_note?: string | null
+          memo?: string | null
+          posted_at: string
+          raw?: Json | null
+          source_file?: string | null
+          status?: string
+          transaction_id?: string | null
+          trn_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          check_number?: string | null
+          created_at?: string
+          fitid?: string
+          id?: string
+          imported_by?: string | null
+          match_note?: string | null
+          memo?: string | null
+          posted_at?: string
+          raw?: Json | null
+          source_file?: string | null
+          status?: string
+          transaction_id?: string | null
+          trn_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_statement_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_entries_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       budgets: {
         Row: {
@@ -296,6 +374,83 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "dre_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ofx_import_rules: {
+        Row: {
+          active: boolean
+          applies_to: string
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          front_id: string | null
+          id: string
+          match_type: string
+          partner_id: string | null
+          pattern: string
+          priority: number
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          applies_to?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          front_id?: string | null
+          id?: string
+          match_type?: string
+          partner_id?: string | null
+          pattern: string
+          priority?: number
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          applies_to?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          front_id?: string | null
+          id?: string
+          match_type?: string
+          partner_id?: string | null
+          pattern?: string
+          priority?: number
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofx_import_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofx_import_rules_front_id_fkey"
+            columns: ["front_id"]
+            isOneToOne: false
+            referencedRelation: "business_fronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofx_import_rules_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofx_import_rules_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
             referencedColumns: ["id"]
           },
         ]
