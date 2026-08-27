@@ -48,7 +48,9 @@ export default function SettingsPage() {
   if (active === 'budget') return <BudgetSettings onBack={() => setActive(null)} />;
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
   if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
+  if (active === 'ofx') return <OfxImportSettings onBack={() => setActive(null)} />;
   if (active === 'quality') return <DataQualitySettings onBack={() => setActive(null)} />;
+
   if (active === 'users') return <UsersSettings onBack={() => setActive(null)} />;
   if (active === 'audit') return <AuditSettings onBack={() => setActive(null)} />;
 
