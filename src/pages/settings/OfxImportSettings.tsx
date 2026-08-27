@@ -59,7 +59,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [ignoreReason, setIgnoreReason] = useState('');
 
   const {
-    enriched, rules, loading, importing, batchRunning, lastImport, stats,
+    enriched, entries, rules, loading, importing, batchRunning, lastImport, stats,
     importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
     linkMany, ignoreMany, createMany, reloadRules,
   } = useOfxImport(accountId || null, from, to);
