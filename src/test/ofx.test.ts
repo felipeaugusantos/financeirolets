@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseOfx, parseOfxAmount, parseOfxDate } from '@/lib/ofx';
-import { applyRules, suggestMatches, CandidateTransaction, OfxRule } from '@/lib/ofxMatch';
+import {
+  applyRules, pickAutoLinkable, suggestMatches, textSimilarity,
+  CandidateTransaction, OfxRule,
+} from '@/lib/ofxMatch';
+
 
 const SGML = `OFXHEADER:100
 DATA:OFXSGML
