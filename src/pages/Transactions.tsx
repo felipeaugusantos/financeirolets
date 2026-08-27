@@ -170,6 +170,17 @@ export default function Transactions() {
         ))}
       </div>
 
+      {!listComplete && (
+        <Alert variant="default" className="border-warning/50 bg-warning/5">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-xs text-warning">
+            A lista mostra as {data.length} linhas mais recentes do filtro, mas os cartões acima somam
+            todos os {totals.count} lançamentos do período. Refine o filtro (ex.: "De" e "Até" no mesmo mês)
+            para ver linha a linha.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Incomplete data alerts */}
       {(incompleteStats.noCategory > 0 || incompleteStats.noUnit > 0) && (
         <Alert variant="default" className="border-warning/50 bg-warning/5">
