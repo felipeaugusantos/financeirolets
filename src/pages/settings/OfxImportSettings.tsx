@@ -447,7 +447,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className={`text-[10px] ${confidenceStyle[s.confidence]}`}>
-                                confiança {s.confidence}
+                                {basisLabel[s.basis] ?? s.basis} · confiança {s.confidence}
                               </Badge>
                               <Button size="sm" className="gap-1.5 rounded-xl h-8" onClick={() => linkEntry(e.id, s.transaction.id, s.reasons.join('; '))}>
                                 <Link2 className="h-3.5 w-3.5" /> Vincular
@@ -457,8 +457,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">Nenhum lançamento compatível encontrado na janela de 5 dias.</p>
+                      <p className="text-xs text-muted-foreground">Nenhum lançamento compatível encontrado na janela de 7 dias, nem considerando taxas ou juros.</p>
                     )}
+
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button size="sm" variant="outline" className="gap-1.5 rounded-xl h-8" onClick={() => openCreate(item)}>
                         <PlusCircle className="h-3.5 w-3.5" /> Criar lançamento
