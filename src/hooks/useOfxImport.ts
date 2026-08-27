@@ -19,7 +19,11 @@ export interface StatementEntry extends StatementLine {
   transaction_id: string | null;
   match_note: string | null;
   source_file: string | null;
+  ignore_reason?: string | null;
+  decided_at?: string | null;
+  decided_by?: string | null;
 }
+
 
 export interface ImportSummary {
   fileName: string;
