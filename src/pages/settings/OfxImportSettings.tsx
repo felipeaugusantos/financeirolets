@@ -403,11 +403,21 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             return (
               <div key={e.id} className="rounded-2xl border border-border p-3 space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{e.memo || '(sem descrição)'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {br(e.posted_at)} · {e.trn_type} · FITID {e.fitid}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-2">
+                    {e.status === 'pendente' && (
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={selected.has(e.id)}
+                        onCheckedChange={() => toggle(e.id)}
+                        aria-label={`Selecionar linha de ${br(e.posted_at)}`}
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{e.memo || '(sem descrição)'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {br(e.posted_at)} · {e.trn_type} · FITID {e.fitid}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-heading font-bold ${e.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
@@ -416,6 +426,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                     <Badge variant="outline" className="text-[10px] capitalize">{e.status}</Badge>
                   </div>
                 </div>
+
 
                 {item.ruleLabel && e.status === 'pendente' && (
                   <p className="text-xs text-accent">Regra "{item.ruleLabel}" aplicada — sugestão preenchida ao criar.</p>
