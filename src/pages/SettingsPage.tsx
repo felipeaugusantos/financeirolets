@@ -26,8 +26,10 @@ const baseSections = [
   { key: 'budget', title: 'Orçamento', desc: 'Planejamento anual por linha do DRE', icon: Target },
   { key: 'partners', title: 'Parceiros', desc: 'Fornecedores, clientes e contatos', icon: Users },
   { key: 'export', title: 'Importar / Exportar', desc: 'CSV e backup de dados', icon: FileDown },
+  { key: 'ofx', title: 'Importar extrato (OFX)', desc: 'Bradesco e Stone com conciliação linha a linha', icon: Landmark },
   { key: 'quality', title: 'Conferência de lançamentos', desc: 'Duplicados, sem categoria, sem unidade...', icon: ClipboardCheck },
 ];
+
 
 const adminSections = [
   { key: 'users', title: 'Usuários e Permissões', desc: 'Atribuir perfis e unidades', icon: Shield },
