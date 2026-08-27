@@ -28,7 +28,7 @@ export default function Transactions() {
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
 
   const appliedFilters = { ...filters, search: search || undefined };
-  const { data, loading, totals, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
+  const { data, loading, totals, listComplete, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
   const { toast } = useToast();
   const history = useDeleteHistory();
 
@@ -169,6 +169,17 @@ export default function Transactions() {
           </Card>
         ))}
       </div>
+
+      {!listComplete && (
+        <Alert variant="default" className="border-warning/50 bg-warning/5">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-xs text-warning">
+            A lista mostra as {data.length} linhas mais recentes do filtro, mas os cartões acima somam
+            todos os {totals.count} lançamentos do período. Refine o filtro (ex.: "De" e "Até" no mesmo mês)
+            para ver linha a linha.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Incomplete data alerts */}
       {(incompleteStats.noCategory > 0 || incompleteStats.noUnit > 0) && (

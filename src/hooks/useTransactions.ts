@@ -3,6 +3,7 @@ import { todayLocalISO, toLocalISODate } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { EMPTY_TOTALS, PAGE_SIZE, sumAllPages, sumTotals, Totals } from '@/lib/transactionTotals';
 
 export interface TransactionRow {
   id: string;
@@ -96,24 +97,15 @@ export interface TransactionInput {
 export function useTransactions(filters: TransactionFilters = {}) {
   const [data, setData] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totals, setTotals] = useState({ receitas: 0, despesas: 0, saldo: 0 });
+  const [totals, setTotals] = useState<Totals>(EMPTY_TOTALS);
+  /** false quando a lista exibida é apenas a primeira página do resultado. */
+  const [listComplete, setListComplete] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    let query = supabase
-      .from('transactions')
-      .select(`
-        *,
-        category:categories(name, type),
-        account:accounts(name),
-        partner:partners(name),
-        unit:units(name),
-        front:business_fronts(name)
-      `)
-      .order('competence_date', { ascending: false });
-
+  /** Aplica exatamente os mesmos filtros na listagem e na agregação de totais. */
+  const applyFilters = useCallback((q: any) => {
+    let query = q;
     if (filters.type) query = query.eq('type', filters.type as any);
     if (filters.status) query = query.eq('status', filters.status as any);
     if (filters.category_id) query = filters.category_id === '__null__' ? query.is('category_id', null) : query.eq('category_id', filters.category_id);
@@ -140,19 +132,57 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
     }
 
-    const { data: rows, error } = await query;
-    if (error) {
-      toast({ title: 'Erro ao carregar lançamentos', description: error.message, variant: 'destructive' });
+    return query;
+  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+
+    // 1) Lista exibida — limitada a uma página do backend.
+    const listQuery = applyFilters(
+      supabase
+        .from('transactions')
+        .select(`
+          *,
+          category:categories(name, type),
+          account:accounts(name),
+          partner:partners(name),
+          unit:units(name),
+          front:business_fronts(name)
+        `)
+    ).order('competence_date', { ascending: false }).range(0, PAGE_SIZE - 1);
+
+    // 2) Totais — agregação de TODAS as linhas do filtro, em páginas.
+    const totalsPromise = sumAllPages(async (fromIdx, toIdx) => {
+      const { data: rows, error } = await applyFilters(
+        supabase.from('transactions').select('type, net_amount, status')
+      ).order('competence_date', { ascending: false }).range(fromIdx, toIdx);
+      if (error) throw error;
+      return (rows ?? []) as any[];
+    });
+
+    const [listRes, aggregated] = await Promise.all([
+      listQuery,
+      totalsPromise.catch((err: any) => {
+        toast({ title: 'Erro ao somar os totais', description: err.message, variant: 'destructive' });
+        return null;
+      }),
+    ]);
+
+    if (listRes.error) {
+      toast({ title: 'Erro ao carregar lançamentos', description: listRes.error.message, variant: 'destructive' });
       setData([]);
+      setTotals(EMPTY_TOTALS);
+      setListComplete(true);
     } else {
-      const typed = (rows ?? []) as unknown as TransactionRow[];
+      const typed = (listRes.data ?? []) as unknown as TransactionRow[];
       setData(typed);
-      const receitas = typed.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
-      const despesas = typed.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.net_amount), 0);
-      setTotals({ receitas, despesas, saldo: receitas - despesas });
+      const complete = typed.length < PAGE_SIZE;
+      setListComplete(complete);
+      setTotals(aggregated ?? sumTotals(typed as any));
     }
     setLoading(false);
-  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
+  }, [applyFilters, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -348,13 +378,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     } catch (e) {
       console.warn('Audit log failed', e);
     }
-    // Recalculate totals from current state
-    setData(prev => {
-      const receitas = prev.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.net_amount), 0);
-      const despesas = prev.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.net_amount), 0);
-      setTotals({ receitas, despesas, saldo: receitas - despesas });
-      return prev;
-    });
+    // Totais vêm sempre da agregação no banco — nunca das linhas em memória.
+    await fetchData();
     return { row: rowFull, allocations: allocs ?? [] };
   };
 
@@ -411,5 +436,5 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return count;
   };
 
-  return { data, loading, totals, fetchData, create, update, remove, restore, markAs, generateRecurring };
+  return { data, loading, totals, listComplete, fetchData, create, update, remove, restore, markAs, generateRecurring };
 }
