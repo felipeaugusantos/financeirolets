@@ -29,7 +29,7 @@ const confidenceStyle: Record<string, string> = {
   baixa: 'bg-muted text-muted-foreground border-border',
 };
 
-export default function OfxImportSettings({ onBack }: { onBack: () => void }) {
+export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
