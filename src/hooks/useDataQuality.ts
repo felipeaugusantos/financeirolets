@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { transactionFingerprint } from '@/lib/finance';
+import {
+  transactionFingerprint,
+  buildAllocationMap,
+  allocationValue,
+  txValue,
+  CENT_TOLERANCE,
+} from '@/lib/finance';
 import { looksLikeTest, looksLikeTransfer } from '@/lib/reviewSuggestions';
 
 export interface QualityTx {
@@ -42,6 +48,14 @@ export interface DreLineIssue {
 
 export interface LookupItem { id: string; name: string }
 
+export interface AllocationIssue {
+  tx: QualityTx;
+  /** Quanto do lançamento ficou sem destino (sobra que cai em "Sem unidade"). */
+  residual: number;
+  /** Quanto foi efetivamente distribuído pelas linhas de rateio. */
+  allocated: number;
+}
+
 export interface OrphanCategoryGroup {
   categoryId: string;
   categoryName: string;
@@ -66,6 +80,9 @@ export interface DataQualityResult {
   transfersInDre: QualityTx[];
   /** Lançamentos em categorias sem linha de DRE, agrupados por categoria. */
   orphanCategoryGroups: OrphanCategoryGroup[];
+  /** Rateios que não fecham com o valor do lançamento (sobra vai para "Sem unidade"). */
+  allocationIssues: AllocationIssue[];
+  fronts: LookupItem[];
   categories: (LookupItem & { type: string; dre_line_id: string | null; active: boolean })[];
   units: LookupItem[];
   accounts: LookupItem[];
@@ -91,6 +108,8 @@ const empty: DataQualityResult = {
   testSuspects: [],
   transfersInDre: [],
   orphanCategoryGroups: [],
+  allocationIssues: [],
+  fronts: [],
   categories: [],
   units: [],
   accounts: [],
@@ -128,13 +147,17 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         { data: dreLines },
         { data: unitRows },
         { data: accountRows },
+        { data: frontRows },
       ] = await Promise.all([
         q,
-        supabase.from('transaction_allocations').select('transaction_id, unit_id'),
+        supabase
+          .from('transaction_allocations')
+          .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount'),
         supabase.from('categories').select('id, name, type, dre_line_id, active'),
         supabase.from('dre_lines').select('id, name').eq('active', true),
         supabase.from('units').select('id, name').order('name'),
         supabase.from('accounts').select('id, name').order('name'),
+        supabase.from('business_fronts').select('id, name').eq('active', true).order('name'),
       ]);
       if (error) throw error;
 
@@ -195,6 +218,21 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         }))
         .sort((a, b) => b.items.length - a.items.length);
 
+      // Rateios que não fecham com o valor do lançamento
+      const allocMap = buildAllocationMap((allocs ?? []) as any);
+      const allocationIssues: AllocationIssue[] = [];
+      active.forEach((t) => {
+        const lines = allocMap.get(t.id);
+        if (!lines || lines.length === 0) return;
+        const total = txValue(t);
+        const allocated = lines.reduce((s, a) => s + allocationValue(a, total), 0);
+        const residual = total - allocated;
+        if (Math.abs(residual) > CENT_TOLERANCE) {
+          allocationIssues.push({ tx: t, residual, allocated });
+        }
+      });
+      allocationIssues.sort((a, b) => Math.abs(b.residual) - Math.abs(a.residual));
+
       // Categorias
       const usage = new Map<string, number>();
       rows.forEach((t) => {
@@ -237,6 +275,8 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         testSuspects,
         transfersInDre,
         orphanCategoryGroups,
+        allocationIssues,
+        fronts: (frontRows ?? []) as any,
         categories: (cats ?? []) as any,
         units: (unitRows ?? []) as any,
         accounts: (accountRows ?? []) as any,
@@ -249,6 +289,7 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
           typeStatusMismatch.length +
           semCategoria.length +
           semUnidade.length +
+          allocationIssues.length +
           pagoSemData.length,
       });
     } catch {

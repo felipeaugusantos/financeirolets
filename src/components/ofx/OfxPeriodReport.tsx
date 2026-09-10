@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { FileDown, FileText, BarChart3 } from 'lucide-react';
+import { FileDown, FileText, BarChart3, PlusCircle, ExternalLink, Link2Off, Sparkles, AlertTriangle, GitCompareArrows, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { StatementEntry } from '@/hooks/useOfxImport';
 import { exportToCsv, csvDate, csvNumber } from '@/lib/exportCsv';
@@ -20,12 +21,42 @@ interface Props {
   accountName: string;
   from: string;
   to: string;
+  /** Ids de linhas pendentes selecionadas para ação em lote. */
+  selected?: Set<string>;
+  onToggle?: (id: string) => void;
+  onToggleAll?: (ids: string[]) => void;
+  onCreate?: (id: string) => void;
+  onCreateSelected?: () => void;
+  /** Ids cuja descrição já existe em lançamentos do período. */
+  duplicates?: Set<string>;
+  /** Ids prontos para vínculo automático por descrição idêntica. */
+  autoLinkables?: Set<string>;
+  /** Ids com descrição igual, porém divergentes da regra (campos divergentes). */
+  divergences?: Map<string, string[]>;
+  /** Ids apenas parecidos (descrição igual, mas data e/ou valor diferentes). */
+  similars?: Map<string, string[]>;
+  /** Abrir o lançamento vinculado a uma linha. */
+  onView?: (entry: StatementEntry) => void;
+  /** Desfazer o vínculo / estornar a decisão da linha. */
+  onUnlink?: (entry: StatementEntry) => void;
+  /** Excluir a conciliação da linha (volta para pendente, com confirmação). */
+  onDeleteLink?: (entry: StatementEntry) => void;
+  /** Excluir todas as conciliações do período. */
+  onDeleteAllLinks?: () => void;
+  busy?: boolean;
 }
 
-export default function OfxPeriodReport({ entries, accountName, from, to }: Props) {
+export default function OfxPeriodReport({
+  entries, accountName, from, to,
+  selected, onToggle, onToggleAll, onCreate, onCreateSelected, duplicates,
+  autoLinkables, divergences, similars, onView, onUnlink, onDeleteLink, onDeleteAllLinks, busy,
+
+}: Props) {
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const interactive = !!onCreate;
+
 
   const data = useMemo(() => {
     const sum = (arr: StatementEntry[]) => arr.reduce((s, e) => s + Number(e.amount), 0);
@@ -53,6 +84,10 @@ export default function OfxPeriodReport({ entries, accountName, from, to }: Prop
       saidasPendentes: sum(pendentes.filter(e => e.amount < 0)),
     };
   }, [entries]);
+
+  const pendingIds = useMemo(() => data.pendentes.map(e => e.id), [data.pendentes]);
+  const selectedCount = pendingIds.filter(id => selected?.has(id)).length;
+  const allSelected = pendingIds.length > 0 && selectedCount === pendingIds.length;
 
   const periodo = `${br(from)} a ${br(to)}`;
   const fileBase = `conciliacao-ofx_${accountName.replace(/\W+/g, '-').toLowerCase()}_${from}_${to}`;
@@ -152,7 +187,17 @@ export default function OfxPeriodReport({ entries, accountName, from, to }: Prop
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium">Linhas pendentes ({data.pendentes.length})</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">Linhas pendentes ({data.pendentes.length})</p>
+              {interactive && selectedCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[11px]">{selectedCount} selecionada(s)</Badge>
+                  <Button size="sm" className="gap-1.5 rounded-xl h-8" disabled={busy} onClick={onCreateSelected}>
+                    <PlusCircle className="h-3.5 w-3.5" /> Criar lançamentos
+                  </Button>
+                </div>
+              )}
+            </div>
             {data.pendentes.length === 0 ? (
               <p className="text-xs text-muted-foreground">Nenhuma pendência — período conciliado.</p>
             ) : (
@@ -160,23 +205,83 @@ export default function OfxPeriodReport({ entries, accountName, from, to }: Prop
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border text-left text-muted-foreground">
+                      {interactive && (
+                        <th className="py-1.5 pr-2 font-medium w-8">
+                          <Checkbox
+                            checked={allSelected}
+                            onCheckedChange={() => onToggleAll?.(pendingIds)}
+                            aria-label="Selecionar todas as linhas pendentes"
+                          />
+                        </th>
+                      )}
                       <th className="py-1.5 pr-2 font-medium">Data</th>
                       <th className="py-1.5 pr-2 font-medium">Descrição</th>
                       <th className="py-1.5 pr-2 font-medium">Tipo</th>
                       <th className="py-1.5 pr-2 font-medium">FITID</th>
-                      <th className="py-1.5 text-right font-medium">Valor</th>
+                      <th className="py-1.5 pr-2 text-right font-medium">Valor</th>
+                      {interactive && <th className="py-1.5 text-right font-medium">Ação</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {data.pendentes.map(e => (
                       <tr key={e.id} className="border-b border-border/50">
+                        {interactive && (
+                          <td className="py-1.5 pr-2">
+                            <Checkbox
+                              checked={selected?.has(e.id) ?? false}
+                              onCheckedChange={() => onToggle?.(e.id)}
+                              aria-label={`Selecionar linha de ${br(e.posted_at)}`}
+                            />
+                          </td>
+                        )}
                         <td className="py-1.5 pr-2 whitespace-nowrap">{br(e.posted_at)}</td>
-                        <td className="py-1.5 pr-2 max-w-[320px] truncate">{e.memo || '(sem descrição)'}</td>
+                        <td className="py-1.5 pr-2 max-w-[320px] truncate">
+                          {e.memo || '(sem descrição)'}
+                          {duplicates?.has(e.id) && (
+                            <Badge variant="outline" className="ml-2 text-[10px] border-destructive/40 text-destructive">
+                              já existe em lançamentos
+                            </Badge>
+                          )}
+                          {autoLinkables?.has(e.id) && (
+                            <Badge variant="outline" className="ml-2 text-[10px] border-secondary/40 text-secondary gap-1">
+                              <Sparkles className="h-3 w-3" /> pronto p/ vínculo automático
+                            </Badge>
+                          )}
+                          {divergences?.get(e.id)?.length ? (
+                            <Badge variant="outline" className="ml-2 text-[10px] border-accent/40 text-accent gap-1">
+                              <AlertTriangle className="h-3 w-3" /> diverge da regra: {divergences.get(e.id)!.join(', ')}
+                            </Badge>
+                          ) : null}
+                          {similars?.has(e.id) && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 text-[10px] border-accent/40 text-accent gap-1"
+                              title={`Similar — confira antes de vincular (difere em: ${similars.get(e.id)!.join(', ') || 'detalhes'})`}
+                            >
+                              <GitCompareArrows className="h-3 w-3" /> similar
+                              {similars.get(e.id)!.length ? ` (difere em ${similars.get(e.id)!.join(', ')})` : ''}
+                            </Badge>
+                          )}
+
+                        </td>
                         <td className="py-1.5 pr-2 whitespace-nowrap">{e.trn_type || '—'}</td>
                         <td className="py-1.5 pr-2 whitespace-nowrap text-muted-foreground">{e.fitid}</td>
-                        <td className={`py-1.5 text-right whitespace-nowrap font-medium ${e.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
+                        <td className={`py-1.5 pr-2 text-right whitespace-nowrap font-medium ${e.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
                           {brl(Number(e.amount))}
                         </td>
+                        {interactive && (
+                          <td className="py-1.5 text-right whitespace-nowrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 rounded-xl h-7"
+                              disabled={busy}
+                              onClick={() => onCreate?.(e.id)}
+                            >
+                              <PlusCircle className="h-3.5 w-3.5" /> Criar lançamento
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -184,6 +289,88 @@ export default function OfxPeriodReport({ entries, accountName, from, to }: Prop
               </div>
             )}
           </div>
+
+          {interactive && (data.criados.length + data.vinculados.length + data.ignorados.length) > 0 && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">
+                  Linhas processadas ({data.criados.length + data.vinculados.length + data.ignorados.length})
+                </p>
+                {onDeleteAllLinks && (data.criados.length + data.vinculados.length) > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 rounded-xl h-8 border-destructive/40 text-destructive"
+                    disabled={busy}
+                    onClick={onDeleteAllLinks}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Excluir conciliações ({data.criados.length + data.vinculados.length})
+                  </Button>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-1.5 pr-2 font-medium">Data</th>
+                      <th className="py-1.5 pr-2 font-medium">Descrição</th>
+                      <th className="py-1.5 pr-2 font-medium">Status</th>
+                      <th className="py-1.5 pr-2 text-right font-medium">Valor</th>
+                      <th className="py-1.5 text-right font-medium">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...data.criados, ...data.vinculados, ...data.ignorados]
+                      .sort((a, b) => a.posted_at.localeCompare(b.posted_at))
+                      .map(e => {
+                        const criado = e.status === 'vinculado' && CREATED_MARK.test(e.match_note ?? '');
+                        const status = e.status === 'ignorado' ? 'Ignorado' : criado ? 'Criado' : 'Vinculado';
+                        return (
+                          <tr key={e.id} className="border-b border-border/50">
+                            <td className="py-1.5 pr-2 whitespace-nowrap">{br(e.posted_at)}</td>
+                            <td className="py-1.5 pr-2 max-w-[320px] truncate">{e.memo || '(sem descrição)'}</td>
+                            <td className="py-1.5 pr-2">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] ${criado ? 'border-secondary/40 text-secondary' : e.status === 'ignorado' ? 'text-muted-foreground' : 'border-accent/40 text-accent'}`}
+                              >
+                                {status}
+                              </Badge>
+                            </td>
+                            <td className={`py-1.5 pr-2 text-right whitespace-nowrap font-medium ${e.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
+                              {brl(Number(e.amount))}
+                            </td>
+                            <td className="py-1.5 text-right whitespace-nowrap space-x-1">
+                              {e.transaction_id && onView && (
+                                <Button size="sm" variant="outline" className="gap-1.5 rounded-xl h-7" onClick={() => onView(e)}>
+                                  <ExternalLink className="h-3.5 w-3.5" /> Ver lançamento
+                                </Button>
+                              )}
+                              {onUnlink && (
+                                <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-7" disabled={busy} onClick={() => onUnlink(e)}>
+                                  <Link2Off className="h-3.5 w-3.5" /> {criado ? 'Cancelar/estornar' : 'Reabrir'}
+                                </Button>
+                              )}
+                              {onDeleteLink && e.transaction_id && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="gap-1.5 rounded-xl h-7 text-destructive"
+                                  disabled={busy}
+                                  onClick={() => onDeleteLink(e)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" /> Excluir conciliação
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

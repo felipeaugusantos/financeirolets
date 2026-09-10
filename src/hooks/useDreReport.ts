@@ -124,9 +124,12 @@ function buildSubtotals(allLines: any[], lineValues: Map<string, number>) {
           val = (g3 ? get(g3) : 0) + (g4 ? get(g4) : 0);
         } else if (code === '8') {
           const g5 = allLines.find((l: any) => l.code === '5');
+          // Pró-labore/honorários da diretoria ficam fora do resultado operacional,
+          // mas continuam impactando o caixa retido.
+          const g51 = allLines.find((l: any) => l.code === '5.1');
           const g6 = allLines.find((l: any) => l.code === '6');
           const g7 = allLines.find((l: any) => l.code === '7');
-          val = (g5 ? get(g5) : 0) + (g6 ? get(g6) : 0) + (g7 ? get(g7) : 0);
+          val = (g5 ? get(g5) : 0) + (g51 ? get(g51) : 0) + (g6 ? get(g6) : 0) + (g7 ? get(g7) : 0);
         } else {
           val = 0;
         }

@@ -255,6 +255,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
 
     // Allocations
+    // Em parcelamento, o rateio em R$ precisa ser dividido pelo nº de parcelas,
+    // senão cada parcela recebe o valor cheio e o rateio estoura o lançamento.
     if (input.allocations && input.allocations.length > 0 && inserted) {
       const allocs = inserted.flatMap(tx =>
         input.allocations!.map(a => ({
@@ -263,7 +265,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
           front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
           allocation_type: a.allocation_type as any,
           percentage: a.percentage ?? null,
-          amount: a.amount ?? null,
+          amount: a.amount != null
+            ? Math.round((a.amount / count) * 100) / 100
+            : null,
         }))
       );
       const { error: allocErr } = await supabase.from('transaction_allocations').insert(allocs);
@@ -330,6 +334,32 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (error) {
       toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
       return false;
+    }
+
+    // Se o valor mudou e o rateio não veio no formulário, os rateios em R$
+    // ficariam desatualizados (sobra caindo em "Sem unidade"). Reajusta na
+    // mesma proporção para o rateio continuar fechando.
+    if (input.allocations === undefined && updateData.net_amount !== undefined) {
+      const prev = data.find((t) => t.id === id);
+      const oldNet = Number(prev?.net_amount) || 0;
+      const newNet = Number(updateData.net_amount) || 0;
+      if (oldNet !== 0 && newNet !== oldNet) {
+        const { data: olds } = await supabase
+          .from('transaction_allocations')
+          .select('id, allocation_type, amount')
+          .eq('transaction_id', id);
+        const factor = newNet / oldNet;
+        await Promise.all(
+          (olds ?? [])
+            .filter((a: any) => a.allocation_type === 'valor' && a.amount != null)
+            .map((a: any) =>
+              supabase
+                .from('transaction_allocations')
+                .update({ amount: Math.round(Number(a.amount) * factor * 100) / 100 })
+                .eq('id', a.id)
+            )
+        );
+      }
     }
 
     // Update allocations if provided

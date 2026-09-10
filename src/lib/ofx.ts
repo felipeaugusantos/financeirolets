@@ -7,6 +7,11 @@
  * NADA aqui grava no banco. A função só transforma texto em linhas de extrato.
  */
 
+import { decodeEntities } from '@/lib/ofxMatch';
+
+
+
+
 export interface OfxTransaction {
   /** Identificador único da transação no banco. Base da proteção anti-duplicidade. */
   fitid: string;
@@ -122,9 +127,10 @@ export function parseOfx(text: string): OfxStatement[] {
       const amount = parseOfxAmount(tagValue(trn, 'TRNAMT'));
       if (!posted_at || !isFinite(amount)) continue;
 
-      const name = tagValue(trn, 'NAME');
-      const memoTag = tagValue(trn, 'MEMO');
+      const name = decodeEntities(tagValue(trn, 'NAME'));
+      const memoTag = decodeEntities(tagValue(trn, 'MEMO'));
       const memo = [name, memoTag].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' — ');
+
 
       const fitidRaw = tagValue(trn, 'FITID');
       // Alguns arquivos vêm sem FITID: geramos um determinístico para que a

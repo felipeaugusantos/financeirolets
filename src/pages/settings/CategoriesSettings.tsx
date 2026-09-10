@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,6 +14,7 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [dreLines, setDreLines] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     (supabase.from('dre_lines') as any).select('id, name, code').order('sort_order').then(({ data }: any) => {
@@ -62,15 +64,46 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
     return editing ? update(editing.id, clean) : create(clean);
   };
 
+  const term = search.trim().toLowerCase();
+  const filtered = term
+    ? data.filter((c: any) => {
+        const line = dreLines.find(l => l.id === c.dre_line_id);
+        const parent = data.find((p: any) => p.id === c.parent_id);
+        return [
+          c.name,
+          c.type === 'receita' ? 'receita' : 'despesa',
+          line ? `${line.code} ${line.name}` : '',
+          parent?.name ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(term);
+      })
+    : data;
+
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 -ml-2">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Button>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por nome, tipo, linha do DRE ou categoria pai..."
+          className="pl-9 rounded-xl"
+        />
+      </div>
+      {term && (
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} de {data.length} categoria(s)
+        </p>
+      )}
       <CrudTable
         title="Categorias"
         columns={columns}
-        data={data}
+        data={filtered}
         loading={loading}
         onAdd={() => { setEditing(null); setDialogOpen(true); }}
         onEdit={row => { setEditing(row); setDialogOpen(true); }}

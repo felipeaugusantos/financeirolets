@@ -129,6 +129,7 @@ export function useReviewStatus() {
 
 export interface AllocationDraft {
   unit_id: string | null;
+  front_id?: string | null;
   allocation_type: 'percentual' | 'valor';
   percentage: number | null;
   amount: number | null;
@@ -249,6 +250,7 @@ export function useReviewActions(onDone?: () => void) {
             rows.map((r) => ({
               transaction_id: transactionId,
               unit_id: r.unit_id,
+              front_id: r.front_id ?? null,
               allocation_type: r.allocation_type,
               percentage: r.allocation_type === 'percentual' ? r.percentage : null,
               amount: r.allocation_type === 'valor' ? r.amount : null,

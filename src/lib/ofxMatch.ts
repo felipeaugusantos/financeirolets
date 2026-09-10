@@ -28,6 +28,7 @@ export interface CandidateTransaction {
   account_id: string | null;
   category_id: string | null;
   unit_id: string | null;
+  front_id?: string | null;
   partner_id?: string | null;
   partner_name?: string | null;
 }
@@ -74,9 +75,22 @@ function isAfter(a: string, b: string): boolean {
   return Date.parse(`${a}T12:00:00`) > Date.parse(`${b}T12:00:00`);
 }
 
-/** Normaliza texto para comparação: sem acento, sem pontuação, minúsculo. */
-export function normalizeText(s: string): string {
+/** Converte entidades HTML/SGML que o banco manda no memo (&amp;, &quot;...). */
+export function decodeEntities(s: string): string {
   return (s || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)));
+}
+
+/** Normaliza texto para comparação: sem entidade, sem acento, sem pontuação, minúsculo. */
+export function normalizeText(s: string): string {
+  return decodeEntities(s || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -84,6 +98,18 @@ export function normalizeText(s: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Assinatura do "tipo de histórico": remove números, datas e códigos para
+ * agrupar linhas que se repetem toda semana (tarifas, Stone, antecipações).
+ */
+export function memoPattern(memo: string): string {
+  return normalizeText(memo)
+    .replace(/\b\d+\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 
 /**
  * Palavras que aparecem em quase todo memo bancário e não ajudam a identificar
@@ -373,4 +399,277 @@ export function applyRules(memo: string, amount: number, rules: OfxRule[]): Rule
     }
   }
   return null;
+}
+
+
+// ---------------------------------------------------------------------------
+// Vínculo automático por descrição idêntica (não concilia, apenas vincula)
+// ---------------------------------------------------------------------------
+
+export interface DescriptionMatch {
+  /** Lançamentos com a MESMA descrição do memo do extrato. */
+  transactions: CandidateTransaction[];
+  /** Lançamentos com descrição + data + valor iguais (pode haver duplicados legítimos). */
+  exactTransactions: CandidateTransaction[];
+  /** Único candidato encontrado (quando há exatamente um com data+valor+descrição iguais). */
+  transaction: CandidateTransaction | null;
+  /** Campos em que a regra de conciliação diverge do lançamento existente. */
+  divergences: string[];
+  /** Mais de um lançamento equivalente — exige decisão manual. */
+  ambiguous: boolean;
+  /** Pronto para vínculo automático: data + descrição + valor iguais, único candidato e sem divergências. */
+  autoLinkable: boolean;
+  /** Bate parcialmente (ex.: mesma descrição e valor, data diferente) — precisa de análise do usuário. */
+  similar: boolean;
+  /** O que difere nos candidatos apenas similares (ex.: "data", "valor"). */
+  similarReasons: string[];
+}
+
+const FIELD_LABEL: Record<string, string> = {
+  category_id: 'categoria',
+  unit_id: 'unidade',
+  front_id: 'frente',
+  partner_id: 'parceiro',
+};
+
+const EMPTY_DESC_MATCH: DescriptionMatch = {
+  transactions: [], exactTransactions: [], transaction: null, divergences: [], ambiguous: false,
+  autoLinkable: false, similar: false, similarReasons: [],
+};
+
+export function emptyDescriptionMatch(): DescriptionMatch {
+  return { ...EMPTY_DESC_MATCH };
+}
+
+/** Campos em que a regra sugerida diverge do lançamento existente. */
+export function ruleDivergences(
+  transaction: CandidateTransaction,
+  outcome: RuleOutcome | null
+): string[] {
+  if (!outcome) return [];
+  const compare: [keyof RuleOutcome & string, string | null | undefined][] = [
+    ['category_id', transaction.category_id],
+    ['unit_id', transaction.unit_id],
+    ['front_id', transaction.front_id],
+    ['partner_id', transaction.partner_id],
+  ];
+  const out: string[] = [];
+  for (const [field, current] of compare) {
+    const expected = (outcome as any)[field] as string | null;
+    if (expected && (current ?? null) !== expected) out.push(FIELD_LABEL[field]);
+  }
+  return out;
+}
+
+/** Datas possíveis do lançamento que podem corresponder à data do extrato. */
+function transactionDates(t: CandidateTransaction): string[] {
+  return [t.payment_date, t.due_date, t.competence_date].filter(Boolean) as string[];
+}
+
+/** O valor do extrato bate com o bruto ou o líquido do lançamento? */
+function sameAmount(entryAmount: number, t: CandidateTransaction): boolean {
+  const target = Math.abs(entryAmount);
+  const bases = [t.amount, t.net_amount].filter(v => v != null) as number[];
+  return bases.some(b => Math.abs(Math.abs(b) - target) <= 0.01);
+}
+
+/**
+ * Procura lançamentos com a MESMA descrição (normalizada) do memo do extrato.
+ *
+ * Vínculo automático só acontece quando DATA, DESCRIÇÃO e VALOR são iguais,
+ * existe um único candidato e a regra de conciliação não diverge do lançamento.
+ * Quando só parte das informações bate (ex.: valor e descrição, data diferente),
+ * o resultado é marcado como *similar* — nunca vinculado sozinho.
+ */
+export function matchByDescription(
+  memo: string,
+  amount: number,
+  postedAt: string,
+  candidates: CandidateTransaction[],
+  outcome: RuleOutcome | null
+): DescriptionMatch {
+  const key = normalizeText(memo || '');
+  if (!key) return emptyDescriptionMatch();
+
+  const type: 'receita' | 'despesa' = amount >= 0 ? 'receita' : 'despesa';
+  const hits = candidates.filter(
+    t => t.type === type && normalizeText(t.description || '') === key
+  );
+  if (hits.length === 0) return emptyDescriptionMatch();
+
+  const exact = hits.filter(
+    t => sameAmount(amount, t) && (postedAt ? transactionDates(t).includes(postedAt) : false)
+  );
+
+  const transaction = exact.length === 1 ? exact[0] : null;
+
+  const divergences = transaction ? ruleDivergences(transaction, outcome) : [];
+
+  const autoLinkable = Boolean(transaction) && divergences.length === 0;
+
+  // Similaridade: existe candidato com a mesma descrição que não fechou tudo.
+  const similarReasons: string[] = [];
+  if (!autoLinkable) {
+    const partial = exact.length > 0 ? exact : hits;
+    const anyAmount = partial.some(t => sameAmount(amount, t));
+    const anyDate = postedAt ? partial.some(t => transactionDates(t).includes(postedAt)) : false;
+    if (!anyDate) similarReasons.push('data');
+    if (!anyAmount) similarReasons.push('valor');
+    if (exact.length > 1) similarReasons.push('mais de um lançamento equivalente');
+    if (similarReasons.length === 0 && divergences.length > 0) {
+      similarReasons.push(`diverge da regra: ${divergences.join(', ')}`);
+    }
+  }
+
+  return {
+    transactions: hits,
+    exactTransactions: exact,
+    transaction,
+    divergences,
+    ambiguous: exact.length > 1 || (exact.length === 0 && hits.length > 1),
+    autoLinkable,
+    similar: !autoLinkable && similarReasons.length > 0,
+    similarReasons,
+  };
+}
+
+
+// ---------------------------------------------------------------------------
+// Pareamento 1:1 de linhas duplicadas do extrato
+// ---------------------------------------------------------------------------
+
+/** Como cada linha duplicada terminou no rateio 1:1. */
+export type PairOutcome = 'pareado' | 'unico' | 'sem-lancamento' | 'divergente';
+
+export interface DuplicatePairLine {
+  key: string;
+  outcome: PairOutcome;
+  transactionId: string | null;
+  transactionDescription: string | null;
+  /** Divergências da regra de conciliação no lançamento reservado. */
+  divergences: string[];
+  note: string;
+}
+
+export interface DuplicatePairGroup {
+  /** Assinatura da duplicidade: descrição normalizada + data + valor. */
+  signature: string;
+  memo: string;
+  posted_at: string;
+  amount: number;
+  /** Quantas linhas do extrato compartilham a assinatura. */
+  entryCount: number;
+  /** Quantos lançamentos equivalentes existem para dividir entre elas. */
+  candidateCount: number;
+  lines: DuplicatePairLine[];
+}
+
+export interface PairableItem {
+  key: string;
+  memo: string;
+  posted_at: string;
+  amount: number;
+  descMatch: DescriptionMatch;
+  outcome: RuleOutcome | null;
+}
+
+export interface PairDuplicatesResult {
+  /** Novo DescriptionMatch por linha que recebeu um lançamento reservado. */
+  patches: Map<string, DescriptionMatch>;
+  /** Relatório de conferência dos grupos com linhas idênticas. */
+  groups: DuplicatePairGroup[];
+}
+
+export function duplicateSignature(memo: string, postedAt: string, amount: number): string {
+  return `${normalizeText(memo || '')}|${postedAt}|${Math.abs(amount).toFixed(2)}`;
+}
+
+/**
+ * Divide lançamentos idênticos entre linhas idênticas do extrato, uma para cada.
+ *
+ * A ordem de entrada define a prioridade — a primeira linha reserva o primeiro
+ * lançamento livre. Lançamentos já vinculados a outra linha entram em `reserved`
+ * e nunca são reaproveitados.
+ */
+export function pairDuplicates(
+  items: PairableItem[],
+  reserved: Iterable<string> = []
+): PairDuplicatesResult {
+  const taken = new Set<string>(reserved);
+  const patches = new Map<string, DescriptionMatch>();
+
+  const groups = new Map<string, DuplicatePairGroup>();
+  const bySignature = new Map<string, PairableItem[]>();
+  for (const item of items) {
+    const sig = duplicateSignature(item.memo, item.posted_at, item.amount);
+    const arr = bySignature.get(sig) ?? [];
+    arr.push(item);
+    bySignature.set(sig, arr);
+  }
+
+  for (const item of items) {
+    const m = item.descMatch;
+    if (m.transaction) { taken.add(m.transaction.id); continue; }
+    if (m.exactTransactions.length < 2) continue;
+
+    const free = m.exactTransactions.find(t => !taken.has(t.id));
+    if (!free) continue;
+    taken.add(free.id);
+
+    const divergences = ruleDivergences(free, item.outcome);
+    patches.set(item.key, {
+      ...m,
+      transaction: free,
+      divergences,
+      ambiguous: false,
+      autoLinkable: divergences.length === 0,
+      similar: divergences.length > 0,
+      similarReasons: divergences.length > 0 ? [`diverge da regra: ${divergences.join(', ')}`] : [],
+    });
+  }
+
+  for (const [sig, list] of bySignature) {
+    const candidateCount = Math.max(...list.map(i => i.descMatch.exactTransactions.length), 0);
+    const isDuplicateGroup = list.length > 1 || candidateCount > 1;
+    if (!isDuplicateGroup) continue;
+
+    const first = list[0];
+    groups.set(sig, {
+      signature: sig,
+      memo: first.memo,
+      posted_at: first.posted_at,
+      amount: first.amount,
+      entryCount: list.length,
+      candidateCount,
+      lines: list.map(item => {
+        const m = patches.get(item.key) ?? item.descMatch;
+        const tx = m.transaction;
+        let outcome: PairOutcome;
+        let note: string;
+        if (!tx) {
+          outcome = 'sem-lancamento';
+          note = 'Nenhum lançamento equivalente sobrou para esta linha.';
+        } else if (m.divergences.length > 0) {
+          outcome = 'divergente';
+          note = `Reservou "${tx.description}", mas a regra diverge em ${m.divergences.join(', ')}.`;
+        } else if (patches.has(item.key)) {
+          outcome = 'pareado';
+          note = `Reservou o lançamento "${tx.description}" no rateio 1:1.`;
+        } else {
+          outcome = 'unico';
+          note = `Candidato único: "${tx.description}".`;
+        }
+        return {
+          key: item.key,
+          outcome,
+          transactionId: tx?.id ?? null,
+          transactionDescription: tx?.description ?? null,
+          divergences: m.divergences,
+          note,
+        };
+      }),
+    });
+  }
+
+  return { patches, groups: [...groups.values()] };
 }

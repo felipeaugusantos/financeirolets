@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Wand2 } from 'lucide-react';
+import { Pencil, Plus, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { OfxRule } from '@/lib/ofxMatch';
@@ -20,6 +24,43 @@ export interface OptionList {
 
 const NONE = '__none__';
 
+type Errors = Partial<Record<'pattern' | 'priority' | 'suggestion', string>>;
+
+/** Valida o formulário e devolve mensagens claras por campo. */
+function validate(form: Partial<OfxRule>, rules: OfxRule[], editingId?: string): Errors {
+  const errors: Errors = {};
+  const pattern = (form.pattern ?? '').trim();
+
+  if (!pattern) {
+    errors.pattern = 'Informe o texto que aparece no extrato.';
+  } else if (pattern.length < 2) {
+    errors.pattern = 'Use pelo menos 2 caracteres para evitar casar com tudo.';
+  } else if (form.match_type === 'regex') {
+    try {
+      new RegExp(pattern, 'i');
+    } catch (e) {
+      errors.pattern = `Expressão regular inválida: ${(e as Error).message}`;
+    }
+  } else if (
+    rules.some(r => r.id !== editingId && r.match_type === (form.match_type ?? 'contains')
+      && r.pattern.trim().toLowerCase() === pattern.toLowerCase()
+      && r.applies_to === (form.applies_to ?? 'ambos'))
+  ) {
+    errors.pattern = 'Já existe uma regra com esse mesmo texto e aplicação.';
+  }
+
+  const priority = Number(form.priority);
+  if (!Number.isInteger(priority) || priority < 1 || priority > 999) {
+    errors.priority = 'A prioridade deve ser um número inteiro entre 1 e 999.';
+  }
+
+  if (!form.category_id && !form.unit_id && !form.front_id && !form.partner_id) {
+    errors.suggestion = 'Escolha ao menos uma sugestão (categoria, unidade, frente ou parceiro).';
+  }
+
+  return errors;
+}
+
 export default function OfxRulesPanel({
   rules, options, onChanged, defaultPattern,
 }: {
@@ -30,20 +71,41 @@ export default function OfxRulesPanel({
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<OfxRule | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<OfxRule | null>(null);
   const [form, setForm] = useState<Partial<OfxRule>>({});
+  const [errors, setErrors] = useState<Errors>({});
 
   const startNew = (pattern = '') => {
+    setEditing(null);
+    setErrors({});
     setForm({ pattern, match_type: 'contains', applies_to: 'ambos', priority: 100, active: true });
     setOpen(true);
   };
 
+  const startEdit = (rule: OfxRule) => {
+    setEditing(rule);
+    setErrors({});
+    setForm({ ...rule });
+    setOpen(true);
+  };
+
+  const setField = (key: keyof OfxRule, value: unknown) => {
+    setForm(f => ({ ...f, [key]: value }));
+    setErrors(e => ({ ...e, [key === 'pattern' ? 'pattern' : key === 'priority' ? 'priority' : 'suggestion']: undefined }));
+  };
+
   const save = async () => {
-    if (!form.pattern?.trim()) {
-      toast({ title: 'Informe o texto que aparece no extrato', variant: 'destructive' });
+    const found = validate(form, rules, editing?.id);
+    setErrors(found);
+    if (Object.values(found).some(Boolean)) {
+      toast({ title: 'Revise os campos destacados', description: Object.values(found).filter(Boolean)[0], variant: 'destructive' });
       return;
     }
+
     const payload = {
-      pattern: form.pattern.trim(),
+      pattern: (form.pattern ?? '').trim(),
       match_type: form.match_type ?? 'contains',
       applies_to: form.applies_to ?? 'ambos',
       category_id: form.category_id ?? null,
@@ -53,16 +115,29 @@ export default function OfxRulesPanel({
       priority: Number(form.priority ?? 100),
       active: true,
     };
-    const { error } = await (supabase as any).from('ofx_import_rules').insert(payload);
-    if (error) { toast({ title: 'Erro ao salvar regra', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Regra criada' });
+
+    setSaving(true);
+    const { error } = editing
+      ? await (supabase as any).from('ofx_import_rules').update(payload).eq('id', editing.id)
+      : await (supabase as any).from('ofx_import_rules').insert(payload);
+    setSaving(false);
+
+    if (error) {
+      toast({ title: editing ? 'Erro ao atualizar regra' : 'Erro ao salvar regra', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: editing ? 'Regra atualizada' : 'Regra criada' });
     setOpen(false);
+    setEditing(null);
     onChanged();
   };
 
-  const remove = async (id: string) => {
-    const { error } = await (supabase as any).from('ofx_import_rules').delete().eq('id', id);
+  const remove = async () => {
+    if (!confirmDelete) return;
+    const { error } = await (supabase as any).from('ofx_import_rules').delete().eq('id', confirmDelete.id);
+    setConfirmDelete(null);
     if (error) { toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Regra excluída' });
     onChanged();
   };
 
@@ -100,6 +175,7 @@ export default function OfxRulesPanel({
                 {r.pattern}
                 <Badge variant="secondary" className="ml-2 text-[10px]">{r.match_type === 'regex' ? 'regex' : 'contém'}</Badge>
                 {r.applies_to !== 'ambos' && <Badge variant="outline" className="ml-1 text-[10px]">{r.applies_to}</Badge>}
+                <Badge variant="outline" className="ml-1 text-[10px]">prioridade {r.priority}</Badge>
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {[nameOf(options.categories, r.category_id), nameOf(options.units, r.unit_id),
@@ -107,30 +183,42 @@ export default function OfxRulesPanel({
                   .filter(Boolean).join(' · ') || 'Sem sugestão definida'}
               </p>
             </div>
-            <Button size="icon" variant="ghost" onClick={() => remove(r.id)} aria-label="Excluir regra">
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button size="icon" variant="ghost" onClick={() => startEdit(r)} aria-label="Editar regra">
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(r)} aria-label="Excluir regra">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
           </div>
         ))}
       </CardContent>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Nova regra de importação</DialogTitle></DialogHeader>
+      <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) setEditing(null); }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              {editing ? 'Editar regra de conciliação' : 'Nova regra de conciliação'}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Texto no extrato</Label>
               <Input
                 value={form.pattern ?? ''}
-                onChange={e => setForm(f => ({ ...f, pattern: e.target.value }))}
+                onChange={e => setField('pattern', e.target.value)}
                 placeholder="Ex.: IFOOD, STONE, TARIFA PACOTE"
+                aria-invalid={!!errors.pattern}
               />
-              <p className="text-xs text-muted-foreground">Ignora acentos e maiúsculas.</p>
+              {errors.pattern
+                ? <p className="text-xs text-destructive">{errors.pattern}</p>
+                : <p className="text-xs text-muted-foreground">Ignora acentos e maiúsculas.</p>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Tipo de comparação</Label>
-                <Select value={form.match_type ?? 'contains'} onValueChange={v => setForm(f => ({ ...f, match_type: v as any }))}>
+                <Select value={form.match_type ?? 'contains'} onValueChange={v => setField('match_type', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="contains">Contém o texto</SelectItem>
@@ -140,7 +228,7 @@ export default function OfxRulesPanel({
               </div>
               <div className="space-y-1.5">
                 <Label>Aplicar em</Label>
-                <Select value={form.applies_to ?? 'ambos'} onValueChange={v => setForm(f => ({ ...f, applies_to: v as any }))}>
+                <Select value={form.applies_to ?? 'ambos'} onValueChange={v => setField('applies_to', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ambos">Entradas e saídas</SelectItem>
@@ -149,6 +237,20 @@ export default function OfxRulesPanel({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Prioridade</Label>
+              <Input
+                type="number"
+                min={1}
+                max={999}
+                value={form.priority ?? 100}
+                onChange={e => setField('priority', e.target.value === '' ? NaN : Number(e.target.value))}
+                aria-invalid={!!errors.priority}
+              />
+              {errors.priority
+                ? <p className="text-xs text-destructive">{errors.priority}</p>
+                : <p className="text-xs text-muted-foreground">Menor número é avaliado primeiro.</p>}
             </div>
             {([
               ['category_id', 'Categoria sugerida', options.categories],
@@ -160,7 +262,7 @@ export default function OfxRulesPanel({
                 <Label>{label}</Label>
                 <Select
                   value={(form as any)[key] ?? NONE}
-                  onValueChange={v => setForm(f => ({ ...f, [key]: v === NONE ? null : v }))}
+                  onValueChange={v => setField(key, v === NONE ? null : v)}
                 >
                   <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
                   <SelectContent className="max-h-64">
@@ -170,13 +272,32 @@ export default function OfxRulesPanel({
                 </Select>
               </div>
             ))}
+            {errors.suggestion && <p className="text-xs text-destructive">{errors.suggestion}</p>}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save}>Salvar regra</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Salvar regra'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta regra?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A regra "{confirmDelete?.pattern}" deixará de sugerir classificação nas próximas conciliações.
+              Lançamentos já conciliados não são alterados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={remove}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

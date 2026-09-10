@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, TrendingUp, Columns3, GitCompare } from 'lucide-react';
+import { FileText, TrendingUp, Columns3, GitCompare, BarChart3 } from 'lucide-react';
 import DreReport from '@/components/reports/DreReport';
 import CashFlowReport from '@/components/reports/CashFlowReport';
 import DreComparativo from '@/components/reports/DreComparativo';
 import ReconciliationReport from '@/components/reports/ReconciliationReport';
+import DreGerencial from '@/components/reports/DreGerencial';
 
-type View = 'menu' | 'dre' | 'cashflow' | 'dre-comparativo' | 'reconciliacao';
+type View = 'menu' | 'dre' | 'dre-gerencial' | 'cashflow' | 'dre-comparativo' | 'reconciliacao';
 
 export default function Reports() {
   const [view, setView] = useState<View>('menu');
 
   if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
+  if (view === 'dre-gerencial') return <DreGerencial onBack={() => setView('menu')} />;
   if (view === 'dre-comparativo') return <DreComparativo onBack={() => setView('menu')} />;
   if (view === 'cashflow') return <CashFlowReport onBack={() => setView('menu')} />;
   if (view === 'reconciliacao') return <ReconciliationReport onBack={() => setView('menu')} />;
@@ -40,6 +42,26 @@ export default function Reports() {
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Gere DRE por unidade ou consolidado, por período, em regime de caixa ou competência.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
+          onClick={() => setView('dre-gerencial')}
+        >
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 rounded-xl bg-secondary/10">
+              <BarChart3 className="h-5 w-5 text-secondary" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-heading">DRE Gerencial</CardTitle>
+              <p className="text-xs text-muted-foreground">Margens e resultado contábil</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Receita Líquida, Lucro Bruto, EBITDA e Lucro Líquido com margens e comparação de períodos.
             </p>
           </CardContent>
         </Card>

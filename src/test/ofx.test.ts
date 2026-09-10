@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseOfx, parseOfxAmount, parseOfxDate } from '@/lib/ofx';
 import {
   applyRules, pickAutoLinkable, suggestMatches, textSimilarity,
-  CandidateTransaction, OfxRule,
+  CandidateTransaction, OfxRule, matchByDescription,
 } from '@/lib/ofxMatch';
 
 
@@ -153,3 +153,28 @@ describe('regras por memo', () => {
   });
 });
 
+
+describe('vínculo automático por data + descrição + valor', () => {
+  const line = { fitid: 'D1', posted_at: '2026-07-03', amount: 1500.5, memo: 'Venda iFood' };
+
+  it('vincula automaticamente quando data, descrição e valor são iguais', () => {
+    const m = matchByDescription(line.memo, line.amount, line.posted_at, [tx({})], null);
+    expect(m.autoLinkable).toBe(true);
+    expect(m.similar).toBe(false);
+  });
+
+  it('marca como similar quando só a data difere', () => {
+    const m = matchByDescription(line.memo, line.amount, '2026-07-09', [tx({
+      competence_date: '2026-07-03', due_date: '2026-07-03', payment_date: '2026-07-03',
+    })], null);
+    expect(m.autoLinkable).toBe(false);
+    expect(m.similar).toBe(true);
+    expect(m.similarReasons).toContain('data');
+  });
+
+  it('marca como similar quando o valor difere', () => {
+    const m = matchByDescription(line.memo, 1400, line.posted_at, [tx({})], null);
+    expect(m.autoLinkable).toBe(false);
+    expect(m.similarReasons).toContain('valor');
+  });
+});
