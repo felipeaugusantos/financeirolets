@@ -211,6 +211,16 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   });
   const categoryHelp = categoryId ? CATEGORY_HELP[categoryId] : undefined;
 
+  // Rateio só pode ser salvo se fechar exatamente com o lançamento.
+  const allocIsPercent = allocations[0]?.allocation_type === 'percentual';
+  const allocTotal = allocIsPercent
+    ? allocations.reduce((s, a) => s + (a.percentage || 0), 0)
+    : allocations.reduce((s, a) => s + (a.amount || 0), 0);
+  const allocExpected = allocIsPercent ? 100 : (parseFloat(amount) || 0);
+  const allocClosed = allocations.length === 0 || Math.abs(allocTotal - allocExpected) < 0.01;
+  const allocHasTarget = allocations.every((a) => a.unit_id || a.front_id);
+  const allocValid = allocClosed && allocHasTarget;
+
   const addAllocation = () => {
     setAllocations(prev => [...prev, { allocation_type: 'percentual', percentage: 0 }]);
   };
@@ -234,6 +244,10 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const handleSubmit = async () => {
     if (!description.trim() || !amount) return;
     if (ruleErrors.length > 0) return;
+    if (!allocValid) {
+      setAllocOpen(true);
+      return;
+    }
     setSaving(true);
     const input: TransactionInput = {
       type,
@@ -656,26 +670,21 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 </Button>
 
                 {/* Validation summary */}
-                {allocations.length > 0 && (() => {
-                  const isPercent = allocations[0]?.allocation_type === 'percentual';
-                  const total = isPercent
-                    ? allocations.reduce((s, a) => s + (a.percentage || 0), 0)
-                    : allocations.reduce((s, a) => s + (a.amount || 0), 0);
-                  const expected = isPercent ? 100 : (parseFloat(amount) || 0);
-                  const diff = Math.abs(total - expected);
-                  const isValid = diff < 0.01;
-                  return (
-                    <div className={cn(
-                      'text-xs px-3 py-2 rounded-lg',
-                      isValid ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'
-                    )}>
-                      {isPercent
-                        ? `Total: ${total.toFixed(1)}% de 100% ${isValid ? '✓' : `(faltam ${(100 - total).toFixed(1)}%)`}`
-                        : `Total: R$ ${total.toFixed(2)} de R$ ${expected.toFixed(2)} ${isValid ? '✓' : `(diferença: R$ ${(expected - total).toFixed(2)})`}`
+                {allocations.length > 0 && (
+                  <div className={cn(
+                    'text-xs px-3 py-2 rounded-lg space-y-1',
+                    allocValid ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-destructive/10 text-destructive'
+                  )}>
+                    <p>
+                      {allocIsPercent
+                        ? `Total: ${allocTotal.toFixed(1)}% de 100% ${allocClosed ? '✓' : `(faltam ${(100 - allocTotal).toFixed(1)}%)`}`
+                        : `Total: R$ ${allocTotal.toFixed(2)} de R$ ${allocExpected.toFixed(2)} ${allocClosed ? '✓' : `(diferença: R$ ${(allocExpected - allocTotal).toFixed(2)})`}`
                       }
-                    </div>
-                  );
-                })()}
+                    </p>
+                    {!allocHasTarget && <p>Cada linha do rateio precisa de uma unidade ou uma frente.</p>}
+                    {!allocValid && <p>Não é possível salvar enquanto o rateio não fechar.</p>}
+                  </div>
+                )}
               </CollapsibleContent>
             </Collapsible>
 
@@ -713,7 +722,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
           <Button
             className="rounded-xl"
             onClick={handleSubmit}
-            disabled={saving || !description.trim() || !amount || ruleErrors.length > 0}
+            disabled={saving || !description.trim() || !amount || ruleErrors.length > 0 || !allocValid}
           >
             {saving ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
           </Button>

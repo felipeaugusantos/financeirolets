@@ -30,4 +30,4 @@ export const APP_ENV: AppEnv = detectEnv();
 export const IS_HOMOLOG = APP_ENV === 'homologacao';
 
 /** Versão exibida no rodapé/faixa — atualizada a cada validação publicada. */
-export const APP_VERSION = '1.0.1';
+export const APP_VERSION = '1.1.0';

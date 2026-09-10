@@ -8,6 +8,7 @@ import {
   History,
   Landmark,
   ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -41,9 +42,13 @@ const navItems = [
 const reconciliationItems = [
   { title: 'Cadastro de banco', url: '/conciliacao/bancos' },
   { title: 'Conciliação', url: '/conciliacao/conciliar' },
+  { title: 'Regras de Conciliação', url: '/conciliacao/regras' },
+  { title: 'Conciliação de Cartão', url: '/conciliacao/cartao' },
+
 ];
 
 const settingsItem = { title: 'Configurações', url: '/configuracoes', icon: Settings };
+const releasesItem = { title: 'Novidades', url: '/novidades', icon: Sparkles };
 
 
 const adminNavItems = [
@@ -57,7 +62,9 @@ export function AppSidebar() {
   const { signOut, user } = useAuth();
   const { isAdmin } = useCurrentUserRoles();
   const items = isAdmin ? [...navItems] : [...navItems];
-  const tailItems = isAdmin ? [settingsItem, ...adminNavItems] : [settingsItem];
+  const tailItems = isAdmin
+    ? [settingsItem, releasesItem, ...adminNavItems]
+    : [settingsItem, releasesItem];
   const reconciliationActive = location.pathname.startsWith('/conciliacao');
 
 

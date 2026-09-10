@@ -211,9 +211,12 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
               val = (g3 ? getLineValue(g3, colId) : 0) + (g4 ? getLineValue(g4, colId) : 0);
             } else if (code === '8') {
               const g5 = dreLines.find((l: any) => l.code === '5');
+              // Pró-labore fica após o resultado líquido, mas entra no caixa retido.
+              const g51 = dreLines.find((l: any) => l.code === '5.1');
               const g6 = dreLines.find((l: any) => l.code === '6');
               const g7 = dreLines.find((l: any) => l.code === '7');
-              val = (g5 ? getLineValue(g5, colId) : 0) + (g6 ? getLineValue(g6, colId) : 0) + (g7 ? getLineValue(g7, colId) : 0);
+              val = (g5 ? getLineValue(g5, colId) : 0) + (g51 ? getLineValue(g51, colId) : 0)
+                + (g6 ? getLineValue(g6, colId) : 0) + (g7 ? getLineValue(g7, colId) : 0);
             } else {
               val = 0;
             }

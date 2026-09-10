@@ -292,10 +292,116 @@ export type Database = {
         }
         Relationships: []
       }
+      card_statement_entries: {
+        Row: {
+          account_id: string | null
+          amount: number
+          card_last4: string | null
+          category_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          description: string
+          front_id: string | null
+          id: string
+          imported_by: string | null
+          note: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          posted_at: string
+          row_hash: string
+          source_file: string | null
+          status: string
+          transaction_id: string | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          card_last4?: string | null
+          category_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          description: string
+          front_id?: string | null
+          id?: string
+          imported_by?: string | null
+          note?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          posted_at: string
+          row_hash: string
+          source_file?: string | null
+          status?: string
+          transaction_id?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          card_last4?: string | null
+          category_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          description?: string
+          front_id?: string | null
+          id?: string
+          imported_by?: string | null
+          note?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          posted_at?: string
+          row_hash?: string
+          source_file?: string | null
+          status?: string
+          transaction_id?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_statement_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statement_entries_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statement_entries_front_id_fkey"
+            columns: ["front_id"]
+            isOneToOne: false
+            referencedRelation: "business_fronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statement_entries_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statement_entries_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           active: boolean
           created_at: string
+          dre_line_contabil_id: string | null
           dre_line_id: string | null
           id: string
           name: string
@@ -307,6 +413,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          dre_line_contabil_id?: string | null
           dre_line_id?: string | null
           id?: string
           name: string
@@ -318,6 +425,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          dre_line_contabil_id?: string | null
           dre_line_id?: string | null
           id?: string
           name?: string
@@ -327,6 +435,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "categories_dre_line_contabil_id_fkey"
+            columns: ["dre_line_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "dre_lines"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "categories_dre_line_id_fkey"
             columns: ["dre_line_id"]
@@ -348,34 +463,43 @@ export type Database = {
           active: boolean
           code: string | null
           created_at: string
+          formula: string | null
           id: string
           is_subtotal: boolean
+          line_type: string | null
           name: string
           parent_id: string | null
           sign: number
           sort_order: number
+          view_scope: string
         }
         Insert: {
           active?: boolean
           code?: string | null
           created_at?: string
+          formula?: string | null
           id?: string
           is_subtotal?: boolean
+          line_type?: string | null
           name: string
           parent_id?: string | null
           sign?: number
           sort_order?: number
+          view_scope?: string
         }
         Update: {
           active?: boolean
           code?: string | null
           created_at?: string
+          formula?: string | null
           id?: string
           is_subtotal?: boolean
+          line_type?: string | null
           name?: string
           parent_id?: string | null
           sign?: number
           sort_order?: number
+          view_scope?: string
         }
         Relationships: [
           {

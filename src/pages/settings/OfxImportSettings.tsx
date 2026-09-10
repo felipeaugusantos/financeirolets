@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle, Zap, CheckSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle, Zap, CheckSquare, RefreshCw, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +14,17 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOfxImport, EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
-import { pickAutoLinkable } from '@/lib/ofxMatch';
-import OfxRulesPanel, { OptionList } from '@/components/ofx/OfxRulesPanel';
+import { pickAutoLinkable, normalizeText } from '@/lib/ofxMatch';
+import { OptionList } from '@/components/ofx/OfxRulesPanel';
+import DuplicatePairingPanel from '@/components/ofx/DuplicatePairingPanel';
 import OfxPeriodReport from '@/components/ofx/OfxPeriodReport';
+import BulkCreateDialog from '@/components/ofx/BulkCreateDialog';
+import ClassicReconciliation from '@/components/ofx/ClassicReconciliation';
+import InternalTransfersPanel from '@/components/ofx/InternalTransfersPanel';
+import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
+import ClosingPanel from '@/components/ofx/ClosingPanel';
+import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog';
+import { parseOfx, readOfxFile } from '@/lib/ofx';
 import { todayLocalISO } from '@/lib/utils';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -44,7 +53,9 @@ const basisLabel: Record<string, string> = {
 
 export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const reprocessRef = useRef<HTMLInputElement>(null);
 
   const [accounts, setAccounts] = useState<any[]>([]);
   const [accountId, setAccountId] = useState<string>('');
@@ -57,11 +68,23 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const [ignoreReason, setIgnoreReason] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
+  const [view, setView] = useState<'paineis' | 'lista'>('paineis');
+  const [existingDescriptions, setExistingDescriptions] = useState<Set<string>>(new Set());
+  /** Conciliação (vínculo) que o usuário pediu para excluir; null = nenhum diálogo. */
+  const [deleteTarget, setDeleteTarget] = useState<StatementEntry | null>(null);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  /** Revisão única para criar vários lançamentos com os mesmos campos. */
+  const [bulkOpen, setBulkOpen] = useState(false);
+  /** Linhas em revisão no diálogo de criação em lote. */
+  const [bulkItems, setBulkItems] = useState<EnrichedEntry[]>([]);
+  /** Regra rápida sendo criada a partir de uma linha/grupo do extrato. */
+  const [ruleSeed, setRuleSeed] = useState<QuickRuleSeed | null>(null);
 
   const {
-    enriched, entries, rules, loading, importing, batchRunning, lastImport, stats,
-    importFile, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
-    linkMany, ignoreMany, createMany, reloadRules,
+    enriched, entries, candidates, rules, loading, importing, batchRunning, lastImport, stats,
+    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    linkMany, ignoreMany, createMany, createGrouped, autoLinkByDescription, unlinkMany, duplicateGroups,
   } = useOfxImport(accountId || null, from, to);
 
 
@@ -87,6 +110,114 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   }, []);
 
   const account = accounts.find(a => a.id === accountId);
+
+  /** Descrições já existentes em lançamentos, para avisar sobre duplicidade. */
+  useEffect(() => {
+    if (!accountId) { setExistingDescriptions(new Set()); return; }
+    const shift = (iso: string, days: number) => {
+      const d = new Date(`${iso}T12:00:00`);
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+    (async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('description')
+        .gte('competence_date', shift(from, -35))
+        .lte('competence_date', shift(to, 35))
+        .neq('status', 'cancelado')
+        .limit(5000);
+      setExistingDescriptions(new Set((data ?? []).map(t => normalizeText(t.description || ''))));
+    })();
+  }, [accountId, from, to, entries.length]);
+
+  /** Ids de linhas pendentes cuja descrição já existe em lançamentos. */
+  const duplicateIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (e.status !== 'pendente') continue;
+      const key = normalizeText(e.memo || '');
+      if (key && existingDescriptions.has(key)) set.add(e.id);
+    }
+    return set;
+  }, [entries, existingDescriptions]);
+
+
+  /** Linhas pendentes com descrição idêntica a um único lançamento e regra compatível. */
+  const descAutoLinkables = useMemo(
+    () => enriched.filter(v => v.entry.status === 'pendente' && v.descMatch.autoLinkable),
+    [enriched]
+  );
+  const descAutoIds = useMemo(
+    () => new Set(descAutoLinkables.map(v => v.entry.id)),
+    [descAutoLinkables]
+  );
+  /** Linhas com descrição idêntica, mas divergentes da regra de conciliação. */
+  const descDivergences = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const v of enriched) {
+      if (v.entry.status !== 'pendente') continue;
+      if (v.descMatch.divergences.length > 0) map.set(v.entry.id, v.descMatch.divergences);
+      else if (v.descMatch.ambiguous) map.set(v.entry.id, ['mais de um lançamento com a mesma descrição']);
+    }
+    return map;
+  }, [enriched]);
+
+  /** Linhas apenas parecidas (ex.: mesma descrição e valor, data diferente). */
+  const descSimilar = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const v of enriched) {
+      if (v.entry.status !== 'pendente') continue;
+      if (v.descMatch.similar) map.set(v.entry.id, v.descMatch.similarReasons);
+    }
+    return map;
+  }, [enriched]);
+
+
+  const runAutoLinkByDescription = async () => {
+    if (descAutoLinkables.length === 0) return;
+    await autoLinkByDescription(descAutoLinkables.map(v => ({
+      entryId: v.entry.id,
+      transactionId: v.descMatch.transaction!.id,
+    })));
+    clearSelection();
+  };
+
+  /**
+   * Aplica a regra atual (data + descrição + valor iguais = vínculo automático;
+   * só parte igual = "similar") também aos registros JÁ importados: reaplica as
+   * regras, revalida todas as linhas pendentes e vincula as que batem exatamente.
+   */
+  const revalidateImported = async () => {
+    await reapplyRules();
+    if (descAutoLinkables.length === 0) {
+      toast({
+        title: 'Nenhum vínculo automático encontrado',
+        description: 'As linhas pendentes já importadas foram revalidadas: nenhuma tem data, descrição e valor idênticos a um lançamento.',
+      });
+      return;
+    }
+    await runAutoLinkByDescription();
+  };
+
+  /** Exclui a conciliação de uma linha: o vínculo é desfeito, o lançamento fica. */
+  const confirmDeleteLink = async () => {
+    if (!deleteTarget) return;
+    await unlinkEntry(deleteTarget.id);
+    setDeleteTarget(null);
+    toast({ title: 'Conciliação excluída', description: 'A linha voltou para pendente. O lançamento não foi apagado.' });
+  };
+
+  /** Exclui todas as conciliações (linhas vinculadas) do período exibido. */
+  const confirmDeleteAllLinks = async () => {
+    const ids = entries.filter(e => e.status === 'vinculado').map(e => e.id);
+    setDeleteAllOpen(false);
+    if (ids.length === 0) return;
+    await unlinkMany(ids);
+    clearSelection();
+  };
+
+
 
   const visible = useMemo(
     () => enriched.filter(e => statusFilter === 'todos' || e.entry.status === statusFilter),
@@ -145,8 +276,57 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     clearSelection();
   };
 
+  /** Abre a revisão em lote para as linhas informadas (ou as selecionadas). */
+  const openBulkCreate = (items?: EnrichedEntry[]) => {
+    const list = (items ?? selectedItems).filter(v => v.entry.status === 'pendente');
+    if (list.length === 0) {
+      toast({ title: 'Selecione ao menos uma linha pendente', variant: 'destructive' });
+      return;
+    }
+    setBulkItems(list);
+    setBulkOpen(true);
+  };
+
+  /** Cria os lançamentos revisados no diálogo em lote. */
+  const confirmBulkCreate = async (
+    payload: { entryId: string; patch: any }[],
+    grouped?: { description: string; competence_date: string },
+  ) => {
+    const byId = new Map(bulkItems.map(v => [v.entry.id, v]));
+    setBulkOpen(false);
+    if (grouped) {
+      const first = payload[0];
+      await createGrouped(
+        payload.filter(p => byId.has(p.entryId)).map(p => byId.get(p.entryId)!.entry as StatementEntry),
+        { ...first.patch, description: grouped.description, competence_date: grouped.competence_date },
+      );
+      clearSelection();
+      return;
+    }
+    await createMany(payload
+      .filter(p => byId.has(p.entryId))
+      .map(p => ({ entry: byId.get(p.entryId)!.entry as StatementEntry, patch: p.patch })));
+    clearSelection();
+  };
+
   const runCreateSelected = async () => {
-    await createMany(selectedItems.map(v => ({
+    const dups = selectedItems.filter(v => duplicateIds.has(v.entry.id));
+    const target = selectedItems.filter(v => !duplicateIds.has(v.entry.id));
+    if (target.length === 0) {
+      toast({
+        title: 'Nada a criar',
+        description: 'Todas as linhas selecionadas já têm lançamento com a mesma descrição.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (dups.length > 0) {
+      toast({
+        title: `${dups.length} linha(s) ignorada(s) por duplicidade`,
+        description: 'Já existe lançamento com a mesma descrição no período. Crie manualmente se for necessário.',
+      });
+    }
+    await createMany(target.map(v => ({
       entry: v.entry as StatementEntry,
       patch: {
         description: v.entry.memo || 'Lançamento do extrato',
@@ -168,12 +348,65 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     }
   };
 
+  /**
+   * Ajusta o período da tela para cobrir as datas do arquivo importado.
+   * Sem isso, importar um extrato de agosto no dia 02/09 mostra a lista vazia.
+   */
+  const widenPeriodTo = (summary: { statements: { transactions: { posted_at: string }[] }[]; fileName: string }) => {
+    const dates = summary.statements.flatMap(s => s.transactions.map(t => t.posted_at)).sort();
+    if (dates.length === 0) return;
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    const nextFrom = first < from ? first : from;
+    const nextTo = last > to ? last : to;
+    if (nextFrom !== from || nextTo !== to) {
+      setFrom(nextFrom);
+      setTo(nextTo);
+      toast({
+        title: 'Período ajustado ao arquivo',
+        description: `O extrato tem lançamentos de ${first.split('-').reverse().join('/')} a ${last.split('-').reverse().join('/')}. O filtro foi ampliado para exibi-los.`,
+      });
+    }
+  };
+
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !accountId) return;
-    const summary = await importFile(file, accountId);
     if (fileRef.current) fileRef.current.value = '';
+
+    // Trava de segurança: nunca importar um arquivo de outra conta.
+    // Importação cruzada é o erro mais caro aqui — bagunça saldo e DRE das duas contas.
+    try {
+      const parsed = parseOfx(await readOfxFile(file));
+      const acct = parsed[0]?.acctid || '';
+      const owner = accounts.find(a => a.ofx_acctid && acct && a.ofx_acctid === acct);
+      if (acct && account?.ofx_acctid && account.ofx_acctid !== acct) {
+        toast({
+          title: 'Importação bloqueada: arquivo de outra conta',
+          description: `O arquivo é da conta ${acct}${owner ? ` ("${owner.name}")` : ''}, mas você selecionou "${account.name}" (${account.ofx_acctid}). Selecione a conta correta e importe de novo.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (acct && !account?.ofx_acctid && owner && owner.id !== accountId) {
+        toast({
+          title: 'Importação bloqueada: conta já usada por outra',
+          description: `A conta ${acct} do arquivo já está gravada em "${owner.name}".`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    } catch {
+      // Se não conseguirmos pré-ler, seguimos: importFile trata e reporta o erro.
+    }
+
+    const summary = await importFile(file, accountId);
+
+    // O filtro de período é o motivo nº 1 de "importei e não apareceu nada":
+    // o arquivo pode ser de datas fora do período na tela. Ampliamos o filtro
+    // para cobrir as datas realmente presentes no arquivo.
+    if (summary) widenPeriodTo(summary);
 
     // Se o arquivo declara a conta e ainda não gravamos, guardamos para o próximo upload.
     const acct = summary?.statements[0]?.acctid;
@@ -184,15 +417,26 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       } as any).eq('id', accountId);
       setAccounts(list => list.map(a => (a.id === accountId ? { ...a, ofx_acctid: acct } : a)));
     }
-    // Aviso quando o arquivo é de outra conta.
-    if (summary && acct && account?.ofx_acctid && account.ofx_acctid !== acct) {
-      toast({
-        title: 'Atenção: conta do arquivo é diferente',
-        description: `O arquivo é da conta ${acct}, mas "${account.name}" está gravada como ${account.ofx_acctid}.`,
-        variant: 'destructive',
-      });
-    }
   };
+
+
+  /** Abre a revisão em lote já com as linhas de um grupo de histórico. */
+  const openBulkFor = (items: EnrichedEntry[]) => {
+    setBulkItems(items);
+    setBulkOpen(true);
+  };
+
+  /** Reprocessa o mesmo arquivo: atualiza pendentes, insere novas e reaplica regras. */
+  const handleReprocessFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !accountId) return;
+    const summary = await reprocessFile(file, accountId);
+    if (summary) widenPeriodTo(summary as any);
+
+    if (reprocessRef.current) reprocessRef.current.value = '';
+    clearSelection();
+  };
+
 
   const openCreate = (item: EnrichedEntry) => {
     setCreateFor(item);
@@ -266,6 +510,35 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
               <Upload className="h-4 w-4" />
               {importing ? 'Lendo arquivo...' : 'Selecionar arquivo OFX'}
             </Button>
+            <input ref={reprocessRef} type="file" accept=".ofx,.OFX,text/plain,application/x-ofx" className="hidden" onChange={handleReprocessFile} />
+            <Button
+              variant="outline"
+              className="gap-2 rounded-xl"
+              disabled={!accountId || importing}
+              onClick={() => setTimeout(() => reprocessRef.current?.click(), 100)}
+              title="Relê o mesmo arquivo e reaplica as regras nas linhas pendentes, sem desfazer decisões já tomadas"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {importing ? 'Processando...' : 'Reprocessar arquivo OFX'}
+            </Button>
+            <Button
+              variant="ghost"
+              className="gap-2 rounded-xl"
+              disabled={!accountId || loading || importing}
+              onClick={reapplyRules}
+              title="Recarrega as regras de conciliação e reaplica às linhas pendentes"
+            >
+              <RotateCcw className="h-4 w-4" /> Reaplicar regras
+            </Button>
+            <Button
+              variant="secondary"
+              className="gap-2 rounded-xl"
+              disabled={!accountId || loading || batchRunning}
+              onClick={revalidateImported}
+              title="Revalida os registros já importados: vincula automaticamente quando data, descrição e valor são iguais e marca os apenas parecidos como similares"
+            >
+              <Zap className="h-4 w-4" /> Revalidar importados ({descAutoLinkables.length})
+            </Button>
             {(['pendente', 'vinculado', 'ignorado', 'todos'] as const).map(s => (
               <Button
                 key={s}
@@ -325,15 +598,134 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         </Alert>
       )}
 
+      {(descAutoLinkables.length > 0 || descDivergences.size > 0) && (
+        <Alert>
+          <Zap className="h-4 w-4" />
+          <AlertDescription className="text-xs space-y-2">
+            <p>
+              {descAutoLinkables.length} linha(s) do extrato têm descrição idêntica a um lançamento existente
+              e batem com a regra de conciliação (categoria, unidade, frente e parceiro) — podem ser
+              <strong> vinculadas automaticamente</strong>, sem conciliar nem alterar o lançamento.
+              {descDivergences.size > 0 && ` ${descDivergences.size} linha(s) têm descrição igual, mas divergem da regra e ficam para decisão manual.`}
+            </p>
+            <Button
+              size="sm"
+              className="gap-1.5 rounded-xl h-8"
+              disabled={descAutoLinkables.length === 0 || batchRunning}
+              onClick={runAutoLinkByDescription}
+            >
+              <Zap className="h-3.5 w-3.5" /> Vincular automático por descrição ({descAutoLinkables.length})
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {([['paineis', 'Visão em painéis'], ['lista', 'Visão em lista']] as const).map(([key, label]) => (
+          <Button
+            key={key}
+            size="sm"
+            variant={view === key ? 'default' : 'outline'}
+            className="rounded-xl"
+            onClick={() => setView(key)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
+      {accountId && view === 'paineis' && (
+        <ClassicReconciliation
+          accountName={account?.name ?? 'Conta'}
+          from={from}
+          to={to}
+          accountId={accountId}
+          enriched={enriched}
+          candidates={candidates}
+          busy={batchRunning}
+          onLink={(entryId, txId, note) => linkEntry(entryId, txId, note)}
+          onUnlink={(entryId) => unlinkEntry(entryId)}
+          onIgnore={(ids, reason) => ignoreMany(ids, reason)}
+          onCreate={(id) => {
+            const item = enriched.find(v => v.entry.id === id);
+            if (item) openCreate(item);
+          }}
+          onCreateMany={(ids) => {
+            const items = ids
+              .map(id => enriched.find(v => v.entry.id === id))
+              .filter(Boolean) as EnrichedEntry[];
+            if (items.length === 1) openCreate(items[0]);
+            else openBulkCreate(items);
+          }}
+        />
+      )}
+
       {accountId && (
+        <ClosingPanel
+          accountId={accountId}
+          accountName={account?.name ?? 'Conta'}
+          to={to}
+          ledgerBalance={lastImport?.ledgerBalance ?? null}
+          ledgerBalanceDate={lastImport?.ledgerBalanceDate ?? null}
+          pendentes={stats.pendentes}
+          pendenteValor={stats.pendenteValor}
+        />
+      )}
+
+      {accountId && <InternalTransfersPanel from={from} to={to} />}
+
+      {accountId && (
+        <PatternGroupsPanel
+          enriched={enriched}
+          onCreateRule={setRuleSeed}
+          onCreateMany={openBulkFor}
+        />
+      )}
+
+      {accountId && view === 'lista' && (
+        <DuplicatePairingPanel groups={duplicateGroups} />
+      )}
+
+
+      {accountId && view === 'lista' && (
         <OfxPeriodReport
           entries={entries}
           accountName={account?.name ?? 'Conta'}
           from={from}
           to={to}
+          selected={selected}
+          duplicates={duplicateIds}
+          autoLinkables={descAutoIds}
+          divergences={descDivergences}
+          similars={descSimilar}
+
+          busy={batchRunning}
+          onView={(e) => navigate(`/lancamentos?q=${encodeURIComponent(e.memo || '')}`)}
+          onUnlink={(e) => unlinkEntry(e.id)}
+          onDeleteLink={(e) => setDeleteTarget(e)}
+          onDeleteAllLinks={() => setDeleteAllOpen(true)}
+          onToggle={toggle}
+          onToggleAll={(ids) => {
+            const all = ids.every(id => selected.has(id));
+            ids.forEach(id => { if (all === selected.has(id)) toggle(id); });
+          }}
+          onCreate={(id) => {
+            const item = enriched.find(v => v.entry.id === id);
+            if (item) openCreate(item);
+          }}
+          onCreateSelected={() => openBulkCreate()}
         />
       )}
 
+      {view === 'lista' && (
+        <div>
+          <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => setShowDetails(v => !v)}>
+            {showDetails ? 'Ocultar detalhes e sugestões' : 'Ver detalhes e sugestões das linhas'}
+          </Button>
+        </div>
+      )}
+
+      {showDetails && view === 'lista' && (
       <Card className="shadow-card rounded-2xl border-border">
         <CardHeader className="space-y-3">
           <CardTitle className="text-sm font-heading">Linhas do extrato</CardTitle>
@@ -378,10 +770,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   variant="outline"
                   className="gap-1.5 rounded-xl h-8"
                   disabled={batchRunning}
-                  onClick={runCreateSelected}
+                  onClick={() => openBulkCreate()}
                 >
                   <PlusCircle className="h-3.5 w-3.5" />
-                  Criar lançamentos
+                  Criar lançamentos em lote
                 </Button>
                 <Button
                   size="sm"
@@ -406,8 +798,23 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         <CardContent className="space-y-3">
           {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
           {!loading && visible.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhuma linha nesse filtro. Importe um arquivo OFX para começar.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Nenhuma linha nesse filtro.</p>
+              <p className="text-xs text-muted-foreground">
+                Se você acabou de importar um extrato, confira o <strong>período</strong> ({from.split('-').reverse().join('/')} a {to.split('-').reverse().join('/')}) e a <strong>conta</strong> selecionada:
+                as linhas só aparecem se a data do extrato estiver dentro do filtro.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                onClick={() => { setFrom(`${to.slice(0, 4)}-01-01`); setTo(todayLocalISO()); }}
+              >
+                Ver o ano todo
+              </Button>
+            </div>
           )}
+
           {visible.map(item => {
             const e = item.entry;
             return (
@@ -497,8 +904,44 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
           })}
         </CardContent>
       </Card>
+      )}
 
-      <OfxRulesPanel rules={rules} options={options} onChanged={reloadRules} />
+
+
+      <Dialog open={!!deleteTarget} onOpenChange={o => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-heading">Excluir conciliação</DialogTitle></DialogHeader>
+          {deleteTarget && (
+            <div className="space-y-2 text-xs">
+              <p className="text-muted-foreground">
+                {br(deleteTarget.posted_at)} · {brl(Number(deleteTarget.amount))} · {deleteTarget.memo}
+              </p>
+              <p>
+                O vínculo com o lançamento será desfeito e a linha voltará para <strong>pendente</strong>.
+                O lançamento em si <strong>não</strong> é excluído.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={batchRunning} onClick={confirmDeleteLink}>Excluir conciliação</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-heading">Excluir todas as conciliações do período</DialogTitle></DialogHeader>
+          <p className="text-xs">
+            {entries.filter(e => e.status === 'vinculado').length} linha(s) vinculada(s) voltarão para pendente.
+            Nenhum lançamento é excluído.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteAllOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" disabled={batchRunning} onClick={confirmDeleteAllLinks}>Excluir conciliações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={ignoreOpen} onOpenChange={o => { setIgnoreOpen(o); if (!o) setIgnoreReason(''); }}>
         <DialogContent className="max-w-md">
@@ -542,6 +985,27 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       </Dialog>
 
 
+      <BulkCreateDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        items={bulkItems}
+        duplicates={duplicateIds}
+        options={options}
+        accounts={accounts}
+        defaultAccountId={accountId}
+        busy={batchRunning}
+        onConfirm={confirmBulkCreate}
+      />
+
+      <QuickRuleDialog
+        seed={ruleSeed}
+        options={options}
+        onOpenChange={o => !o && setRuleSeed(null)}
+        onSaved={reapplyRules}
+      />
+
+
+
       <Dialog open={!!createFor} onOpenChange={o => !o && setCreateFor(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading">Criar lançamento a partir do extrato</DialogTitle></DialogHeader>
@@ -555,6 +1019,30 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   com data de pagamento igual à do extrato.
                 </p>
               </div>
+              {duplicateIds.has(createFor.entry.id) && (
+                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+                  Já existe um lançamento com esta mesma descrição no período. Confirme se não é duplicidade antes de criar.
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-xl border border-border p-2">
+                  <p className="text-muted-foreground">Valor</p>
+                  <p className="font-medium">{brl(Math.abs(createFor.entry.amount))}</p>
+                </div>
+                <div className="rounded-xl border border-border p-2">
+                  <p className="text-muted-foreground">Data</p>
+                  <p className="font-medium">{br(createFor.entry.posted_at)}</p>
+                </div>
+                <div className="rounded-xl border border-border p-2">
+                  <p className="text-muted-foreground">Conta</p>
+                  <p className="font-medium truncate">{account?.name ?? '—'}</p>
+                </div>
+              </div>
+              {createFor.ruleLabel && (
+                <p className="text-xs text-muted-foreground">
+                  Campos pré-preenchidos pela regra de conciliação "<strong>{createFor.ruleLabel}</strong>". Revise e salve.
+                </p>
+              )}
               <div className="space-y-1.5">
                 <Label>Descrição</Label>
                 <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f: any) => ({ ...f, description: ev.target.value }))} />

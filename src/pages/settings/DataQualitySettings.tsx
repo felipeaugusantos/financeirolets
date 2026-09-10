@@ -929,6 +929,49 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
             <SimpleTable items={q.foraDoCaixa} />
           </Section>
 
+          <Section
+            icon={Split}
+            title="Rateio que não fecha"
+            hint='A soma do rateio é diferente do valor do lançamento — a sobra aparece como "Sem unidade" nos relatórios.'
+            count={q.allocationIssues.length}
+            tone={q.allocationIssues.length > 0 ? 'destructive' : 'muted'}
+          >
+            {q.allocationIssues.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">Todos os rateios fecham com o valor do lançamento.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {q.allocationIssues.map(({ tx, residual, allocated }) => (
+                  <div key={tx.id} className="p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium truncate">{tx.description}</p>
+                      <p className="text-sm whitespace-nowrap">{fmt(tx.net_amount)}</p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {fmtDate(tx.competence_date)} • rateado {fmt(allocated)} • sobra {fmt(residual)}
+                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => openTx(tx)}>
+                        <ExternalLink className="h-3 w-3" /> Abrir
+                      </Button>
+                      <Button
+                        variant="outline" size="sm" className="h-7 text-xs gap-1"
+                        onClick={() => setAllocTarget({
+                          id: tx.id,
+                          description: tx.description,
+                          total: Number(tx.net_amount) || 0,
+                          competence_date: tx.competence_date,
+                          currentUnits: [],
+                        })}
+                      >
+                        <Split className="h-3 w-3" /> Refazer rateio
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
           <Section icon={Users} title="Despesas sem fornecedor" hint="Somente leitura — ajuste pelo próprio lançamento."
             count={q.semFornecedor.length} tone="muted" onExport={() => exportTxs('sem_fornecedor', q.semFornecedor, 'despesa sem fornecedor')}>
             <SimpleTable items={q.semFornecedor} />
@@ -951,6 +994,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
       <AllocationAssistant
         target={allocTarget}
         units={q.units}
+        fronts={q.fronts}
         busy={busy}
         onClose={() => setAllocTarget(null)}
         onSave={saveAllocations}

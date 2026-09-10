@@ -22,21 +22,27 @@ export interface AllocationTarget {
  * Rateio ASSISTIDO: o usuário define percentuais ou valores por unidade.
  * Não divide igualmente por conta própria e não grava nada sem confirmação.
  */
+const NO_FRONT = '__none__';
+
 export default function AllocationAssistant({
   target,
   units,
+  fronts = [],
   busy,
   onClose,
   onSave,
 }: {
   target: AllocationTarget | null;
   units: { id: string; name: string }[];
+  fronts?: { id: string; name: string }[];
   busy?: boolean;
   onClose: () => void;
   onSave: (id: string, rows: AllocationDraft[]) => Promise<boolean>;
 }) {
   const [mode, setMode] = useState<'percentual' | 'valor'>('percentual');
-  const [rows, setRows] = useState<{ unit_id: string; v: string }[]>([{ unit_id: '', v: '' }]);
+  const [rows, setRows] = useState<{ unit_id: string; front_id: string; v: string }[]>([
+    { unit_id: '', front_id: NO_FRONT, v: '' },
+  ]);
 
   const total = target?.total || 0;
   const sum = useMemo(
@@ -48,7 +54,7 @@ export default function AllocationAssistant({
     rows.length > 0 &&
     rows.every((r) => r.unit_id) &&
     Math.abs(sum - expected) < 0.01 &&
-    new Set(rows.map((r) => r.unit_id)).size === rows.length;
+    new Set(rows.map((r) => `${r.unit_id}|${r.front_id}`)).size === rows.length;
 
   if (!target) return null;
 
@@ -99,6 +105,18 @@ export default function AllocationAssistant({
                   ))}
                 </SelectContent>
               </Select>
+              <Select
+                value={r.front_id}
+                onValueChange={(v) => setRows((p) => p.map((x, j) => (j === i ? { ...x, front_id: v } : x)))}
+              >
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Frente" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FRONT}>Sem frente</SelectItem>
+                  {fronts.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 className="w-32"
                 inputMode="decimal"
@@ -111,7 +129,7 @@ export default function AllocationAssistant({
               </Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setRows((p) => [...p, { unit_id: '', v: '' }])}>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setRows((p) => [...p, { unit_id: '', front_id: NO_FRONT, v: '' }])}>
             <Plus className="h-4 w-4" /> Adicionar unidade
           </Button>
         </div>
@@ -133,6 +151,7 @@ export default function AllocationAssistant({
                 target.id,
                 rows.map((r) => ({
                   unit_id: r.unit_id,
+                  front_id: r.front_id === NO_FRONT ? null : r.front_id,
                   allocation_type: mode,
                   percentage: mode === 'percentual' ? parseFloat(r.v.replace(',', '.')) : null,
                   amount: mode === 'valor' ? parseFloat(r.v.replace(',', '.')) : null,
