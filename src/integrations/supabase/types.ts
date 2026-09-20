@@ -469,6 +469,39 @@ export type Database = {
           },
         ]
       }
+      closed_periods: {
+        Row: {
+          closed_at: string
+          closed_by: string | null
+          created_at: string
+          id: string
+          month: number
+          note: string | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          closed_at?: string
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          month: number
+          note?: string | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          month?: number
+          note?: string | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       dre_lines: {
         Row: {
           active: boolean
@@ -1102,6 +1135,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_period_closed: { Args: { _d: string }; Returns: boolean }
       log_reconciliation_fix: {
         Args: { _new_data: Json; _old_data: Json; _record_id: string }
         Returns: string
