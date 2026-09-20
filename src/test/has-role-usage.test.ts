@@ -42,6 +42,7 @@ describe("has_role — uso restrito a autorização via RLS", () => {
       if (
         f.endsWith("has-role-usage.test.ts") ||
         f.endsWith("rls.test.ts") ||
+        f.endsWith("data/releases.ts") || // apenas texto de novidades
         f.includes("integrations/supabase/types") // tipos auto-gerados
       )
         continue;

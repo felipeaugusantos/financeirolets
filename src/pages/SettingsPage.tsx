@@ -1,7 +1,8 @@
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target, ClipboardCheck } from 'lucide-react';
+import { Building2, Layers, Wallet, Tag, Users, BarChart3, FileDown, Shield, History, Target, ClipboardCheck, Lock } from 'lucide-react';
+import ClosedPeriodsSettings from './settings/ClosedPeriodsSettings';
 import UnitsSettings from './settings/UnitsSettings';
 import FrontsSettings from './settings/FrontsSettings';
 import AccountsSettings from './settings/AccountsSettings';
@@ -26,6 +27,7 @@ const baseSections = [
   { key: 'partners', title: 'Parceiros', desc: 'Fornecedores, clientes e contatos', icon: Users },
   { key: 'export', title: 'Importar / Exportar', desc: 'CSV e backup de dados', icon: FileDown },
   { key: 'quality', title: 'Conferência de lançamentos', desc: 'Duplicados, sem categoria, sem unidade...', icon: ClipboardCheck },
+  { key: 'closing', title: 'Fechamento de mês', desc: 'Travar meses já conferidos', icon: Lock },
 ];
 
 
@@ -47,6 +49,7 @@ export default function SettingsPage() {
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
   if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
   if (active === 'quality') return <DataQualitySettings onBack={() => setActive(null)} />;
+  if (active === 'closing') return <ClosedPeriodsSettings onBack={() => setActive(null)} />;
 
   if (active === 'users') return <UsersSettings onBack={() => setActive(null)} />;
   if (active === 'audit') return <AuditSettings onBack={() => setActive(null)} />;
