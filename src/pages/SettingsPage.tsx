@@ -27,6 +27,7 @@ const baseSections = [
   { key: 'partners', title: 'Parceiros', desc: 'Fornecedores, clientes e contatos', icon: Users },
   { key: 'export', title: 'Importar / Exportar', desc: 'CSV e backup de dados', icon: FileDown },
   { key: 'quality', title: 'Conferência de lançamentos', desc: 'Duplicados, sem categoria, sem unidade...', icon: ClipboardCheck },
+  { key: 'closing', title: 'Fechamento de mês', desc: 'Travar meses já conferidos', icon: Lock },
 ];
 
 
