@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          default_unit_id: string | null
           id: string
           initial_balance: number
           initial_balance_date: string | null
@@ -30,6 +31,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          default_unit_id?: string | null
           id?: string
           initial_balance?: number
           initial_balance_date?: string | null
@@ -42,6 +44,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          default_unit_id?: string | null
           id?: string
           initial_balance?: number
           initial_balance_date?: string | null
@@ -51,7 +54,15 @@ export type Database = {
           type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounts_default_unit_id_fkey"
+            columns: ["default_unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       attachments: {
         Row: {
@@ -511,53 +522,102 @@ export type Database = {
           },
         ]
       }
+      kaikin_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ofx_import_rules: {
         Row: {
+          account_id: string | null
           active: boolean
+          allocations: Json | null
           applies_to: string
           category_id: string | null
           created_at: string
           created_by: string | null
+          exclude_pattern: string | null
           front_id: string | null
           id: string
           match_type: string
+          max_amount: number | null
+          min_amount: number | null
           partner_id: string | null
           pattern: string
           priority: number
           unit_id: string | null
           updated_at: string
+          use_statement_unit: boolean
         }
         Insert: {
+          account_id?: string | null
           active?: boolean
+          allocations?: Json | null
           applies_to?: string
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          exclude_pattern?: string | null
           front_id?: string | null
           id?: string
           match_type?: string
+          max_amount?: number | null
+          min_amount?: number | null
           partner_id?: string | null
           pattern: string
           priority?: number
           unit_id?: string | null
           updated_at?: string
+          use_statement_unit?: boolean
         }
         Update: {
+          account_id?: string | null
           active?: boolean
+          allocations?: Json | null
           applies_to?: string
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          exclude_pattern?: string | null
           front_id?: string | null
           id?: string
           match_type?: string
+          max_amount?: number | null
+          min_amount?: number | null
           partner_id?: string | null
           pattern?: string
           priority?: number
           unit_id?: string | null
           updated_at?: string
+          use_statement_unit?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "ofx_import_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ofx_import_rules_category_id_fkey"
             columns: ["category_id"]
