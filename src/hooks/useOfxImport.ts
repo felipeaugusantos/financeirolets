@@ -59,6 +59,8 @@ export interface EnrichedEntry {
   ruleFrontId: string | null;
   rulePartnerId: string | null;
   ruleLabel: string | null;
+  /** Rateio sugerido pela regra (percentual por unidade/frente). */
+  ruleAllocations: OfxAllocation[] | null;
   /** Lançamento existente com a mesma descrição, e checagem contra a regra. */
   descMatch: DescriptionMatch;
 }
@@ -69,6 +71,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   const [entries, setEntries] = useState<StatementEntry[]>([]);
   const [candidates, setCandidates] = useState<CandidateTransaction[]>([]);
   const [rules, setRules] = useState<OfxRule[]>([]);
+  const [accountUnitId, setAccountUnitId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<ImportSummary | null>(null);
@@ -81,6 +84,18 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       .order('priority');
     setRules((data ?? []) as OfxRule[]);
   }, []);
+
+  /** Unidade padrão da conta do extrato, usada pelas regras "unidade do extrato". */
+  useEffect(() => {
+    if (!accountId) { setAccountUnitId(null); return; }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('accounts').select('default_unit_id').eq('id', accountId).maybeSingle();
+      setAccountUnitId((data?.default_unit_id ?? null) as string | null);
+    })();
+  }, [accountId]);
+
+  const ruleContext = useMemo(() => ({ accountId, accountUnitId }), [accountId, accountUnitId]);
 
   const load = useCallback(async () => {
     if (!accountId) { setEntries([]); setCandidates([]); return; }
@@ -140,7 +155,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
     const list = entries.map(entry => {
       const pool = candidates.filter(t => !linkedTransactionIds.has(t.id) || t.id === entry.transaction_id);
-      const outcome = applyRules(entry.memo || '', entry.amount, rules);
+      const outcome = applyRules(entry.memo || '', entry.amount, rules, ruleContext);
       const descMatch = entry.status === 'pendente'
         ? matchByDescription(entry.memo || '', entry.amount, entry.posted_at, pool, outcome)
         : emptyDescriptionMatch();
@@ -154,6 +169,12 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         ruleFrontId: outcome?.front_id ?? null,
         rulePartnerId: outcome?.partner_id ?? null,
         ruleLabel: outcome ? outcome.rule.pattern : null,
+        ruleAllocations: outcome?.allocations
+          ? outcome.allocations.map(a => ({
+              unit_id: a.unit_id, front_id: a.front_id,
+              allocation_type: 'percentual' as const, value: a.percentage,
+            }))
+          : null,
         outcome,
       };
     });
@@ -179,7 +200,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       })),
       duplicateGroups: groups,
     };
-  }, [entries, candidates, rules, accountId, linkedTransactionIds]);
+  }, [entries, candidates, rules, accountId, linkedTransactionIds, ruleContext]);
 
 
   /** Lê o arquivo e grava as linhas novas. Nenhum lançamento é criado aqui. */
@@ -418,6 +439,14 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   ): Promise<{ id: string } | { error: string }> => {
     const amount = Math.abs(entry.amount);
     const type = entry.amount >= 0 ? 'receita' : 'despesa';
+    // Sem rateio informado na tela, vale o rateio definido na regra do extrato.
+    const outcome = applyRules(entry.memo || '', entry.amount, rules, ruleContext);
+    const allocations = patch.allocations?.length
+      ? patch.allocations
+      : (outcome?.allocations ?? []).map(a => ({
+          unit_id: a.unit_id, front_id: a.front_id,
+          allocation_type: 'percentual' as const, value: a.percentage,
+        }));
     const { data: created, error } = await supabase
       .from('transactions')
       .insert({
@@ -442,9 +471,9 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       .select('id')
       .single();
     if (error || !created) return { error: error?.message ?? 'Falha ao criar lançamento' };
-    await insertAllocations(created.id, patch.allocations);
+    await insertAllocations(created.id, allocations);
     return { id: created.id };
-  }, [user, insertAllocations]);
+  }, [user, insertAllocations, rules, ruleContext]);
 
 
   /** Cria o lançamento a partir da linha do extrato e já o vincula. */

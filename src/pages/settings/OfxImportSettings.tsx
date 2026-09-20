@@ -24,6 +24,10 @@ import InternalTransfersPanel from '@/components/ofx/InternalTransfersPanel';
 import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
 import ClosingPanel from '@/components/ofx/ClosingPanel';
 import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog';
+import AutoPostDialog from '@/components/ofx/AutoPostDialog';
+import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
+import { suggestPaymentMethod } from '@/lib/paymentMethod';
+
 import { parseOfx, readOfxFile } from '@/lib/ofx';
 import { todayLocalISO } from '@/lib/utils';
 
@@ -70,7 +74,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [ignoreReason, setIgnoreReason] = useState('');
   const [showDetails, setShowDetails] = useState(false);
   const [view, setView] = useState<'paineis' | 'lista'>('paineis');
-  const [existingDescriptions, setExistingDescriptions] = useState<Set<string>>(new Set());
+  const [existingDescriptions, setExistingDescriptions] = useState<Map<string, string[]>>(new Map());
   /** Conciliação (vínculo) que o usuário pediu para excluir; null = nenhum diálogo. */
   const [deleteTarget, setDeleteTarget] = useState<StatementEntry | null>(null);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
@@ -80,6 +84,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [bulkItems, setBulkItems] = useState<EnrichedEntry[]>([]);
   /** Regra rápida sendo criada a partir de uma linha/grupo do extrato. */
   const [ruleSeed, setRuleSeed] = useState<QuickRuleSeed | null>(null);
+  /** Revisão do lançamento automático das linhas já classificadas por regra. */
+  const [autoPostOpen, setAutoPostOpen] = useState(false);
+
 
   const {
     enriched, entries, candidates, rules, loading, importing, batchRunning, lastImport, stats,
@@ -111,9 +118,13 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   const account = accounts.find(a => a.id === accountId);
 
-  /** Descrições já existentes em lançamentos, para avisar sobre duplicidade. */
+  /**
+   * Lançamentos já existentes (mesma conta ou sem conta) usados para detectar
+   * duplicidade. A chave combina descrição + valor; as datas ficam na lista
+   * para exigir proximidade de dias — descrição repetida sozinha não basta.
+   */
   useEffect(() => {
-    if (!accountId) { setExistingDescriptions(new Set()); return; }
+    if (!accountId) { setExistingDescriptions(new Map()); return; }
     const shift = (iso: string, days: number) => {
       const d = new Date(`${iso}T12:00:00`);
       d.setDate(d.getDate() + days);
@@ -122,22 +133,43 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     (async () => {
       const { data } = await supabase
         .from('transactions')
-        .select('description')
+        .select('description, amount, net_amount, competence_date, due_date, payment_date, account_id')
+        .or(`account_id.eq.${accountId},account_id.is.null`)
         .gte('competence_date', shift(from, -35))
         .lte('competence_date', shift(to, 35))
         .neq('status', 'cancelado')
         .limit(5000);
-      setExistingDescriptions(new Set((data ?? []).map(t => normalizeText(t.description || ''))));
+      const map = new Map<string, string[]>();
+      for (const t of (data ?? []) as any[]) {
+        const desc = normalizeText(t.description || '');
+        if (!desc) continue;
+        const values = [t.amount, t.net_amount]
+          .filter(v => v !== null && v !== undefined)
+          .map(v => Math.abs(Number(v)).toFixed(2));
+        const dates = [t.payment_date, t.due_date, t.competence_date].filter(Boolean) as string[];
+        for (const v of new Set(values)) {
+          const key = `${desc}|${v}`;
+          map.set(key, [...(map.get(key) ?? []), ...dates]);
+        }
+      }
+      setExistingDescriptions(map);
     })();
   }, [accountId, from, to, entries.length]);
 
-  /** Ids de linhas pendentes cuja descrição já existe em lançamentos. */
+  /**
+   * Ids de linhas pendentes que já têm lançamento equivalente:
+   * mesma descrição, mesmo valor e data em até 5 dias de diferença.
+   */
   const duplicateIds = useMemo(() => {
     const set = new Set<string>();
+    const dayDiff = (a: string, b: string) =>
+      Math.abs(new Date(`${a}T12:00:00`).getTime() - new Date(`${b}T12:00:00`).getTime()) / 86400000;
     for (const e of entries) {
       if (e.status !== 'pendente') continue;
-      const key = normalizeText(e.memo || '');
-      if (key && existingDescriptions.has(key)) set.add(e.id);
+      const desc = normalizeText(e.memo || '');
+      if (!desc) continue;
+      const dates = existingDescriptions.get(`${desc}|${Math.abs(Number(e.amount)).toFixed(2)}`);
+      if (dates?.some(d => dayDiff(d, e.posted_at) <= 5)) set.add(e.id);
     }
     return set;
   }, [entries, existingDescriptions]);
@@ -259,6 +291,44 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     setSelected(allVisibleSelected ? new Set() : new Set(selectableIds));
 
   const clearSelection = () => setSelected(new Set());
+
+  /**
+   * Linhas pendentes que uma regra já classificou (categoria definida) e que
+   * ainda não têm lançamento equivalente: candidatas ao lançamento automático.
+   */
+  const autoPostable = useMemo(
+    () => enriched.filter(v =>
+      v.entry.status === 'pendente'
+      && !!v.ruleCategoryId
+      && !descAutoIds.has(v.entry.id)
+      && !duplicateIds.has(v.entry.id)
+    ),
+    [enriched, descAutoIds, duplicateIds]
+  );
+
+  /** Cria e concilia, de uma vez, as linhas revisadas no diálogo automático. */
+  const confirmAutoPost = async (items: EnrichedEntry[]) => {
+    setAutoPostOpen(false);
+    const res = await createMany(items.map(v => ({
+      entry: v.entry as StatementEntry,
+      patch: {
+        description: v.entry.memo || 'Lançamento do extrato',
+        category_id: v.ruleCategoryId,
+        unit_id: v.ruleAllocations?.length ? null : v.ruleUnitId,
+        front_id: v.ruleAllocations?.length ? null : v.ruleFrontId,
+        partner_id: v.rulePartnerId,
+        payment_method: suggestPaymentMethod(v.entry.memo),
+        allocations: v.ruleAllocations ?? undefined,
+      },
+    })));
+    clearSelection();
+    // Depois de lançar, mostra o extrato já conciliado para conferência.
+    if (res.ok > 0) {
+      setStatusFilter('vinculado');
+      setView('lista');
+    }
+  };
+
 
   const runAutoLink = async () => {
     await linkMany(autoLinkable.map(a => ({
@@ -539,6 +609,16 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             >
               <Zap className="h-4 w-4" /> Revalidar importados ({descAutoLinkables.length})
             </Button>
+            <Button
+              variant="secondary"
+              className="gap-2 rounded-xl"
+              disabled={!accountId || loading || batchRunning || autoPostable.length === 0}
+              onClick={() => setAutoPostOpen(true)}
+              title="Cria e concilia de uma vez todas as linhas pendentes que as regras já classificaram"
+            >
+              <PlusCircle className="h-4 w-4" /> Lançar pelas regras ({autoPostable.length})
+            </Button>
+
             {(['pendente', 'vinculado', 'ignorado', 'todos'] as const).map(s => (
               <Button
                 key={s}
@@ -680,6 +760,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
           onCreateRule={setRuleSeed}
           onCreateMany={openBulkFor}
         />
+      )}
+
+      {accountId && (
+        <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />
       )}
 
       {accountId && view === 'lista' && (
@@ -1003,6 +1087,17 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         onOpenChange={o => !o && setRuleSeed(null)}
         onSaved={reapplyRules}
       />
+
+      <AutoPostDialog
+        open={autoPostOpen}
+        onOpenChange={setAutoPostOpen}
+        items={autoPostable}
+        duplicateIds={duplicateIds}
+        options={options}
+        busy={batchRunning}
+        onConfirm={confirmAutoPost}
+      />
+
 
 
 

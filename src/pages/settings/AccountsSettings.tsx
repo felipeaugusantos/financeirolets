@@ -1,5 +1,6 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
@@ -42,11 +43,31 @@ const fields: FieldConfig[] = [
   { name: 'ofx_bankid', label: 'Código do banco no OFX (BANKID)', placeholder: 'Ex: 237 (Bradesco)' },
 ];
 
+/** Campo extra: unidade padrão desta conta, usada pelas regras de conciliação. */
+function buildFields(units: { id: string; name: string }[]): FieldConfig[] {
+  return [
+    ...fields,
+    {
+      name: 'default_unit_id',
+      label: 'Unidade padrão desta conta',
+      type: 'select',
+      options: units.map(u => ({ value: u.id, label: u.name })),
+      hint: 'Usada pelas regras de conciliação marcadas como "unidade da conta do extrato".',
+    },
+  ];
+}
+
 
 export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('accounts');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from('units').select('id, name').eq('active', true).order('name')
+      .then(({ data }) => setUnits((data ?? []) as any));
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -70,11 +91,15 @@ export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Editar Conta' : 'Nova Conta'}
-        fields={fields}
+        fields={buildFields(units)}
         initialData={editing}
         onSave={data => {
           // Data-base vazia precisa virar nulo (string vazia não é data válida).
-          const payload = { ...data, initial_balance_date: data.initial_balance_date || null };
+          const payload = {
+            ...data,
+            initial_balance_date: data.initial_balance_date || null,
+            default_unit_id: data.default_unit_id || null,
+          };
           return editing ? update(editing.id, payload) : create(payload);
         }}
       />

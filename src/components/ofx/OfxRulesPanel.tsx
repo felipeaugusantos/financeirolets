@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Trash2, Wand2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus, Power, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { OfxRule } from '@/lib/ofxMatch';
+import { Switch } from '@/components/ui/switch';
+import type { OfxRule, RuleAllocation } from '@/lib/ofxMatch';
 
 export interface OptionList {
   categories: { id: string; name: string; type: string }[];
@@ -24,7 +25,9 @@ export interface OptionList {
 
 const NONE = '__none__';
 
-type Errors = Partial<Record<'pattern' | 'priority' | 'suggestion', string>>;
+type Errors = Partial<Record<'pattern' | 'priority' | 'suggestion' | 'amount' | 'allocations', string>>;
+
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Valida o formulário e devolve mensagens claras por campo. */
 function validate(form: Partial<OfxRule>, rules: OfxRule[], editingId?: string): Errors {
@@ -54,18 +57,43 @@ function validate(form: Partial<OfxRule>, rules: OfxRule[], editingId?: string):
     errors.priority = 'A prioridade deve ser um número inteiro entre 1 e 999.';
   }
 
-  if (!form.category_id && !form.unit_id && !form.front_id && !form.partner_id) {
-    errors.suggestion = 'Escolha ao menos uma sugestão (categoria, unidade, frente ou parceiro).';
+  const allocs = (form.allocations ?? []) as RuleAllocation[];
+
+  if (!form.category_id && !form.unit_id && !form.front_id && !form.partner_id
+    && !form.use_statement_unit && allocs.length === 0) {
+    errors.suggestion = 'Escolha ao menos uma sugestão (categoria, unidade, frente, parceiro ou rateio).';
+  }
+
+  const min = form.min_amount == null ? null : Number(form.min_amount);
+  const max = form.max_amount == null ? null : Number(form.max_amount);
+  if ((min != null && (Number.isNaN(min) || min < 0)) || (max != null && (Number.isNaN(max) || max < 0))) {
+    errors.amount = 'Os valores da faixa devem ser números positivos.';
+  } else if (min != null && max != null && min > max) {
+    errors.amount = 'O valor mínimo não pode ser maior que o máximo.';
+  }
+
+  if (allocs.length > 0) {
+    if (allocs.some(a => !a.unit_id && !a.front_id)) {
+      errors.allocations = 'Cada linha do rateio precisa de unidade ou frente.';
+    } else if (allocs.some(a => !(Number(a.percentage) > 0))) {
+      errors.allocations = 'Informe um percentual maior que zero em cada linha do rateio.';
+    } else {
+      const total = allocs.reduce((sum, a) => sum + Number(a.percentage || 0), 0);
+      if (Math.abs(total - 100) > 0.01) {
+        errors.allocations = `O rateio soma ${total.toFixed(2)}% — precisa fechar em 100%.`;
+      }
+    }
   }
 
   return errors;
 }
 
 export default function OfxRulesPanel({
-  rules, options, onChanged, defaultPattern,
+  rules, options, accounts = [], onChanged, defaultPattern,
 }: {
   rules: OfxRule[];
   options: OptionList;
+  accounts?: { id: string; name: string }[];
   onChanged: () => void;
   defaultPattern?: string;
 }) {
@@ -80,21 +108,29 @@ export default function OfxRulesPanel({
   const startNew = (pattern = '') => {
     setEditing(null);
     setErrors({});
-    setForm({ pattern, match_type: 'contains', applies_to: 'ambos', priority: 100, active: true });
+    setForm({
+      pattern, match_type: 'contains', applies_to: 'ambos', priority: 100, active: true,
+      account_id: null, exclude_pattern: '', min_amount: null, max_amount: null,
+      use_statement_unit: false, allocations: [],
+    });
     setOpen(true);
   };
 
   const startEdit = (rule: OfxRule) => {
     setEditing(rule);
     setErrors({});
-    setForm({ ...rule });
+    setForm({ ...rule, allocations: rule.allocations ?? [] });
     setOpen(true);
   };
 
   const setField = (key: keyof OfxRule, value: unknown) => {
     setForm(f => ({ ...f, [key]: value }));
-    setErrors(e => ({ ...e, [key === 'pattern' ? 'pattern' : key === 'priority' ? 'priority' : 'suggestion']: undefined }));
+    setErrors({});
   };
+
+  const allocs = (form.allocations ?? []) as RuleAllocation[];
+  const setAllocs = (list: RuleAllocation[]) => setField('allocations', list);
+  const allocTotal = allocs.reduce((sum, a) => sum + Number(a.percentage || 0), 0);
 
   const save = async () => {
     const found = validate(form, rules, editing?.id);
@@ -113,7 +149,13 @@ export default function OfxRulesPanel({
       front_id: form.front_id ?? null,
       partner_id: form.partner_id ?? null,
       priority: Number(form.priority ?? 100),
-      active: true,
+      active: form.active !== false,
+      account_id: form.account_id ?? null,
+      exclude_pattern: (form.exclude_pattern ?? '').trim() || null,
+      min_amount: form.min_amount == null || form.min_amount === ('' as any) ? null : Number(form.min_amount),
+      max_amount: form.max_amount == null || form.max_amount === ('' as any) ? null : Number(form.max_amount),
+      use_statement_unit: !!form.use_statement_unit,
+      allocations: allocs.length ? allocs : null,
     };
 
     setSaving(true);
@@ -144,6 +186,29 @@ export default function OfxRulesPanel({
   const nameOf = (list: { id: string; name: string }[], id?: string | null) =>
     list.find(o => o.id === id)?.name;
 
+  /** Liga/desliga a regra sem apagá-la. */
+  const toggleActive = async (rule: OfxRule) => {
+    const { error } = await (supabase as any)
+      .from('ofx_import_rules').update({ active: !rule.active }).eq('id', rule.id);
+    if (error) { toast({ title: 'Erro ao alterar a regra', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: rule.active ? 'Regra desativada' : 'Regra ativada' });
+    onChanged();
+  };
+
+  /** Sobe (mais prioridade) ou desce a regra na ordem de aplicação. */
+  const movePriority = async (rule: OfxRule, delta: number) => {
+    const next = Math.min(999, Math.max(1, Number(rule.priority ?? 100) + delta));
+    if (next === Number(rule.priority)) return;
+    const { error } = await (supabase as any)
+      .from('ofx_import_rules').update({ priority: next }).eq('id', rule.id);
+    if (error) { toast({ title: 'Erro ao mudar a prioridade', description: error.message, variant: 'destructive' }); return; }
+    onChanged();
+  };
+
+  const ordered = [...rules].sort(
+    (a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0) || a.pattern.localeCompare(b.pattern),
+  );
+
   return (
     <Card className="shadow-card rounded-2xl border-border">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
@@ -168,22 +233,57 @@ export default function OfxRulesPanel({
             Nenhuma regra ainda. Ex.: texto <strong>IFOOD</strong> → categoria "Receita iFood".
           </p>
         )}
-        {rules.map(r => (
-          <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border p-2">
+        {ordered.map(r => (
+          <div
+            key={r.id}
+            className={`flex items-center justify-between gap-2 rounded-xl border border-border p-2 ${r.active === false ? 'opacity-60' : ''}`}
+          >
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">
                 {r.pattern}
                 <Badge variant="secondary" className="ml-2 text-[10px]">{r.match_type === 'regex' ? 'regex' : 'contém'}</Badge>
                 {r.applies_to !== 'ambos' && <Badge variant="outline" className="ml-1 text-[10px]">{r.applies_to}</Badge>}
                 <Badge variant="outline" className="ml-1 text-[10px]">prioridade {r.priority}</Badge>
+                {r.account_id && (
+                  <Badge variant="outline" className="ml-1 text-[10px]">
+                    {accounts.find(a => a.id === r.account_id)?.name ?? 'conta específica'}
+                  </Badge>
+                )}
+                {r.use_statement_unit && <Badge variant="outline" className="ml-1 text-[10px]">unidade do extrato</Badge>}
+                {r.allocations?.length ? <Badge variant="outline" className="ml-1 text-[10px]">rateio</Badge> : null}
+                {r.active === false && <Badge variant="destructive" className="ml-1 text-[10px]">inativa</Badge>}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {[nameOf(options.categories, r.category_id), nameOf(options.units, r.unit_id),
                   nameOf(options.fronts, r.front_id), nameOf(options.partners, r.partner_id)]
                   .filter(Boolean).join(' · ') || 'Sem sugestão definida'}
+                {r.exclude_pattern ? ` · exceto: ${r.exclude_pattern}` : ''}
+                {r.min_amount != null || r.max_amount != null
+                  ? ` · ${r.min_amount != null ? `de ${brl(Number(r.min_amount))}` : ''}`
+                    + `${r.max_amount != null ? ` até ${brl(Number(r.max_amount))}` : ''}`
+                  : ''}
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <Button
+                size="icon" variant="ghost" onClick={() => movePriority(r, -10)}
+                aria-label="Aplicar antes (mais prioridade)" title="Aplicar antes das outras"
+              >
+                <ArrowUp className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button
+                size="icon" variant="ghost" onClick={() => movePriority(r, 10)}
+                aria-label="Aplicar depois (menos prioridade)" title="Aplicar depois das outras"
+              >
+                <ArrowDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button
+                size="icon" variant="ghost" onClick={() => toggleActive(r)}
+                aria-label={r.active === false ? 'Ativar regra' : 'Desativar regra'}
+                title={r.active === false ? 'Ativar regra' : 'Desativar regra'}
+              >
+                <Power className={`h-4 w-4 ${r.active === false ? 'text-muted-foreground' : 'text-secondary'}`} />
+              </Button>
               <Button size="icon" variant="ghost" onClick={() => startEdit(r)} aria-label="Editar regra">
                 <Pencil className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -252,6 +352,70 @@ export default function OfxRulesPanel({
                 ? <p className="text-xs text-destructive">{errors.priority}</p>
                 : <p className="text-xs text-muted-foreground">Menor número é avaliado primeiro.</p>}
             </div>
+
+            <div className="space-y-1.5">
+              <Label>Conta do extrato</Label>
+              <Select
+                value={form.account_id ?? NONE}
+                onValueChange={v => setField('account_id', v === NONE ? null : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Qualquer conta" /></SelectTrigger>
+                <SelectContent className="max-h-64">
+                  <SelectItem value={NONE}>Qualquer conta</SelectItem>
+                  {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Permite o mesmo texto ter classificação diferente em cada conta.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Exceções (não aplicar quando aparecer)</Label>
+              <Input
+                value={form.exclude_pattern ?? ''}
+                onChange={e => setField('exclude_pattern', e.target.value)}
+                placeholder="Ex.: MARTINHO, ESTORNO"
+              />
+              <p className="text-xs text-muted-foreground">Separe por vírgula. Ignora acentos e maiúsculas.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor mínimo (R$)</Label>
+                <Input
+                  type="number" step="0.01" min={0}
+                  value={form.min_amount ?? ''}
+                  onChange={e => setField('min_amount', e.target.value === '' ? null : Number(e.target.value))}
+                  placeholder="Sem mínimo"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Valor máximo (R$)</Label>
+                <Input
+                  type="number" step="0.01" min={0}
+                  value={form.max_amount ?? ''}
+                  onChange={e => setField('max_amount', e.target.value === '' ? null : Number(e.target.value))}
+                  placeholder="Sem máximo"
+                />
+              </div>
+            </div>
+            {errors.amount
+              ? <p className="text-xs text-destructive">{errors.amount}</p>
+              : <p className="text-xs text-muted-foreground">Comparação pelo valor da linha, sem sinal.</p>}
+
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+              <div className="min-w-0">
+                <Label className="text-sm">Usar a unidade da conta do extrato</Label>
+                <p className="text-xs text-muted-foreground">
+                  A unidade vem da conta importada, sem precisar de uma regra por unidade.
+                </p>
+              </div>
+              <Switch
+                checked={!!form.use_statement_unit}
+                onCheckedChange={v => setField('use_statement_unit', v)}
+              />
+            </div>
             {([
               ['category_id', 'Categoria sugerida', options.categories],
               ['unit_id', 'Unidade sugerida', options.units],
@@ -262,6 +426,7 @@ export default function OfxRulesPanel({
                 <Label>{label}</Label>
                 <Select
                   value={(form as any)[key] ?? NONE}
+                  disabled={key === 'unit_id' && !!form.use_statement_unit}
                   onValueChange={v => setField(key, v === NONE ? null : v)}
                 >
                   <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
@@ -272,6 +437,66 @@ export default function OfxRulesPanel({
                 </Select>
               </div>
             ))}
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label className="text-sm">Rateio automático</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Divide o lançamento entre unidades/frentes. Precisa fechar 100%.
+                  </p>
+                </div>
+                <Button
+                  size="sm" variant="outline" className="rounded-xl"
+                  onClick={() => setAllocs([...allocs, { unit_id: null, front_id: null, percentage: 50 }])}
+                >
+                  <Plus className="h-4 w-4" /> Linha
+                </Button>
+              </div>
+              {allocs.map((a, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_80px_auto] items-center gap-2">
+                  <Select
+                    value={a.unit_id ?? NONE}
+                    onValueChange={v => setAllocs(allocs.map((x, j) =>
+                      j === i ? { ...x, unit_id: v === NONE ? null : v } : x))}
+                  >
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Unidade" /></SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      <SelectItem value={NONE}>Sem unidade</SelectItem>
+                      {options.units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={a.front_id ?? NONE}
+                    onValueChange={v => setAllocs(allocs.map((x, j) =>
+                      j === i ? { ...x, front_id: v === NONE ? null : v } : x))}
+                  >
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Frente" /></SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      <SelectItem value={NONE}>Sem frente</SelectItem>
+                      {options.fronts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    className="h-9" type="number" step="0.01" min={0}
+                    value={a.percentage}
+                    onChange={e => setAllocs(allocs.map((x, j) =>
+                      j === i ? { ...x, percentage: e.target.value === '' ? 0 : Number(e.target.value) } : x))}
+                  />
+                  <Button
+                    size="icon" variant="ghost" aria-label="Remover linha do rateio"
+                    onClick={() => setAllocs(allocs.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              {allocs.length > 0 && (
+                <p className={`text-xs ${Math.abs(allocTotal - 100) > 0.01 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  Total rateado: {allocTotal.toFixed(2)}%
+                </p>
+              )}
+              {errors.allocations && <p className="text-xs text-destructive">{errors.allocations}</p>}
+            </div>
             {errors.suggestion && <p className="text-xs text-destructive">{errors.suggestion}</p>}
           </div>
           <DialogFooter>

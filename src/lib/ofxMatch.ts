@@ -347,6 +347,13 @@ export function pickAutoLinkable<T extends { key: string; suggestions: MatchSugg
 // Regras por texto do memo
 // ---------------------------------------------------------------------------
 
+/** Uma linha de rateio guardada na própria regra (sempre em percentual). */
+export interface RuleAllocation {
+  unit_id: string | null;
+  front_id: string | null;
+  percentage: number;
+}
+
 export interface OfxRule {
   id: string;
   pattern: string;
@@ -358,6 +365,23 @@ export interface OfxRule {
   partner_id: string | null;
   priority: number;
   active: boolean;
+  /** Só vale para o extrato desta conta (null = qualquer conta). */
+  account_id?: string | null;
+  /** Textos que anulam a regra, separados por vírgula. */
+  exclude_pattern?: string | null;
+  /** Faixa de valor (em módulo) em que a regra vale. */
+  min_amount?: number | null;
+  max_amount?: number | null;
+  /** Usa a unidade padrão da conta do extrato em vez de uma unidade fixa. */
+  use_statement_unit?: boolean | null;
+  /** Rateio percentual por unidade/frente. */
+  allocations?: RuleAllocation[] | null;
+}
+
+/** Contexto do extrato usado pelas regras (conta e unidade padrão da conta). */
+export interface RuleContext {
+  accountId?: string | null;
+  accountUnitId?: string | null;
 }
 
 export interface RuleOutcome {
@@ -366,39 +390,82 @@ export interface RuleOutcome {
   unit_id: string | null;
   front_id: string | null;
   partner_id: string | null;
+  allocations: RuleAllocation[] | null;
+}
+
+/** Lê o rateio da regra, tolerando dado antigo/ inválido no banco. */
+export function ruleAllocations(rule: OfxRule): RuleAllocation[] | null {
+  const raw = rule.allocations;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const list = raw
+    .map(a => ({
+      unit_id: a?.unit_id ?? null,
+      front_id: a?.front_id ?? null,
+      percentage: Number(a?.percentage ?? 0),
+    }))
+    .filter(a => a.percentage > 0 && (a.unit_id || a.front_id));
+  return list.length ? list : null;
+}
+
+/** Diz se uma regra casa com a linha, considerando conta, exceção e faixa de valor. */
+export function ruleMatches(
+  rule: OfxRule,
+  memo: string,
+  amount: number,
+  ctx: RuleContext = {},
+): boolean {
+  const type: 'receita' | 'despesa' = amount >= 0 ? 'receita' : 'despesa';
+  if (!rule.active) return false;
+  if (rule.applies_to !== 'ambos' && rule.applies_to !== type) return false;
+
+  // 5) regra restrita a uma conta do extrato
+  if (rule.account_id && ctx.accountId && rule.account_id !== ctx.accountId) return false;
+
+  // 4) faixa de valor (sempre em módulo)
+  const abs = Math.abs(amount);
+  if (rule.min_amount != null && abs < Number(rule.min_amount)) return false;
+  if (rule.max_amount != null && abs > Number(rule.max_amount)) return false;
+
+  const haystack = normalizeText(memo);
+
+  // 3) exceções: qualquer termo presente anula a regra
+  const excludes = (rule.exclude_pattern ?? '')
+    .split(',')
+    .map(s => normalizeText(s.trim()))
+    .filter(Boolean);
+  if (excludes.some(e => haystack.includes(e))) return false;
+
+  if (rule.match_type === 'regex') {
+    try { return new RegExp(rule.pattern, 'i').test(memo); } catch { return false; }
+  }
+  return haystack.includes(normalizeText(rule.pattern));
+}
+
+/** Todas as regras que casam com a linha, na ordem de prioridade. */
+export function matchingRules(
+  memo: string, amount: number, rules: OfxRule[], ctx: RuleContext = {},
+): OfxRule[] {
+  return [...rules]
+    .sort((a, b) => a.priority - b.priority)
+    .filter(r => ruleMatches(r, memo, amount, ctx));
 }
 
 /** Aplica a primeira regra ativa que casar com o memo (menor prioridade primeiro). */
-export function applyRules(memo: string, amount: number, rules: OfxRule[]): RuleOutcome | null {
-  const type: 'receita' | 'despesa' = amount >= 0 ? 'receita' : 'despesa';
-  const haystack = normalizeText(memo);
-
-  const ordered = [...rules]
-    .filter(r => r.active && (r.applies_to === 'ambos' || r.applies_to === type))
-    .sort((a, b) => a.priority - b.priority);
-
-  for (const rule of ordered) {
-    let hit = false;
-    if (rule.match_type === 'regex') {
-      try {
-        hit = new RegExp(rule.pattern, 'i').test(memo);
-      } catch {
-        hit = false; // regra com regex inválida é ignorada, nunca quebra a importação
-      }
-    } else {
-      hit = haystack.includes(normalizeText(rule.pattern));
-    }
-    if (hit) {
-      return {
-        rule,
-        category_id: rule.category_id,
-        unit_id: rule.unit_id,
-        front_id: rule.front_id,
-        partner_id: rule.partner_id,
-      };
-    }
-  }
-  return null;
+export function applyRules(
+  memo: string, amount: number, rules: OfxRule[], ctx: RuleContext = {},
+): RuleOutcome | null {
+  const rule = matchingRules(memo, amount, rules, ctx)[0];
+  if (!rule) return null;
+  return {
+    rule,
+    category_id: rule.category_id,
+    // 1) unidade vinda da conta do extrato
+    unit_id: rule.use_statement_unit ? (ctx.accountUnitId ?? null) : rule.unit_id,
+    front_id: rule.front_id,
+    partner_id: rule.partner_id,
+    // 2) rateio definido na própria regra
+    allocations: ruleAllocations(rule),
+  };
 }
 
 

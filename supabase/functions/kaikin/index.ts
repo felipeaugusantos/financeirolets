@@ -30,7 +30,34 @@ Conhecimento essencial sobre o sistema:
   • pagoForaDaCompetencia — competência no período mas pagamento antes/depois
   • negativeOrZero — líquido ≤ 0 (suspeito)
 
-Quando o usuário pedir detalhes de transações específicas, use a tool list_transactions ou get_transaction. Use summarize_period se ele perguntar sobre outro período/unidade que não esteja no contexto da página.`;
+Uso das ferramentas (sempre prefira consultar a responder de memória):
+- list_entities — descubra IDs de unidades, frentes e contas ANTES de filtrar por nome.
+- list_transactions / get_transaction — detalhes de lançamentos.
+- summarize_period — totais por regime (dashboard, provisionado, caixa).
+- account_balances — saldo das contas bancárias.
+- list_open_bills — contas a pagar/receber em aberto e atrasadas.
+- top_categories — ranking de categorias por valor no período.
+- list_dre_lines / list_categories — estrutura do DRE.
+
+Jargão do negócio (use exatamente esse vocabulário nas respostas):
+- "Unidade" = unidade de negócio (loja/fábrica/franqueadora). Nunca diga "filial", "empresa" ou "centro de custo".
+- "Frente" (frente de negócio) = linha de atuação dentro da unidade (ex.: varejo, eventos, institucional/administrativo). É opcional no lançamento.
+- "Conta" = conta bancária ou caixa (accounts). Fale "conta Bradesco Boulevard", não "banco 237".
+- "Categoria" = plano de contas do lançamento, sempre de receita ou despesa, e ligada a uma linha do DRE.
+- "Lançamento" = transação (receita ou despesa). Nunca diga "movimento", "registro" ou "entrada contábil".
+- "Rateio" = divisão do valor de um lançamento entre unidades/frentes (allocations). Um rateio precisa fechar 100% do valor.
+- "Baixa" = marcar um lançamento como pago/recebido, com data de pagamento.
+- "Conciliação bancária" = casar linhas do extrato OFX com lançamentos; "vincular" (ligar a um lançamento existente), "criar lançamento" e "ignorar" são as três ações. "Conciliação de cartão" usa planilha da operadora.
+- "Provisionado" = pendente/agendado, ainda não pago. "Realizado" = já pago/recebido.
+- "Competência" = mês do fato gerador; "Caixa" = mês em que o dinheiro entrou/saiu.
+- "DRE Gerencial" = visão com margem bruta e EBITDA. "DRE Comparativo" = unidades lado a lado.
+- "Sem unidade" = lançamento não classificado, precisa ser corrigido pelo operador.
+
+Regras de resposta:
+- Formate dinheiro em reais (R$ 1.234,56) e datas como DD/MM/AAAA.
+- Ao listar lançamentos, mostre uma tabela markdown enxuta (data, descrição, unidade, valor) e o total.
+- Sempre cite unidades, frentes, contas e categorias pelo NOME cadastrado (nunca por ID nem por apelido inventado).
+- Se o usuário citar um nome de unidade/conta/categoria, resolva o ID via ferramenta; nunca chute. Se o nome não existir, diga quais existem.`;
 
 const TOOLS = [
   {
@@ -105,6 +132,69 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'list_entities',
+      description: 'Lista unidades, frentes de negócio e contas bancárias com seus nomes e IDs. Use SEMPRE que o usuário citar uma unidade/frente/conta pelo nome, para descobrir o ID antes de filtrar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: ['units', 'fronts', 'accounts', 'all'], description: 'Default all.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'account_balances',
+      description: 'Saldo atual de cada conta bancária (saldo inicial + lançamentos pagos/recebidos até a data informada).',
+      parameters: {
+        type: 'object',
+        properties: {
+          date_to: { type: 'string', description: 'YYYY-MM-DD. Default hoje.' },
+          account_id: { type: 'string' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_open_bills',
+      description: 'Contas a pagar/receber em aberto (pendente ou agendado), ordenadas por vencimento. Use para "o que vence", "atrasados", "quanto tenho a pagar".',
+      parameters: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['receita', 'despesa'] },
+          due_from: { type: 'string' },
+          due_to: { type: 'string' },
+          overdue_only: { type: 'boolean' },
+          unit_id: { type: 'string' },
+          limit: { type: 'number', description: 'até 50' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'top_categories',
+      description: 'Ranking de categorias por valor em um período (regime de competência ou caixa). Use para "onde estou gastando mais".',
+      parameters: {
+        type: 'object',
+        properties: {
+          date_from: { type: 'string' },
+          date_to: { type: 'string' },
+          type: { type: 'string', enum: ['receita', 'despesa'] },
+          regime: { type: 'string', enum: ['competencia', 'caixa'], description: 'Default competencia.' },
+          unit_id: { type: 'string' },
+        },
+        required: ['date_from', 'date_to'],
+      },
+    },
+  },
 ];
 
 function todaySaoPaulo(): string {
@@ -125,6 +215,42 @@ function makeClient(authHeader: string | null) {
   });
 }
 
+// Vocabulário real do cliente: nomes cadastrados de unidades, frentes, contas e categorias.
+async function buildGlossary(supabase: ReturnType<typeof makeClient>): Promise<string | null> {
+  try {
+    const [units, fronts, accounts, categories] = await Promise.all([
+      supabase.from('units').select('name, code').eq('active', true).order('name'),
+      supabase.from('business_fronts').select('name').eq('active', true).order('name'),
+      supabase.from('accounts').select('name, type').eq('active', true).order('name'),
+      supabase.from('categories').select('name, type').eq('active', true).order('name').limit(200),
+    ]);
+
+    const list = (rows: any[] | null, fmt: (r: any) => string) =>
+      (rows ?? []).map(fmt).join(', ') || '(nenhum cadastrado)';
+
+    const receitas = (categories.data ?? []).filter((c: any) => c.type === 'receita');
+    const despesas = (categories.data ?? []).filter((c: any) => c.type === 'despesa');
+
+    const unitsTxt = list(units.data, (u) => (u.code ? u.name + ' (' + u.code + ')' : u.name));
+    const frontsTxt = list(fronts.data, (f) => f.name);
+    const accountsTxt = list(accounts.data, (a) => (a.type ? a.name + ' [' + a.type + ']' : a.name));
+    const receitasTxt = list(receitas, (c) => c.name);
+    const despesasTxt = list(despesas, (c) => c.name);
+
+    return [
+      'Cadastros reais deste workspace (use estes nomes exatos ao responder):',
+      '- Unidades: ' + unitsTxt,
+      '- Frentes de negócio: ' + frontsTxt,
+      '- Contas: ' + accountsTxt,
+      '- Categorias de receita: ' + receitasTxt,
+      '- Categorias de despesa: ' + despesasTxt,
+      'Se o usuário usar um apelido parecido com um desses nomes, assuma que é ele e confirme na resposta.',
+    ].join('\n');
+  } catch (_e) {
+    return null;
+  }
+}
+
 async function runTool(name: string, args: any, supabase: ReturnType<typeof makeClient>) {
   try {
     if (name === 'list_transactions') {
@@ -132,7 +258,7 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
       const field = args.date_field || 'competence_date';
       let q = supabase
         .from('transactions')
-        .select('id, type, description, net_amount, status, competence_date, payment_date, due_date, unit_id, category_id, front_id')
+        .select('id, type, description, net_amount, status, competence_date, payment_date, due_date, payment_method, unit:units(name), category:categories(name), front:business_fronts(name), account:accounts(name)')
         .limit(limit);
       if (args.date_from) q = q.gte(field, args.date_from);
       if (args.date_to) q = q.lte(field, args.date_to);
@@ -205,6 +331,112 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
       return data ?? [];
     }
 
+    if (name === 'list_entities') {
+      const kind = args.kind || 'all';
+      const out: any = {};
+      if (kind === 'all' || kind === 'units') {
+        const { data } = await supabase.from('units').select('id, name, code').eq('active', true).order('name');
+        out.units = data ?? [];
+      }
+      if (kind === 'all' || kind === 'fronts') {
+        const { data } = await supabase.from('business_fronts').select('id, name').eq('active', true).order('name');
+        out.fronts = data ?? [];
+      }
+      if (kind === 'all' || kind === 'accounts') {
+        const { data } = await supabase.from('accounts').select('id, name, type').eq('active', true).order('name');
+        out.accounts = data ?? [];
+      }
+      return out;
+    }
+
+    if (name === 'account_balances') {
+      const dateTo = args.date_to || todaySaoPaulo();
+      let accQ = supabase.from('accounts').select('id, name, initial_balance, initial_balance_date').eq('active', true);
+      if (args.account_id) accQ = accQ.eq('id', args.account_id);
+      const { data: accounts, error: accErr } = await accQ;
+      if (accErr) return { error: accErr.message };
+
+      let txQ = supabase
+        .from('transactions')
+        .select('account_id, type, net_amount, payment_date')
+        .in('status', ['pago', 'recebido'])
+        .not('payment_date', 'is', null)
+        .lte('payment_date', dateTo)
+        .limit(20000);
+      if (args.account_id) txQ = txQ.eq('account_id', args.account_id);
+      const { data: txs, error: txErr } = await txQ;
+      if (txErr) return { error: txErr.message };
+
+      return {
+        date_to: dateTo,
+        accounts: (accounts ?? []).map((a: any) => {
+          const moves = (txs ?? []).filter(
+            (t: any) => t.account_id === a.id && (!a.initial_balance_date || t.payment_date >= a.initial_balance_date)
+          );
+          const delta = moves.reduce(
+            (s: number, t: any) => s + (t.type === 'receita' ? 1 : -1) * (Number(t.net_amount) || 0),
+            0
+          );
+          return {
+            id: a.id,
+            name: a.name,
+            initial_balance: Number(a.initial_balance) || 0,
+            movimentacao: delta,
+            saldo: (Number(a.initial_balance) || 0) + delta,
+          };
+        }),
+      };
+    }
+
+    if (name === 'list_open_bills') {
+      const limit = Math.min(Number(args.limit) || 25, 50);
+      let q = supabase
+        .from('transactions')
+        .select('id, type, description, net_amount, status, due_date, unit:units(name), category:categories(name)')
+        .in('status', ['pendente', 'agendado'])
+        .order('due_date', { ascending: true })
+        .limit(limit);
+      if (args.type) q = q.eq('type', args.type);
+      if (args.unit_id) q = q.eq('unit_id', args.unit_id);
+      if (args.due_from) q = q.gte('due_date', args.due_from);
+      if (args.due_to) q = q.lte('due_date', args.due_to);
+      if (args.overdue_only) q = q.lt('due_date', todaySaoPaulo());
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const total = (data ?? []).reduce((s: number, t: any) => s + (Number(t.net_amount) || 0), 0);
+      return { hoje: todaySaoPaulo(), count: data?.length ?? 0, total, items: data ?? [] };
+    }
+
+    if (name === 'top_categories') {
+      const regime = args.regime === 'caixa' ? 'caixa' : 'competencia';
+      const field = regime === 'caixa' ? 'payment_date' : 'competence_date';
+      let q = supabase
+        .from('transactions')
+        .select('type, net_amount, status, category:categories(name)')
+        .gte(field, args.date_from)
+        .lte(field, args.date_to)
+        .not('status', 'eq', 'cancelado')
+        .limit(20000);
+      if (regime === 'caixa') q = q.in('status', ['pago', 'recebido']);
+      if (args.type) q = q.eq('type', args.type);
+      if (args.unit_id) q = q.eq('unit_id', args.unit_id);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const map = new Map<string, { categoria: string; tipo: string; total: number; count: number }>();
+      (data ?? []).forEach((t: any) => {
+        const nome = t.category?.name ?? 'Sem categoria';
+        const key = `${t.type}|${nome}`;
+        const cur = map.get(key) ?? { categoria: nome, tipo: t.type, total: 0, count: 0 };
+        cur.total += Number(t.net_amount) || 0;
+        cur.count++;
+        map.set(key, cur);
+      });
+      return {
+        regime,
+        items: [...map.values()].sort((a, b) => b.total - a.total).slice(0, 25),
+      };
+    }
+
     return { error: `tool desconhecida: ${name}` };
   } catch (e: any) {
     return { error: e?.message ?? 'erro desconhecido' };
@@ -230,6 +462,8 @@ Deno.serve(async (req) => {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'system', content: `Hoje (America/Sao_Paulo) é ${todaySaoPaulo()}. Sempre use essa data como "hoje".` },
     ];
+    const glossary = await buildGlossary(supabase);
+    if (glossary) chatMessages.push({ role: 'system', content: glossary });
     if (pageContext) {
       chatMessages.push({
         role: 'system',

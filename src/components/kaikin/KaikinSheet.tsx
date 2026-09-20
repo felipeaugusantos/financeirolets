@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Send, RotateCcw } from 'lucide-react';
 import { useKaikin } from './KaikinProvider';
 import { useKaikinStream } from '@/hooks/useKaikinStream';
+import { useKaikinHistory } from '@/hooks/useKaikinHistory';
 import { KaikinMessage } from './KaikinMessage';
 import kaikinAvatar from '@/assets/kaikin-avatar.png.asset.json';
 
@@ -22,16 +23,31 @@ const GENERIC_SUGGESTIONS = [
 ];
 
 export function KaikinSheet() {
-  const { isOpen, close, messages, pageContext, loading, resetMessages } = useKaikin();
+  const { isOpen, close, messages, pageContext, loading, resetMessages, replaceMessages } = useKaikin();
   const { send } = useKaikinStream();
+  const { load, clear } = useKaikinHistory();
   const [input, setInput] = useState('');
+  const hydrated = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen || hydrated.current) return;
+    hydrated.current = true;
+    load().then((saved) => {
+      if (saved.length) replaceMessages(saved);
+    });
+  }, [isOpen, load, replaceMessages]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  function handleReset() {
+    resetMessages();
+    void clear();
+  }
 
   const suggestions = pageContext?.scope === 'reconciliacao' ? RECON_SUGGESTIONS : GENERIC_SUGGESTIONS;
   const subtitle = pageContext?.scope === 'reconciliacao'
@@ -70,7 +86,7 @@ export function KaikinSheet() {
               <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
             </div>
             {messages.length > 0 && (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetMessages} title="Limpar conversa">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleReset} title="Limpar conversa">
                 <RotateCcw className="h-3.5 w-3.5" />
               </Button>
             )}
