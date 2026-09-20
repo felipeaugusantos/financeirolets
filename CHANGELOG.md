@@ -3,6 +3,19 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.0 — 20/09/2026
+- Regras de conciliação avançadas: por conta, exceções de texto, faixa de valor,
+  unidade da conta do extrato e rateio dentro da regra (validação de 100%).
+- Aba de Simulação e botão "Lançar pelas regras" com conferência, trava de
+  duplicidade (descrição + valor + 5 dias na mesma conta) e quadro de nomes
+  repetidos sem regra.
+- Conciliação de Cartão (`/conciliacao/cartao`) com importação .xlsx/.csv e
+  anti-duplicidade por hash.
+- Assistente Kaikin com histórico por usuário (`kaikin_messages`).
+- Escrita de conciliação bancária, de cartão e de regras restrita a Admin e
+  Financeiro.
+- Dados: 37 regras de conciliação validadas e unidade padrão por conta.
+
 ## 1.1.0 — 31/08/2026
 > Padrão do projeto: a cada publicação, registrar as mudanças aqui **e** em
 > `src/data/releases.ts` (tela Novidades + PDF da equipe), agrupadas por data
