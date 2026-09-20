@@ -49,6 +49,7 @@ export default function SettingsPage() {
   if (active === 'partners') return <PartnersSettings onBack={() => setActive(null)} />;
   if (active === 'export') return <ImportExportSettings onBack={() => setActive(null)} />;
   if (active === 'quality') return <DataQualitySettings onBack={() => setActive(null)} />;
+  if (active === 'closing') return <ClosedPeriodsSettings onBack={() => setActive(null)} />;
 
   if (active === 'users') return <UsersSettings onBack={() => setActive(null)} />;
   if (active === 'audit') return <AuditSettings onBack={() => setActive(null)} />;
