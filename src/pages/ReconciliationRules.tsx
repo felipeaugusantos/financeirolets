@@ -8,14 +8,14 @@ import type { OfxRule } from '@/lib/ofxMatch';
 /** Conciliação Bancária → Regras de Conciliação. */
 export default function ReconciliationRules() {
   const [rules, setRules] = useState<OfxRule[]>([]);
-  const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [accounts, setAccounts] = useState<{ id: string; name: string; default_unit_id?: string | null }[]>([]);
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
 
   const reloadRules = useCallback(async () => {
+    // Traz também as inativas: a tela permite ligar/desligar sem excluir.
     const { data } = await (supabase as any)
       .from('ofx_import_rules')
       .select('*')
-      .eq('active', true)
       .order('priority');
     setRules((data ?? []) as OfxRule[]);
   }, []);
@@ -28,7 +28,7 @@ export default function ReconciliationRules() {
         supabase.from('units').select('id, name').eq('active', true).order('name'),
         supabase.from('business_fronts').select('id, name').eq('active', true).order('name'),
         supabase.from('partners').select('id, name').eq('active', true).order('name'),
-        supabase.from('accounts').select('id, name').eq('active', true).order('name'),
+        supabase.from('accounts').select('id, name, default_unit_id').eq('active', true).order('name'),
       ]);
       setOptions({
         categories: (cat.data ?? []) as any,
@@ -55,10 +55,10 @@ export default function ReconciliationRules() {
           <TabsTrigger value="simulacao">Simulação</TabsTrigger>
         </TabsList>
         <TabsContent value="regras">
-          <OfxRulesPanel rules={rules} options={options} onChanged={reloadRules} />
+          <OfxRulesPanel rules={rules} options={options} accounts={accounts} onChanged={reloadRules} />
         </TabsContent>
         <TabsContent value="simulacao">
-          <RuleSimulationPanel rules={rules} options={options} accounts={accounts} />
+          <RuleSimulationPanel rules={rules.filter(r => r.active !== false)} options={options} accounts={accounts} />
         </TabsContent>
       </Tabs>
     </div>

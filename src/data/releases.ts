@@ -45,6 +45,71 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.0',
+    date: '2026-09-20',
+    summary:
+      'Regras de conciliação avançadas com rateio e simulação, lançamento em lote pelas regras, conciliação de cartão e assistente com histórico.',
+    items: [
+      {
+        area: 'Conciliação Bancária',
+        kind: 'novidade',
+        title: 'Regras mais espertas',
+        detail:
+          'Uma regra pode valer só para uma conta, ignorar textos específicos, valer apenas dentro de uma faixa de valor, usar a unidade da própria conta do extrato e já dividir o valor entre unidades ou frentes.',
+        tech:
+          'Colunas account_id, exclude_pattern, min_amount, max_amount, use_statement_unit e allocations em ofx_import_rules; accounts.default_unit_id.',
+      },
+      {
+        area: 'Conciliação Bancária',
+        kind: 'novidade',
+        title: 'Simulação antes de conciliar',
+        detail:
+          'Uma aba mostra qual regra cairia em cada linha do extrato, com o rateio sugerido, antes de gravar qualquer coisa.',
+        tech: 'RuleSimulationPanel.tsx sobre as linhas pendentes.',
+      },
+      {
+        area: 'Conciliação Bancária',
+        kind: 'novidade',
+        title: 'Lançar pelas regras',
+        detail:
+          'Um botão junta as linhas já classificadas, abre uma conferência item a item e grava os lançamentos de uma vez, com trava contra duplicidade.',
+        tech: 'AutoPostDialog.tsx; trava por descrição + valor + 5 dias na mesma conta.',
+      },
+      {
+        area: 'Conciliação Bancária',
+        kind: 'melhoria',
+        title: 'Nomes repetidos sem regra',
+        detail:
+          'Um quadro aponta os nomes que se repetem nas pendências, com quantidade e total, e oferece criar a regra na hora.',
+        tech: 'SuggestedRulesPanel.tsx.',
+      },
+      {
+        area: 'Conciliação Bancária',
+        kind: 'novidade',
+        title: 'Conciliação de cartão',
+        detail:
+          'Importação da fatura em Excel ou CSV, sem repetir linhas já importadas, com escolha de unidade, frente, categoria e forma de pagamento.',
+        tech: 'Rota /conciliacao/cartao; tabela card_statement_entries com row_hash único.',
+      },
+      {
+        area: 'Geral',
+        kind: 'melhoria',
+        title: 'Assistente com histórico',
+        detail:
+          'O Kaikin guarda as conversas de cada usuário e responde com base nos dados reais do sistema.',
+        tech: 'Tabela kaikin_messages com acesso restrito ao próprio usuário; hook useKaikinHistory.',
+      },
+      {
+        area: 'Acessos',
+        kind: 'melhoria',
+        title: 'Conciliação só para Admin e Financeiro',
+        detail:
+          'Consultar continua liberado para todos, mas incluir, alterar e excluir dados de conciliação e regras passa a ser exclusivo dos perfis Admin e Financeiro.',
+        tech: 'Políticas de escrita com has_role(admin|financeiro) em bank_statement_entries, card_statement_entries e ofx_import_rules.',
+      },
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-08-31',
     summary:

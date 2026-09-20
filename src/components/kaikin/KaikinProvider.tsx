@@ -17,6 +17,7 @@ interface KaikinCtx {
   close: () => void;
   toggle: () => void;
   messages: KaikinMessage[];
+  replaceMessages: (m: KaikinMessage[]) => void;
   appendMessage: (m: KaikinMessage) => void;
   patchLastAssistant: (chunk: string) => void;
   resetMessages: () => void;
@@ -57,6 +58,7 @@ export function KaikinProvider({ children }: { children: ReactNode }) {
       close: () => setIsOpen(false),
       toggle: () => setIsOpen((v) => !v),
       messages,
+      replaceMessages: setMessages,
       appendMessage,
       patchLastAssistant,
       resetMessages: () => setMessages([]),

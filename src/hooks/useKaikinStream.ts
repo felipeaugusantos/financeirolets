@@ -1,17 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useKaikin, KaikinMessage, KaikinPageContext } from '@/components/kaikin/KaikinProvider';
+import { useKaikinHistory } from '@/hooks/useKaikinHistory';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kaikin`;
 
 export function useKaikinStream() {
   const { appendMessage, patchLastAssistant, setLoading, messages, pageContext } = useKaikin();
   const { toast } = useToast();
+  const { save } = useKaikinHistory();
 
   async function send(input: string) {
     const userMsg: KaikinMessage = { role: 'user', content: input };
     appendMessage(userMsg);
     setLoading(true);
+    void save(userMsg);
+    let answer = '';
 
     // empty assistant placeholder
     appendMessage({ role: 'assistant', content: '' });
@@ -68,7 +72,10 @@ export function useKaikinStream() {
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) patchLastAssistant(content);
+            if (content) {
+              answer += content;
+              patchLastAssistant(content);
+            }
           } catch {
             textBuffer = line + '\n' + textBuffer;
             break;
@@ -80,6 +87,7 @@ export function useKaikinStream() {
       toast({ title: 'Erro de conexão', description: e?.message ?? 'falha desconhecida', variant: 'destructive' });
       patchLastAssistant('_Erro de conexão._');
     } finally {
+      if (answer.trim()) void save({ role: 'assistant', content: answer });
       setLoading(false);
     }
   }

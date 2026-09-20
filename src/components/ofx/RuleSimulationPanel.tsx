@@ -9,25 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { parseOfx, readOfxFile } from '@/lib/ofx';
-import { applyRules, normalizeText, type OfxRule, type StatementLine } from '@/lib/ofxMatch';
+import { applyRules, matchingRules, type OfxRule, type StatementLine } from '@/lib/ofxMatch';
 import type { OptionList } from './OfxRulesPanel';
 
 type Source = 'arquivo' | 'importado';
-
-/** Todas as regras que casam com a linha (a primeira é a que seria aplicada). */
-function matchingRules(memo: string, amount: number, rules: OfxRule[]): OfxRule[] {
-  const type = amount >= 0 ? 'receita' : 'despesa';
-  const haystack = normalizeText(memo);
-  return [...rules]
-    .filter(r => r.active && (r.applies_to === 'ambos' || r.applies_to === type))
-    .sort((a, b) => a.priority - b.priority)
-    .filter(r => {
-      if (r.match_type === 'regex') {
-        try { return new RegExp(r.pattern, 'i').test(memo); } catch { return false; }
-      }
-      return haystack.includes(normalizeText(r.pattern));
-    });
-}
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -37,7 +22,7 @@ export default function RuleSimulationPanel({
 }: {
   rules: OfxRule[];
   options: OptionList;
-  accounts: { id: string; name: string }[];
+  accounts: { id: string; name: string; default_unit_id?: string | null }[];
 }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -90,10 +75,15 @@ export default function RuleSimulationPanel({
     setLabel(`${accounts.find(a => a.id === accountId)?.name ?? 'Conta'} · ${parsed.length} linhas`);
   };
 
+  const ctx = useMemo(() => {
+    const acc = accounts.find(a => a.id === accountId);
+    return { accountId: accountId || null, accountUnitId: acc?.default_unit_id ?? null };
+  }, [accounts, accountId]);
+
   const simulation = useMemo(() => lines.map(line => {
-    const all = matchingRules(line.memo, line.amount, rules);
-    return { line, outcome: applyRules(line.memo, line.amount, rules), others: all.slice(1) };
-  }), [lines, rules]);
+    const all = matchingRules(line.memo, line.amount, rules, ctx);
+    return { line, outcome: applyRules(line.memo, line.amount, rules, ctx), others: all.slice(1) };
+  }), [lines, rules, ctx]);
 
   const withRule = simulation.filter(s => s.outcome).length;
   const conflicts = simulation.filter(s => s.others.length > 0).length;
@@ -207,6 +197,14 @@ export default function RuleSimulationPanel({
                       .filter(Boolean).join(' · ') || 'Regra sem sugestão definida'}
                   </p>
                 )}
+                {outcome?.allocations?.length ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Rateio da regra: {outcome.allocations.map(a =>
+                      `${nameOf(options.units, a.unit_id) ?? 'Sem unidade'}`
+                      + `${a.front_id ? ' / ' + (nameOf(options.fronts, a.front_id) ?? '') : ''}`
+                      + ` ${a.percentage}%`).join(' · ')}
+                  </p>
+                ) : null}
                 {others.length > 0 && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     Outras regras que também casam: {others.map(o => o.pattern).join(', ')}
