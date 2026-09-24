@@ -4,11 +4,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OfxRulesPanel, { OptionList } from '@/components/ofx/OfxRulesPanel';
 import RuleSimulationPanel from '@/components/ofx/RuleSimulationPanel';
 import type { OfxRule } from '@/lib/ofxMatch';
+import { Wand2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import CategorySplitsPanel from '@/components/rules/CategorySplitsPanel';
+import SimpleRuleDialog from '@/components/rules/SimpleRuleDialog';
+import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 
 /** Conciliação Bancária → Regras de Conciliação. */
 export default function ReconciliationRules() {
   const [rules, setRules] = useState<OfxRule[]>([]);
   const [accounts, setAccounts] = useState<{ id: string; name: string; default_unit_id?: string | null }[]>([]);
+  const [simpleOpen, setSimpleOpen] = useState(false);
+  const { isAdmin, isFinanceiro } = useCurrentUserRoles();
+  const canEdit = isAdmin || isFinanceiro;
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
 
   const reloadRules = useCallback(async () => {
@@ -42,20 +50,37 @@ export default function ReconciliationRules() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 className="font-heading text-2xl font-bold text-card-foreground">Regras de Conciliação</h1>
         <p className="text-sm text-muted-foreground">
           Regras por texto do extrato que sugerem categoria, unidade, frente e parceiro na conciliação.
         </p>
       </div>
+        {canEdit && (
+          <Button className="gap-2 rounded-xl" onClick={() => setSimpleOpen(true)}>
+            <Wand2 className="h-4 w-4" /> Nova regra simples
+          </Button>
+        )}
+      </div>
+
+      <SimpleRuleDialog
+        open={simpleOpen} onOpenChange={setSimpleOpen}
+        categories={options.categories} units={options.units} accounts={accounts}
+        onSaved={reloadRules}
+      />
 
       <Tabs defaultValue="regras" className="space-y-4">
         <TabsList>
           <TabsTrigger value="regras">Regras</TabsTrigger>
+          <TabsTrigger value="divisoes">Divisão por categoria</TabsTrigger>
           <TabsTrigger value="simulacao">Simulação</TabsTrigger>
         </TabsList>
         <TabsContent value="regras">
           <OfxRulesPanel rules={rules} options={options} accounts={accounts} onChanged={reloadRules} />
+        </TabsContent>
+        <TabsContent value="divisoes">
+          <CategorySplitsPanel categories={options.categories} units={options.units} accounts={accounts} canEdit={canEdit} />
         </TabsContent>
         <TabsContent value="simulacao">
           <RuleSimulationPanel rules={rules.filter(r => r.active !== false)} options={options} accounts={accounts} />

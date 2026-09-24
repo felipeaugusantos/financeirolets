@@ -9,6 +9,9 @@ import { EnrichedEntry } from '@/hooks/useOfxImport';
 import { OptionList } from '@/components/ofx/OfxRulesPanel';
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
 
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const br = (iso: string) => iso.split('-').reverse().join('/');
+
 /** Regras de baixo risco: tarifas, antecipações/débito de cartão, telefone, contabilidade etc. */
 const SAFE_RULE = /tarifa|antecipacao|stone .*debito|telefone|contabilidade|rentab|sindicato|odonto/;
 export function isSafeRule(v: EnrichedEntry): boolean {
@@ -16,9 +19,6 @@ export function isSafeRule(v: EnrichedEntry): boolean {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return SAFE_RULE.test(txt);
 }
-
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const br = (iso: string) => iso.split('-').reverse().join('/');
 
 export interface AutoPostDialogProps {
   open: boolean;
@@ -50,6 +50,8 @@ export default function AutoPostDialog({
     [items, duplicateIds],
   );
 
+  // "Automatizar mantendo um olhar": só as regras de baixo risco vêm marcadas;
+  // as demais aparecem desmarcadas para o usuário conferir antes.
   useEffect(() => {
     if (open) setChecked(new Set(eligible.filter(isSafeRule).map(v => v.entry.id)));
   }, [open, eligible]);

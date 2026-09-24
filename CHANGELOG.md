@@ -3,6 +3,13 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.2 — 24/09/2026
+- Divisão padrão por categoria (`category_split_rules`) e botão "Nova regra simples".
+- 50 regras de conciliação (37 atualizadas + 13 novas).
+- "Lançar pelas regras" só para Admin/Financeiro; tarifas fora da trava de duplicidade.
+- Relatório Fluxo de Caixa por Unidade.
+- Importação CSV aceita coluna Unidade (com rateio igual para várias).
+
 ## 1.2.1 — 24/09/2026
 - Vínculo por descrição ignora a data no fim do histórico ("... 04/09").
 - Quadro "Nomes repetidos sem regra" oculto.

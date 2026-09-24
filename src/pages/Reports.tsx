@@ -6,8 +6,9 @@ import CashFlowReport from '@/components/reports/CashFlowReport';
 import DreComparativo from '@/components/reports/DreComparativo';
 import ReconciliationReport from '@/components/reports/ReconciliationReport';
 import DreGerencial from '@/components/reports/DreGerencial';
+import CashFlowByUnit from '@/components/reports/CashFlowByUnit';
 
-type View = 'menu' | 'dre' | 'dre-gerencial' | 'cashflow' | 'dre-comparativo' | 'reconciliacao';
+type View = 'menu' | 'dre' | 'dre-gerencial' | 'cashflow' | 'dre-comparativo' | 'reconciliacao' | 'cashflow-unidade';
 
 export default function Reports() {
   const [view, setView] = useState<View>('menu');
@@ -16,6 +17,7 @@ export default function Reports() {
   if (view === 'dre-gerencial') return <DreGerencial onBack={() => setView('menu')} />;
   if (view === 'dre-comparativo') return <DreComparativo onBack={() => setView('menu')} />;
   if (view === 'cashflow') return <CashFlowReport onBack={() => setView('menu')} />;
+  if (view === 'cashflow-unidade') return <CashFlowByUnit onBack={() => setView('menu')} />;
   if (view === 'reconciliacao') return <ReconciliationReport onBack={() => setView('menu')} />;
 
   return (
@@ -26,6 +28,26 @@ export default function Reports() {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card
+          className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
+          onClick={() => setView('cashflow-unidade')}
+        >
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="p-2 rounded-xl bg-secondary/10">
+              <TrendingUp className="h-5 w-5 text-secondary" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-heading">Fluxo de Caixa por Unidade</CardTitle>
+              <p className="text-xs text-muted-foreground">Receitas e despesas por unidade</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Unidades lado a lado e evolução mês a mês, realizado e previsto, com rateios aplicados.
+            </p>
+          </CardContent>
+        </Card>
+
         <Card
           className="shadow-card rounded-2xl border-border cursor-pointer hover:shadow-elevated transition-shadow"
           onClick={() => setView('dre')}

@@ -45,6 +45,27 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.2',
+    date: '2026-09-24',
+    summary: 'Divisão padrão por categoria, 50 regras de conciliação e fluxo de caixa por unidade.',
+    items: [
+      { area: 'Conciliação Bancária', kind: 'novidade', title: 'Divisão padrão por categoria',
+        detail: 'Em Regras de Conciliação, a aba "Divisão por categoria" define como uma despesa é dividida entre as unidades quando nenhuma unidade é escolhida.',
+        tech: 'Tabela category_split_rules (categoria + conta opcional); aplicada em useOfxImport só sem unidade e sem rateio.' },
+      { area: 'Conciliação Bancária', kind: 'novidade', title: 'Nova regra simples',
+        detail: 'Botão para criar uma regra em poucos passos: texto, categoria e unidade ou divisão.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: '50 regras de conciliação',
+        detail: 'Entraram regras para Receita Federal, Hapvida, CPFL e água por conta, Stone, Pix, contabilidade, jurídico e outras.',
+        tech: 'Upsert por id de 50 regras (37 atualizadas, 13 novas).' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Lançar pelas regras restrito',
+        detail: 'Só Administrador e Financeiro veem o botão. Tarifas iguais em dias próximos não são tratadas como repetidas.' },
+      { area: 'Relatórios', kind: 'novidade', title: 'Fluxo de Caixa por Unidade',
+        detail: 'Unidades lado a lado e evolução mês a mês, realizado e previsto, com rateios aplicados.' },
+      { area: 'Lançamentos', kind: 'melhoria', title: 'Importação CSV com coluna Unidade',
+        detail: 'Uma unidade vai direto; duas ou mais dividem o valor igualmente.' },
+    ],
+  },
+  {
     version: '1.2.1',
     date: '2026-09-24',
     summary: 'Ajustes pedidos pelo cliente na conciliação bancária.',

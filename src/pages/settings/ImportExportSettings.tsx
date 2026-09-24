@@ -11,6 +11,24 @@ import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
 import { transactionFingerprint } from '@/lib/finance';
 
 /** Divide uma linha CSV respeitando aspas, aceitando ';' ou ',' como delimitador. */
+const normUnit = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/let'?s\s*/g, '').replace(/\s+/g, ' ').trim();
+
+/** "Café/Boulevard/Fábrica", "Café, Boulevard e Fábrica" → ["Café","Boulevard","Fábrica"] */
+export function splitUnitNames(raw: string): string[] {
+  return raw.split(/\s*(?:\/|,|;|\+|\||\s+e\s+)\s*/i).map(s => s.trim()).filter(Boolean);
+}
+
+/** Casa o nome digitado com a unidade: exato primeiro, depois o nome mais curto que contém o texto. */
+export function resolveUnit(name: string, units: { id: string; name: string }[]): string | null {
+  const n = normUnit(name);
+  if (!n) return null;
+  const exact = units.find(u => normUnit(u.name) === n);
+  if (exact) return exact.id;
+  const partial = units.filter(u => normUnit(u.name).includes(n)).sort((a, b) => a.name.length - b.name.length);
+  return partial[0]?.id ?? null;
+}
+
 function splitCsvLine(line: string, delimiter: string): string[] {
   const out: string[] = [];
   let cur = '';
@@ -141,6 +159,9 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
       const amountIdx = headers.findIndex(h => h.includes('valor bruto') || h.includes('valor') || h.includes('amount'));
       const typeIdx = headers.findIndex(h => h.includes('tipo') || h.includes('type'));
       const dateIdx = headers.findIndex(h => h.includes('data') || h.includes('date') || h.includes('competência'));
+      const unitIdx = headers.findIndex(h => h.includes('unidade') || h === 'unit');
+      const { data: unitRows } = await supabase.from('units').select('id, name');
+      const unitList = (unitRows ?? []) as { id: string; name: string }[];
 
       if (descIdx === -1 || amountIdx === -1) {
         throw new Error('CSV deve ter pelo menos colunas "Descrição" e "Valor"');
@@ -199,7 +220,21 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           continue;
         }
 
-        const { error } = await supabase.from('transactions').insert({
+        // Coluna Unidade: 1 unidade → vai direto; 2 ou mais → valor dividido igualmente (rateio).
+        const unitIds: string[] = [];
+        const unknownUnits: string[] = [];
+        if (unitIdx !== -1) {
+          for (const n of splitUnitNames(cols[unitIdx] || '')) {
+            const id = resolveUnit(n, unitList);
+            if (id) { if (!unitIds.includes(id)) unitIds.push(id); } else unknownUnits.push(n);
+          }
+        }
+        if (unknownUnits.length) {
+          errors.push(`Linha ${i + 1}: unidade não encontrada (${unknownUnits.join(', ')}). Linha não importada.`);
+          continue;
+        }
+
+        const { data: created, error } = await supabase.from('transactions').insert({
           type: type as any,
           description,
           amount,
@@ -208,11 +243,23 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
           competence_date,
           status: 'pendente' as any,
           created_by: user.id,
-        });
+          unit_id: unitIds.length === 1 ? unitIds[0] : null,
+        }).select('id').single();
 
         if (error) {
           errors.push(`Linha ${i + 1}: ${error.message}`);
         } else {
+          if (unitIds.length > 1 && created) {
+            const base = Math.floor((100 / unitIds.length) * 100) / 100;
+            const allocs = unitIds.map((unit_id, k) => ({
+              transaction_id: created.id,
+              unit_id,
+              allocation_type: 'percentual' as const,
+              percentage: k === unitIds.length - 1 ? +(100 - base * (unitIds.length - 1)).toFixed(2) : base,
+            }));
+            const { error: aErr } = await supabase.from('transaction_allocations').insert(allocs);
+            if (aErr) errors.push(`Linha ${i + 1}: lançamento criado, mas o rateio falhou (${aErr.message})`);
+          }
           success++;
           fileFingerprints.add(fingerprint);
         }

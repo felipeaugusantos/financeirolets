@@ -469,6 +469,57 @@ export type Database = {
           },
         ]
       }
+      category_split_rules: {
+        Row: {
+          account_id: string | null
+          active: boolean
+          allocations: Json
+          category_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          active?: boolean
+          allocations?: Json
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          active?: boolean
+          allocations?: Json
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_split_rules_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "category_split_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       closed_periods: {
         Row: {
           closed_at: string

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveCategorySplit, type CategorySplitRule } from '@/lib/categorySplits';
 import { parseOfx, readOfxFile, OfxStatement } from '@/lib/ofx';
 import {
   applyRules,
@@ -86,19 +87,28 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   const [entries, setEntries] = useState<StatementEntry[]>([]);
   const [candidates, setCandidates] = useState<CandidateTransaction[]>([]);
   const [rules, setRules] = useState<OfxRule[]>([]);
+  const [splitRules, setSplitRules] = useState<CategorySplitRule[]>([]);
   const [accountUnitId, setAccountUnitId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [lastImport, setLastImport] = useState<ImportSummary | null>(null);
 
   const loadRules = useCallback(async () => {
-    const { data } = await (supabase as any)
-      .from('ofx_import_rules')
-      .select('*')
-      .eq('active', true)
-      .order('priority');
+    const [{ data }, { data: splits }] = await Promise.all([
+      (supabase as any).from('ofx_import_rules').select('*').eq('active', true).order('priority'),
+      (supabase as any).from('category_split_rules').select('*').eq('active', true),
+    ]);
+    setSplitRules((splits ?? []) as CategorySplitRule[]);
     setRules((data ?? []) as OfxRule[]);
   }, []);
+
+  /** Sem rateio informado, aplica a divisão padrão da categoria (se houver). */
+  const categorySplitFor = useCallback((categoryId: string | null, accId: string | null): OfxAllocation[] => {
+    const lines = resolveCategorySplit(categoryId, accId, splitRules);
+    return (lines ?? []).map(l => ({
+      unit_id: l.unit_id, front_id: null, allocation_type: 'percentual' as const, value: l.percentage,
+    }));
+  }, [splitRules]);
 
   /** Unidade padrão da conta do extrato, usada pelas regras "unidade do extrato". */
   useEffect(() => {
@@ -450,12 +460,16 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     const type = entry.amount >= 0 ? 'receita' : 'despesa';
     // Sem rateio informado na tela, vale o rateio definido na regra do extrato.
     const outcome = applyRules(entry.memo || '', entry.amount, rules, ruleContext);
-    const allocations = patch.allocations?.length
+    const ruleAllocs = patch.allocations?.length
       ? patch.allocations
       : patch.useRuleAllocations === false ? [] : (outcome?.allocations ?? []).map(a => ({
           unit_id: a.unit_id, front_id: a.front_id,
           allocation_type: 'percentual' as const, value: a.percentage,
         }));
+    // Por último, a divisão padrão da categoria (só quando não há unidade nem rateio definidos).
+    const allocations = ruleAllocs.length || patch.unit_id
+      ? ruleAllocs
+      : categorySplitFor(patch.category_id, patch.account_id ?? entry.account_id);
     const { data: created, error } = await supabase
       .from('transactions')
       .insert({
@@ -482,7 +496,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     if (error || !created) return { error: error?.message ?? 'Falha ao criar lançamento' };
     await insertAllocations(created.id, allocations);
     return { id: created.id };
-  }, [user, insertAllocations, rules, ruleContext]);
+  }, [user, insertAllocations, rules, ruleContext, categorySplitFor]);
 
 
   /** Cria o lançamento a partir da linha do extrato e já o vincula. */
@@ -608,7 +622,12 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       return { ok: 0, failed: items.length };
     }
 
-    await insertAllocations(created.id, patch.allocations);
+    await insertAllocations(
+      created.id,
+      patch.allocations?.length || patch.unit_id
+        ? patch.allocations
+        : categorySplitFor(patch.category_id, patch.account_id ?? items[0].account_id),
+    );
 
 
 
@@ -631,7 +650,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       variant: failures.length ? 'destructive' : undefined,
     });
     return { ok, failed: failures.length };
-  }, [updateEntry, decisionStamp, load, toast, user, insertAllocations]);
+  }, [updateEntry, decisionStamp, load, toast, user, insertAllocations, categorySplitFor]);
 
   /**
    * Exclui a conciliação de várias linhas: o vínculo é desfeito e a linha volta
