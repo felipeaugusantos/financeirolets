@@ -87,6 +87,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   const [entries, setEntries] = useState<StatementEntry[]>([]);
   const [candidates, setCandidates] = useState<CandidateTransaction[]>([]);
   const [rules, setRules] = useState<OfxRule[]>([]);
+  const [splitRules, setSplitRules] = useState<CategorySplitRule[]>([]);
   const [accountUnitId, setAccountUnitId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -100,6 +101,14 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     setSplitRules((splits ?? []) as CategorySplitRule[]);
     setRules((data ?? []) as OfxRule[]);
   }, []);
+
+  /** Sem rateio informado, aplica a divisão padrão da categoria (se houver). */
+  const categorySplitFor = useCallback((categoryId: string | null, accId: string | null): OfxAllocation[] => {
+    const lines = resolveCategorySplit(categoryId, accId, splitRules);
+    return (lines ?? []).map(l => ({
+      unit_id: l.unit_id, front_id: null, allocation_type: 'percentual' as const, value: l.percentage,
+    }));
+  }, [splitRules]);
 
   /** Unidade padrão da conta do extrato, usada pelas regras "unidade do extrato". */
   useEffect(() => {
