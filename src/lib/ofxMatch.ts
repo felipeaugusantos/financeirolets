@@ -100,6 +100,16 @@ export function normalizeText(s: string): string {
 }
 
 /**
+ * Texto normalizado sem a data que o banco cola no fim do histórico
+ * ("... 04/09", "... 05/09/2026"). Autorizado pelo cliente.
+ */
+export function stripDateSuffix(s: string): string {
+  const semData = decodeEntities(s || '')
+    .replace(/(\s+\d{1,2}[\/.-]\d{1,2}([\/.-]\d{2,4})?)+\s*$/g, '');
+  return normalizeText(semData);
+}
+
+/**
  * Assinatura do "tipo de histórico": remove números, datas e códigos para
  * agrupar linhas que se repetem toda semana (tarifas, Stone, antecipações).
  */
@@ -555,12 +565,12 @@ export function matchByDescription(
   candidates: CandidateTransaction[],
   outcome: RuleOutcome | null
 ): DescriptionMatch {
-  const key = normalizeText(memo || '');
+  const key = stripDateSuffix(memo || '');
   if (!key) return emptyDescriptionMatch();
 
   const type: 'receita' | 'despesa' = amount >= 0 ? 'receita' : 'despesa';
   const hits = candidates.filter(
-    t => t.type === type && normalizeText(t.description || '') === key
+    t => t.type === type && stripDateSuffix(t.description || '') === key
   );
   if (hits.length === 0) return emptyDescriptionMatch();
 

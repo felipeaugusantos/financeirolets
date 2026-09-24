@@ -3,6 +3,11 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.1 — 24/09/2026
+- Vínculo por descrição ignora a data no fim do histórico ("... 04/09").
+- Quadro "Nomes repetidos sem regra" oculto.
+- "Lançar pelas regras": só regras de baixo risco vêm marcadas; demais para conferência.
+
 ## 1.2.0 — 20/09/2026
 - Regras de conciliação avançadas: por conta, exceções de texto, faixa de valor,
   unidade da conta do extrato e rateio dentro da regra (validação de 100%).

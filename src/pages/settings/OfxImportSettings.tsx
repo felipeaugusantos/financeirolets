@@ -762,7 +762,8 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         />
       )}
 
-      {accountId && (
+      {/* Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15). */}
+      {false && accountId && (
         <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />
       )}
 
