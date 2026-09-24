@@ -45,6 +45,22 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.1',
+    date: '2026-09-24',
+    summary: 'Ajustes pedidos pelo cliente na conciliação bancária.',
+    items: [
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Data no fim do histórico é ignorada',
+        detail: 'Históricos como "... 04/09" agora casam com o lançamento mesmo com a data colada pelo banco.',
+        tech: 'stripDateSuffix em ofxMatch.ts no vínculo por descrição.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Sem sugestão de novas regras',
+        detail: 'O quadro "Nomes repetidos sem regra" foi ocultado.',
+        tech: 'SuggestedRulesPanel desativado em OfxImportSettings.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Lançar pelas regras com conferência',
+        detail: 'Tarifas, antecipações, telefone, contabilidade e similares vêm marcados; o restante (ex.: Pix por nome) vem desmarcado para conferir.',
+        tech: 'isSafeRule em AutoPostDialog.' },
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-09-20',
     summary:

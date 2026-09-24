@@ -9,6 +9,14 @@ import { EnrichedEntry } from '@/hooks/useOfxImport';
 import { OptionList } from '@/components/ofx/OfxRulesPanel';
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
 
+/** Regras de baixo risco: tarifas, antecipações/débito de cartão, telefone, contabilidade etc. */
+const SAFE_RULE = /tarifa|antecipacao|stone .*debito|telefone|contabilidade|rentab|sindicato|odonto/;
+export function isSafeRule(v: EnrichedEntry): boolean {
+  const txt = `${(v as any).ruleLabel ?? ''} ${v.entry.memo ?? ''}`
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return SAFE_RULE.test(txt);
+}
+
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => iso.split('-').reverse().join('/');
 
@@ -43,7 +51,7 @@ export default function AutoPostDialog({
   );
 
   useEffect(() => {
-    if (open) setChecked(new Set(eligible.map(v => v.entry.id)));
+    if (open) setChecked(new Set(eligible.filter(isSafeRule).map(v => v.entry.id)));
   }, [open, eligible]);
 
   const name = (list: { id: string; name: string }[], id: string | null) =>
