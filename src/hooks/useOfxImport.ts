@@ -340,7 +340,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       }
 
       if (newRows.length > 0) {
-        const { error } = await (supabase as any).from('bank_statement_entries').insert(newRows);
+        const { error } = await (supabase as any).from('bank_statement_entries').upsert(newRows, { onConflict: 'account_id,fitid', ignoreDuplicates: true });
         if (error) throw error;
       }
 
