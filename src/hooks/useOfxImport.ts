@@ -460,12 +460,16 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     const type = entry.amount >= 0 ? 'receita' : 'despesa';
     // Sem rateio informado na tela, vale o rateio definido na regra do extrato.
     const outcome = applyRules(entry.memo || '', entry.amount, rules, ruleContext);
-    const allocations = patch.allocations?.length
+    const ruleAllocs = patch.allocations?.length
       ? patch.allocations
       : patch.useRuleAllocations === false ? [] : (outcome?.allocations ?? []).map(a => ({
           unit_id: a.unit_id, front_id: a.front_id,
           allocation_type: 'percentual' as const, value: a.percentage,
         }));
+    // Por último, a divisão padrão da categoria (só quando não há unidade nem rateio definidos).
+    const allocations = ruleAllocs.length || patch.unit_id
+      ? ruleAllocs
+      : categorySplitFor(patch.category_id, patch.account_id ?? entry.account_id);
     const { data: created, error } = await supabase
       .from('transactions')
       .insert({
@@ -492,7 +496,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     if (error || !created) return { error: error?.message ?? 'Falha ao criar lançamento' };
     await insertAllocations(created.id, allocations);
     return { id: created.id };
-  }, [user, insertAllocations, rules, ruleContext]);
+  }, [user, insertAllocations, rules, ruleContext, categorySplitFor]);
 
 
   /** Cria o lançamento a partir da linha do extrato e já o vincula. */
@@ -618,7 +622,12 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       return { ok: 0, failed: items.length };
     }
 
-    await insertAllocations(created.id, patch.allocations);
+    await insertAllocations(
+      created.id,
+      patch.allocations?.length || patch.unit_id
+        ? patch.allocations
+        : categorySplitFor(patch.category_id, patch.account_id ?? items[0].account_id),
+    );
 
 
 
@@ -641,7 +650,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       variant: failures.length ? 'destructive' : undefined,
     });
     return { ok, failed: failures.length };
-  }, [updateEntry, decisionStamp, load, toast, user, insertAllocations]);
+  }, [updateEntry, decisionStamp, load, toast, user, insertAllocations, categorySplitFor]);
 
   /**
    * Exclui a conciliação de várias linhas: o vínculo é desfeito e a linha volta
