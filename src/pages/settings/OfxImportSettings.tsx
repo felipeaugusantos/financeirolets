@@ -25,6 +25,7 @@ import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
 import ClosingPanel from '@/components/ofx/ClosingPanel';
 import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog';
 import AutoPostDialog from '@/components/ofx/AutoPostDialog';
+import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
 import { suggestPaymentMethod } from '@/lib/paymentMethod';
 
@@ -160,6 +161,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
    * Ids de linhas pendentes que já têm lançamento equivalente:
    * mesma descrição, mesmo valor e data em até 5 dias de diferença.
    */
+  const { isAdmin: roleAdmin, isFinanceiro: roleFin } = useCurrentUserRoles();
+  /** Resposta do cliente (P13): só Administrador e Financeiro lançam pelas regras. */
+  const canAutoPost = roleAdmin || roleFin;
+
   const duplicateIds = useMemo(() => {
     const set = new Set<string>();
     const dayDiff = (a: string, b: string) =>
@@ -168,6 +173,8 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       if (e.status !== 'pendente') continue;
       const desc = normalizeText(e.memo || '');
       if (!desc) continue;
+      // Resposta do cliente (P12): tarifas iguais em dias próximos nunca são repetidas.
+      if (desc.includes('tarifa')) continue;
       const dates = existingDescriptions.get(`${desc}|${Math.abs(Number(e.amount)).toFixed(2)}`);
       if (dates?.some(d => dayDiff(d, e.posted_at) <= 5)) set.add(e.id);
     }
@@ -609,6 +616,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             >
               <Zap className="h-4 w-4" /> Revalidar importados ({descAutoLinkables.length})
             </Button>
+            {canAutoPost && (
             <Button
               variant="secondary"
               className="gap-2 rounded-xl"
@@ -618,6 +626,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             >
               <PlusCircle className="h-4 w-4" /> Lançar pelas regras ({autoPostable.length})
             </Button>
+            )}
 
             {(['pendente', 'vinculado', 'ignorado', 'todos'] as const).map(s => (
               <Button
@@ -763,9 +772,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       )}
 
       {/* Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15). */}
-      {false && accountId && (
-        <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />
-      )}
+      {false && accountId && <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />}
 
       {accountId && view === 'lista' && (
         <DuplicatePairingPanel groups={duplicateGroups} />
