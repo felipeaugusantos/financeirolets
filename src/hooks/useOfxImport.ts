@@ -18,6 +18,21 @@ import {
 
 } from '@/lib/ofxMatch';
 
+
+/** Busca FITIDs já gravados em lotes (evita o limite de 1.000 do .in()). */
+async function fetchExistingByFitid(accountId: string, fitids: string[], cols: string): Promise<any[]> {
+  const unique = Array.from(new Set(fitids));
+  const out: any[] = [];
+  for (let i = 0; i < unique.length; i += 200) {
+    const { data, error } = await (supabase as any)
+      .from('bank_statement_entries').select(cols)
+      .eq('account_id', accountId).in('fitid', unique.slice(i, i + 200));
+    if (error) throw error;
+    out.push(...(data ?? []));
+  }
+  return out;
+}
+
 export interface StatementEntry extends StatementLine {
   id: string;
   account_id: string;
@@ -211,11 +226,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       const statements = parseOfx(text);
       const lines = statements.flatMap(s => s.transactions);
 
-      const { data: existing } = await (supabase as any)
-        .from('bank_statement_entries')
-        .select('fitid')
-        .eq('account_id', targetAccountId)
-        .in('fitid', lines.map(l => l.fitid).slice(0, 1000));
+      const existing = await fetchExistingByFitid(targetAccountId, lines.map(l => l.fitid), 'fitid');
       const known = new Set(((existing ?? []) as { fitid: string }[]).map(r => r.fitid));
 
       const seen = new Set<string>();
@@ -242,7 +253,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       if (rows.length > 0) {
         const { error, count } = await (supabase as any)
           .from('bank_statement_entries')
-          .insert(rows, { count: 'exact' });
+          .upsert(rows, { onConflict: 'account_id,fitid', ignoreDuplicates: true, count: 'exact' });
         if (error) throw error;
         inserted = count ?? rows.length;
       }
@@ -287,11 +298,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       const statements = parseOfx(text);
       const lines = statements.flatMap(s => s.transactions);
 
-      const { data: existing } = await (supabase as any)
-        .from('bank_statement_entries')
-        .select('id, fitid, status')
-        .eq('account_id', targetAccountId)
-        .in('fitid', lines.map(l => l.fitid).slice(0, 1000));
+      const existing = await fetchExistingByFitid(targetAccountId, lines.map(l => l.fitid), 'id, fitid, status');
       const byFitid = new Map(
         ((existing ?? []) as { id: string; fitid: string; status: string }[]).map(r => [r.fitid, r])
       );
@@ -333,7 +340,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       }
 
       if (newRows.length > 0) {
-        const { error } = await (supabase as any).from('bank_statement_entries').insert(newRows);
+        const { error } = await (supabase as any).from('bank_statement_entries').upsert(newRows, { onConflict: 'account_id,fitid', ignoreDuplicates: true });
         if (error) throw error;
       }
 
@@ -435,6 +442,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       payment_method?: string | null;
       /** Rateio por unidade/frente. */
       allocations?: OfxAllocation[];
+      /** Se false, não aplica o rateio da regra (usuário escolheu a unidade manualmente). */
+      useRuleAllocations?: boolean;
     }
   ): Promise<{ id: string } | { error: string }> => {
     const amount = Math.abs(entry.amount);
@@ -443,7 +452,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     const outcome = applyRules(entry.memo || '', entry.amount, rules, ruleContext);
     const allocations = patch.allocations?.length
       ? patch.allocations
-      : (outcome?.allocations ?? []).map(a => ({
+      : patch.useRuleAllocations === false ? [] : (outcome?.allocations ?? []).map(a => ({
           unit_id: a.unit_id, front_id: a.front_id,
           allocation_type: 'percentual' as const, value: a.percentage,
         }));

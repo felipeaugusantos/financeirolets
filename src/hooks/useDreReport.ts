@@ -237,6 +237,7 @@ export function useDreReport() {
         .from('dre_lines')
         .select('*')
         .eq('active', true)
+        .neq('view_scope', 'contabil')
         .order('sort_order');
       if (dreErr) throw dreErr;
 

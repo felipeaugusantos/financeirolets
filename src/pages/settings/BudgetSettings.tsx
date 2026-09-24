@@ -55,7 +55,7 @@ export default function BudgetSettings({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('dre_lines').select('*').eq('active', true).order('sort_order'),
+      supabase.from('dre_lines').select('*').eq('active', true).neq('view_scope', 'contabil').order('sort_order'),
       supabase.from('units').select('id, name').eq('active', true).order('name'),
     ]).then(([dre, un]) => {
       setDreLines((dre.data ?? []) as DreLine[]);

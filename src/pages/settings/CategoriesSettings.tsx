@@ -17,7 +17,7 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    (supabase.from('dre_lines') as any).select('id, name, code').order('sort_order').then(({ data }: any) => {
+    (supabase.from('dre_lines') as any).select('id, name, code').neq('view_scope', 'contabil').order('sort_order').then(({ data }: any) => {
       setDreLines(data ?? []);
     });
   }, []);
