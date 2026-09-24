@@ -521,7 +521,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   const confirmCreate = async () => {
     if (!createFor) return;
-    const ok = await createFromEntry(createFor.entry as StatementEntry, createForm);
+    const ok = await createFromEntry(createFor.entry as StatementEntry, { ...createForm, useRuleAllocations: false });
     if (ok) setCreateFor(null);
   };
 
