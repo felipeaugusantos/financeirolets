@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveCategorySplit, type CategorySplitRule } from '@/lib/categorySplits';
 import { parseOfx, readOfxFile, OfxStatement } from '@/lib/ofx';
 import {
   applyRules,
@@ -92,11 +93,11 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   const [lastImport, setLastImport] = useState<ImportSummary | null>(null);
 
   const loadRules = useCallback(async () => {
-    const { data } = await (supabase as any)
-      .from('ofx_import_rules')
-      .select('*')
-      .eq('active', true)
-      .order('priority');
+    const [{ data }, { data: splits }] = await Promise.all([
+      (supabase as any).from('ofx_import_rules').select('*').eq('active', true).order('priority'),
+      (supabase as any).from('category_split_rules').select('*').eq('active', true),
+    ]);
+    setSplitRules((splits ?? []) as CategorySplitRule[]);
     setRules((data ?? []) as OfxRule[]);
   }, []);
 

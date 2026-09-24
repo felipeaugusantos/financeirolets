@@ -101,7 +101,8 @@ export function normalizeText(s: string): string {
 
 /**
  * Texto normalizado sem a data que o banco cola no fim do histórico
- * ("... 04/09", "... 05/09/2026"). Autorizado pelo cliente.
+ * ("... 04/09", "... 05/09/2026"). Autorizado pelo cliente: o mesmo
+ * fornecedor em dias diferentes passa a ser tratado como igual.
  */
 export function stripDateSuffix(s: string): string {
   const semData = decodeEntities(s || '')
