@@ -111,10 +111,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       setAccounts(acc.data ?? []);
       if (!accountId && acc.data?.length) setAccountId(acc.data[0].id);
       setOptions({
-        categories: (cat.data ?? []) as any,
-        units: (uni.data ?? []) as any,
-        fronts: (fro.data ?? []) as any,
-        partners: (par.data ?? []) as any,
+        categories: (cat.data ?? []),
+        units: (uni.data ?? []),
+        fronts: (fro.data ?? []),
+        partners: (par.data ?? []),
       });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,7 +144,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         .neq('status', 'cancelado')
         .limit(5000);
       const map = new Map<string, string[]>();
-      for (const t of (data ?? []) as any[]) {
+      for (const t of (data ?? [])) {
         const desc = normalizeText(t.description || '');
         if (!desc) continue;
         const values = [t.amount, t.net_amount]

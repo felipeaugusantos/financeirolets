@@ -220,7 +220,7 @@ export function useDreGerencial() {
       const lineById = new Map<string, { code: string | null; name: string }>();
       (allDreLines ?? []).forEach((l) => lineById.set(l.id, { code: l.code, name: l.name }));
 
-      const allLinesRaw = (dreLines ?? []) as any[];
+      const allLinesRaw = (dreLines ?? []);
       /** Linha contábil por código (C1.02, C6.05, ...) para o vínculo automático. */
       const contabilByCode = new Map<string, string>();
       allLinesRaw.forEach((l) => { if (l.code) contabilByCode.set(l.code, l.id); });

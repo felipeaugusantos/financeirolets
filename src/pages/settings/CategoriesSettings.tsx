@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
-import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
+import { CrudDialog, type FormValues, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,17 +13,17 @@ import type { Tables } from '@/integrations/supabase/types';
 export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'categories'>>('categories');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
-  const [dreLines, setDreLines] = useState<any[]>([]);
+  const [editing, setEditing] = useState<Tables<'categories'> | null>(null);
+  const [dreLines, setDreLines] = useState<Pick<Tables<'dre_lines'>, 'id' | 'name' | 'code'>[]>([]);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    (supabase.from('dre_lines') as any).select('id, name, code').neq('view_scope', 'contabil').order('sort_order').then(({ data }: any) => {
+    supabase.from('dre_lines').select('id, name, code').neq('view_scope', 'contabil').order('sort_order').then(({ data }) => {
       setDreLines(data ?? []);
     });
   }, []);
 
-  const columns: ColumnConfig[] = [
+  const columns: ColumnConfig<Tables<'categories'>>[] = [
     { key: 'name', label: 'Nome' },
     { key: 'type', label: 'Tipo', render: (v: string) => (
       <Badge variant={v === 'receita' ? 'default' : 'secondary'} className="rounded-full text-xs">
@@ -57,7 +57,7 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
     { name: 'sort_order', label: 'Ordem', type: 'number', placeholder: '0' },
   ];
 
-  const handleSave = async (formData: Record<string, any>) => {
+  const handleSave = async (formData: FormValues) => {
     const clean = { ...formData };
     if (!clean.parent_id || clean.parent_id === '__none__') clean.parent_id = null;
     if (!clean.dre_line_id || clean.dre_line_id === '__none__') clean.dre_line_id = null;

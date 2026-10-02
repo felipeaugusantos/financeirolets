@@ -71,7 +71,7 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
         category:categories(name),
         unit:units(name)
       `)
-      .eq('type', type as any)
+      .eq('type', type)
       .in('status', ['pendente', 'agendado'] as Database['public']['Enums']['transaction_status'][]);
 
     if (filters?.dateFrom) query = query.gte('due_date', filters.dateFrom);

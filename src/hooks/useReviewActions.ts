@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { errorMessage } from '@/lib/utils';
+import type { Json } from '@/integrations/supabase/types';
 
 /**
  * Ações MANUAIS da Conferência de lançamentos.
@@ -104,7 +105,7 @@ export function useReviewStatus() {
       };
       const { error } = await supabase
         .from('transaction_reviews')
-        .upsert(payload as any, { onConflict: 'transaction_id' });
+        .upsert(payload, { onConflict: 'transaction_id' });
       if (error) {
         toast({ title: 'Erro ao salvar marcação', description: error.message, variant: 'destructive' });
         return;
@@ -142,10 +143,10 @@ export function useReviewActions(onDone?: () => void) {
 
   const logAudit = async (id: string, before: unknown, after: unknown) => {
     try {
-      await supabase.rpc('log_reconciliation_fix' as any, {
+      await supabase.rpc('log_reconciliation_fix', {
         _record_id: id,
-        _old_data: before ?? {},
-        _new_data: after ?? {},
+        _old_data: (before ?? {}) as Json,
+        _new_data: (after ?? {}) as Json,
       });
     } catch (e) {
       console.warn('[conferencia] audit log falhou', e);
@@ -206,7 +207,7 @@ export function useReviewActions(onDone?: () => void) {
             .eq('id', id)
             .maybeSingle();
           try {
-            await supabase.rpc('log_transaction_action' as any, {
+            await supabase.rpc('log_transaction_action', {
               _record_id: id,
               _action: 'DELETE',
               _old_data: before ?? {},

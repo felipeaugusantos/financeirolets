@@ -11,8 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
-import type { TablesUpdate } from '@/integrations/supabase/types';
+import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { errorMessage } from '@/lib/utils';
+import type { DbTxType, DbTxStatus, DbPaymentMethod } from '@/lib/dbTypes';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
@@ -35,7 +36,7 @@ interface CardEntry {
 }
 
 /** Data em ISO a partir de célula do Excel (serial, Date ou texto dd/mm/aaaa). */
-function toISODate(value: any): string | null {
+function toISODate(value: unknown): string | null {
   if (value == null || value === '') return null;
   if (value instanceof Date) {
     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
@@ -57,7 +58,7 @@ function toISODate(value: any): string | null {
 }
 
 /** Converte "1.234,56" ou "1234.56" em número. */
-function toAmount(value: any): number | null {
+function toAmount(value: unknown): number | null {
   if (value == null || value === '') return null;
   if (typeof value === 'number') return value;
   const text = String(value).replace(/[^\d,.-]/g, '');
@@ -102,11 +103,11 @@ export default function CardReconciliation() {
         supabase.from('business_fronts').select('id, name').eq('active', true).order('name'),
         supabase.from('categories').select('id, name, type').eq('active', true).order('name'),
       ]);
-      setAccounts((a.data ?? []) as any);
-      setUnits((u.data ?? []) as any);
-      setFronts((f.data ?? []) as any);
-      setCategories((c.data ?? []) as any);
-      if ((a.data ?? []).length > 0) setAccountId((a.data as any)[0].id);
+      setAccounts((a.data ?? []));
+      setUnits((u.data ?? []));
+      setFronts((f.data ?? []));
+      setCategories((c.data ?? []));
+      if ((a.data ?? []).length > 0) setAccountId(a.data![0].id);
     })();
   }, []);
 
@@ -138,7 +139,7 @@ export default function CardReconciliation() {
     try {
       const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
       if (rows.length === 0) throw new Error('A planilha está vazia.');
 
       const headers = Object.keys(rows[0]);
@@ -150,7 +151,7 @@ export default function CardReconciliation() {
         throw new Error('A planilha precisa ter as colunas Data, Descrição e Valor.');
       }
 
-      const payload: any[] = [];
+      const payload: TablesInsert<'card_statement_entries'>[] = [];
       let ignored = 0;
       for (const r of rows) {
         const posted_at = toISODate(r[colDate]);
@@ -208,7 +209,7 @@ export default function CardReconciliation() {
     const { data: created, error } = await supabase
       .from('transactions')
       .insert({
-        type: type as any,
+        type: type as DbTxType,
         description: entry.description,
         amount,
         tax_amount: 0,
@@ -216,12 +217,12 @@ export default function CardReconciliation() {
         competence_date: entry.posted_at,
         due_date: entry.posted_at,
         payment_date: entry.posted_at,
-        status: (type === 'receita' ? 'recebido' : 'pago') as any,
+        status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
         account_id: entry.account_id,
         category_id: entry.category_id,
         unit_id: entry.unit_id,
         front_id: entry.front_id,
-        payment_method: (entry.payment_method || 'cartao_credito') as any,
+        payment_method: (entry.payment_method || 'cartao_credito') as DbPaymentMethod | null,
         notes: `Importado da planilha de cartão (${entry.source_file ?? 'arquivo'})${entry.card_last4 ? ` — final ${entry.card_last4}` : ''}`,
         created_by: user?.id ?? null,
       })

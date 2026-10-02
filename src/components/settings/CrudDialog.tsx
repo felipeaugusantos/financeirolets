@@ -18,22 +18,25 @@ export interface FieldConfig {
   hint?: string;
 }
 
+/** Valores brutos do formulário (strings dos inputs/selects); cada tela converte para o tipo da tabela. */
+export type FormValues = Record<string, string | number | boolean | null>;
+
 interface CrudDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Record<string, any>) => Promise<boolean | string>;
+  onSave: (data: FormValues) => Promise<boolean | string>;
   title: string;
   fields: FieldConfig[];
-  initialData?: Record<string, any>;
+  initialData?: FormValues;
 }
 
 export function CrudDialog({ open, onClose, onSave, title, fields, initialData }: CrudDialogProps) {
-  const [form, setForm] = useState<Record<string, any>>({});
+  const [form, setForm] = useState<FormValues>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      const defaults: Record<string, any> = {};
+      const defaults: FormValues = {};
       fields.forEach(f => {
         const val = initialData?.[f.name];
         if (f.type === 'select' && (val === null || val === undefined || val === '')) {
@@ -66,7 +69,7 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
             <div key={f.name} className="space-y-1.5">
               <Label className="text-xs font-medium">{f.label}</Label>
               {f.type === 'select' ? (
-                <Select value={form[f.name] || ''} onValueChange={v => setForm(p => ({ ...p, [f.name]: v }))}>
+                <Select value={String(form[f.name] || '')} onValueChange={v => setForm(p => ({ ...p, [f.name]: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
                     {f.options?.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -74,7 +77,7 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
                 </Select>
               ) : f.type === 'textarea' ? (
                 <Textarea
-                  value={form[f.name] || ''}
+                  value={String(form[f.name] || '')}
                   onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))}
                   placeholder={f.placeholder}
                   className="rounded-xl"
@@ -82,7 +85,7 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
               ) : (
                 <Input
                   type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                  value={form[f.name] || ''}
+                  value={String(form[f.name] || '')}
                   onChange={e => setForm(p => ({ ...p, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value }))}
                   placeholder={f.placeholder}
                   className="rounded-xl"

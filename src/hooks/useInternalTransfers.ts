@@ -26,7 +26,7 @@ export function useInternalTransfers(from: string, to: string) {
       .gte('posted_at', from)
       .lte('posted_at', to)
       .limit(3000);
-    setRows(((data ?? []) as any[]).map(r => ({
+    setRows(((data ?? [])).map(r => ({
       id: r.id,
       account_id: r.account_id,
       account_name: r.account?.name ?? 'Conta',

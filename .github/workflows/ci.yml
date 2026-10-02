@@ -28,5 +28,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run lint --max-warnings 196
+      - run: bun run lint --max-warnings 76
       - run: bunx tsc -p tsconfig.app.json --noEmit

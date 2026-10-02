@@ -50,16 +50,17 @@ export function useFinanceSnapshot(range: { from: string; to: string }) {
           .limit(20000),
       ]);
 
-      const sum = (rows: any[] | null, kind: string) =>
+      type SumRow = { type: string; net_amount: number | string | null };
+      const sum = (rows: SumRow[] | null, kind: string) =>
         (rows ?? []).reduce(
           (s, r) => (r.type === kind ? s + (Number(r.net_amount) || 0) : s),
           0
         );
 
-      const receita = sum(dre.data as any[], 'receita');
-      const despesa = sum(dre.data as any[], 'despesa');
-      const entradas = sum(cash.data as any[], 'receita');
-      const saidas = sum(cash.data as any[], 'despesa');
+      const receita = sum(dre.data as unknown as SumRow[], 'receita');
+      const despesa = sum(dre.data as unknown as SumRow[], 'despesa');
+      const entradas = sum(cash.data as unknown as SumRow[], 'receita');
+      const saidas = sum(cash.data as unknown as SumRow[], 'despesa');
       setSnapshot({
         receita,
         despesa,

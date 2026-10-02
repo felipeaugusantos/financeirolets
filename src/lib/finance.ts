@@ -189,40 +189,57 @@ export function valueForFilters(
 // Bases de consulta compartilhadas (PostgREST query builders)
 // ---------------------------------------------------------------------------
 
+/**
+ * Subconjunto encadeável do query builder do Supabase usado pelos helpers abaixo.
+ * O tipo recursivo do builder estoura o compilador (TS2589), então os helpers
+ * recebem e devolvem o mesmo tipo `Q` e coagem só aqui, num ponto único.
+ */
+export interface FilterableQuery {
+  not(column: string, operator: string, value: unknown): FilterableQuery;
+  eq(column: string, value: unknown): FilterableQuery;
+  is(column: string, value: null): FilterableQuery;
+  in(column: string, values: readonly unknown[]): FilterableQuery;
+  gte(column: string, value: string): FilterableQuery;
+  lte(column: string, value: string): FilterableQuery;
+  ilike(column: string, pattern: string): FilterableQuery;
+  or(filters: string): FilterableQuery;
+}
+
 /** Base do DRE: exclui cancelados, exige affects_dre e aplica o regime. */
-export function applyDreBase(
-  query: any,
+export function applyDreBase<Q>(
+  query: Q,
   opts: { regime: 'competencia' | 'caixa'; onlyRealized?: boolean }
-) {
-  let q = query.not('status', 'eq', CANCELLED_STATUS).eq('affects_dre', true);
+): Q {
+  let q = (query as unknown as FilterableQuery).not('status', 'eq', CANCELLED_STATUS).eq('affects_dre', true);
   if (opts.regime === 'caixa' || opts.onlyRealized) {
-    q = q.in('status', [...PAID_STATUSES] as any);
+    q = q.in('status', PAID_STATUSES);
   }
-  return q;
+  return q as unknown as Q;
 }
 
 /** Base do Fluxo de Caixa realizado: pagos/recebidos com data de pagamento. */
-export function applyCashRealizedBase(query: any) {
-  return query
+export function applyCashRealizedBase<Q>(query: Q): Q {
+  return (query as unknown as FilterableQuery)
     .not('payment_date', 'is', null)
-    .in('status', [...PAID_STATUSES] as any)
-    .eq('affects_cashflow', true);
+    .in('status', PAID_STATUSES)
+    .eq('affects_cashflow', true) as unknown as Q;
 }
 
 /** Base do Fluxo de Caixa projetado: pendentes/agendados por vencimento. */
-export function applyCashProjectedBase(query: any) {
-  return query
+export function applyCashProjectedBase<Q>(query: Q): Q {
+  return (query as unknown as FilterableQuery)
     .not('due_date', 'is', null)
-    .in('status', [...PROVISIONED_STATUSES] as any)
-    .eq('affects_cashflow', true);
+    .in('status', PROVISIONED_STATUSES)
+    .eq('affects_cashflow', true) as unknown as Q;
 }
 
 /** Filtro "sem categoria"/categoria específica, igual em todas as telas. */
-export function applyCategoryFilter(query: any, categoryId?: string) {
+export function applyCategoryFilter<Q>(query: Q, categoryId?: string): Q {
   if (!categoryId) return query;
-  return categoryId === NO_UNIT_KEY || categoryId === '__null__'
-    ? query.is('category_id', null)
-    : query.eq('category_id', categoryId);
+  const q = query as unknown as FilterableQuery;
+  return (categoryId === NO_UNIT_KEY || categoryId === '__null__'
+    ? q.is('category_id', null)
+    : q.eq('category_id', categoryId)) as unknown as Q;
 }
 
 // ---------------------------------------------------------------------------

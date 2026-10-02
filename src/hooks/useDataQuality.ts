@@ -219,7 +219,7 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         .sort((a, b) => b.items.length - a.items.length);
 
       // Rateios que não fecham com o valor do lançamento
-      const allocMap = buildAllocationMap((allocs ?? []) as any);
+      const allocMap = buildAllocationMap((allocs ?? []));
       const allocationIssues: AllocationIssue[] = [];
       active.forEach((t) => {
         const lines = allocMap.get(t.id);
@@ -276,11 +276,11 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         transfersInDre,
         orphanCategoryGroups,
         allocationIssues,
-        fronts: (frontRows ?? []) as any,
-        categories: (cats ?? []) as any,
-        units: (unitRows ?? []) as any,
-        accounts: (accountRows ?? []) as any,
-        dreLines: (dreLines ?? []) as any,
+        fronts: (frontRows ?? []),
+        categories: (cats ?? []),
+        units: (unitRows ?? []),
+        accounts: (accountRows ?? []),
+        dreLines: (dreLines ?? []),
         categoryNameById: new Map((cats ?? []).map((c) => [c.id, c.name as string])),
         unitNameById: new Map((unitRows ?? []).map((u) => [u.id, u.name as string])),
         accountNameById: new Map((accountRows ?? []).map((a) => [a.id, a.name as string])),

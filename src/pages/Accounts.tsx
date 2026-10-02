@@ -29,6 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO } from '@/lib/utils';
 import BillFilters, { BillFiltersState, emptyFilters } from '@/components/accounts/BillFilters';
+import type { Tables } from '@/integrations/supabase/types';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -67,7 +68,7 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
   const [filters, setFilters] = useState<BillFiltersState>(emptyFilters);
   const { data, summary, loading, markAs, fetchData } = useBills(tab, filters);
   const { create: createTransaction, generateRecurring } = useTransactions();
-  const { data: accounts, create: createAccount } = useSupabaseCrud('accounts');
+  const { data: accounts, create: createAccount } = useSupabaseCrud<Tables<'accounts'>>('accounts');
   const { toast } = useToast();
   const [payDialog, setPayDialog] = useState<BillRow | null>(null);
   const [selectedAccount, setSelectedAccount] = useState('');
@@ -98,7 +99,7 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
     if (!payDialog) return;
     setPaying(true);
     const status = tab === 'pagar' ? 'pago' : 'recebido';
-    await markAs(payDialog.id, status as any, selectedAccount || undefined, selectedMethod || undefined);
+    await markAs(payDialog.id, status, selectedAccount || undefined, selectedMethod || undefined);
     setPaying(false);
     setPayDialog(null);
     setSelectedAccount('');
@@ -227,7 +228,7 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
             const statusInfo = getStatusInfo(bill);
             const isOverdue = statusInfo.label === 'Vencida';
             const isSelected = selected.has(bill.id);
-            const isRecurring = (bill as any).is_recurring || (bill as any).recurrence_parent_id;
+            const isRecurring = bill.is_recurring || bill.recurrence_parent_id;
             return (
               <Card
                 key={bill.id}
@@ -363,7 +364,7 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
                 <SelectWithAdd
                   value={selectedAccount}
                   onValueChange={setSelectedAccount}
-                  options={(accounts as any[])?.filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })) ?? []}
+                  options={(accounts)?.filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })) ?? []}
                   placeholder="Selecione..."
                   noneLabel="Selecione..."
                   addLabel="+ Nova Conta"
@@ -372,7 +373,7 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
                     { value: 'banco', label: 'Banco' }, { value: 'caixa', label: 'Caixa' }, { value: 'carteira', label: 'Carteira Digital' },
                   ]}]}
                   onAdd={async (d) => {
-                    const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true } as any);
+                    const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true });
                     return id || null;
                   }}
                 />

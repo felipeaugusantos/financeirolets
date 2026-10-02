@@ -20,8 +20,8 @@ interface AuditRow {
   table_name: string;
   record_id: string;
   action: 'INSERT' | 'UPDATE' | 'DELETE' | string;
-  old_data: any;
-  new_data: any;
+  old_data: AuditData;
+  new_data: AuditData;
   user_id: string | null;
   created_at: string;
 }
@@ -61,7 +61,10 @@ const SP_OFFSET = '-03:00';
 const spDayStart = (isoDate: string) => `${isoDate}T00:00:00.000${SP_OFFSET}`;
 const spDayEnd = (isoDate: string) => `${isoDate}T23:59:59.999${SP_OFFSET}`;
 
-function diffFields(oldData: any, newData: any): { key: string; old: any; new: any }[] {
+/** Snapshot jsonb de uma linha auditada. */
+type AuditData = Record<string, unknown> | null;
+
+function diffFields(oldData: AuditData, newData: AuditData): { key: string; old: unknown; new: unknown }[] {
   if (!oldData && !newData) return [];
   if (!oldData) return Object.entries(newData).map(([key, value]) => ({ key, old: undefined, new: value }));
   if (!newData) return Object.entries(oldData).map(([key, value]) => ({ key, old: value, new: undefined }));
@@ -71,7 +74,7 @@ function diffFields(oldData: any, newData: any): { key: string; old: any; new: a
     .map((k) => ({ key: k, old: oldData[k], new: newData[k] }));
 }
 
-function valueDisplay(v: any) {
+function valueDisplay(v: unknown) {
   if (v === null || v === undefined) return <span className="italic text-muted-foreground">vazio</span>;
   if (typeof v === 'object') return <code className="text-[10px]">{JSON.stringify(v)}</code>;
   if (typeof v === 'boolean') return v ? 'sim' : 'não';
@@ -95,7 +98,7 @@ export default function AuditSettings({ onBack }: Props) {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('units').select('id, name').order('name');
-      setUnits((data ?? []) as any);
+      setUnits((data ?? []));
     })();
   }, []);
 
@@ -281,7 +284,7 @@ export default function AuditSettings({ onBack }: Props) {
                     <span className="text-sm font-medium">{r.table_name}</span>
                     <span className="text-xs text-muted-foreground font-mono truncate">{r.record_id.slice(0, 8)}…</span>
                     {(() => {
-                      const uid = r.new_data?.unit_id || r.old_data?.unit_id;
+                      const uid = (r.new_data?.unit_id || r.old_data?.unit_id) as string | undefined;
                       const name = unitName(uid);
                       return name ? (
                         <Badge variant="outline" className="text-[10px] border-accent/30 text-accent gap-1">
@@ -321,7 +324,7 @@ export default function AuditSettings({ onBack }: Props) {
                   {fmtDate(detail.created_at)} ·{' '}
                   {detail.user_id ? (profiles[detail.user_id] || detail.user_id.slice(0, 8)) : 'Sistema'}
                   {(() => {
-                    const uid = detail.new_data?.unit_id || detail.old_data?.unit_id;
+                    const uid = (detail.new_data?.unit_id || detail.old_data?.unit_id) as string | undefined;
                     const name = unitName(uid);
                     return name ? <> · Unidade: <strong>{name}</strong></> : null;
                   })()}

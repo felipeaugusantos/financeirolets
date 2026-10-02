@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO, errorMessage } from '@/lib/utils';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface ReconciliationFilters {
   dateFrom: string;
@@ -321,8 +322,8 @@ export function useReconciliation() {
           ? supabase.from('business_fronts').select('id, name').in('id', Array.from(frontIds))
           : Promise.resolve({ data: [] as any[] }),
       ]);
-      const catName = new Map<string, string>(((cRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
-      const frontName = new Map<string, string>(((fRes.data ?? []) as any[]).map((f) => [f.id, f.name]));
+      const catName = new Map<string, string>(((cRes.data ?? [])).map((c) => [c.id, c.name]));
+      const frontName = new Map<string, string>(((fRes.data ?? [])).map((f) => [f.id, f.name]));
 
       const init = (): SideData => ({
         dashboard: 0, dreCompetenciaRealizado: 0, dreCompetenciaFull: 0, dreCaixa: 0,
@@ -448,10 +449,10 @@ export function useReconciliation() {
 
     // Write audit log entry (non-blocking on failure)
     try {
-      await supabase.rpc('log_reconciliation_fix' as any, {
+      await supabase.rpc('log_reconciliation_fix', {
         _record_id: id,
-        _old_data: before ?? {},
-        _new_data: after ?? patch,
+        _old_data: (before ?? {}) as Json,
+        _new_data: (after ?? patch) as Json,
       });
     } catch (e) {
       console.warn('[useReconciliation] audit log failed', e);

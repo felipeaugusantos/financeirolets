@@ -79,10 +79,10 @@ export default function QuickRuleDialog({
     seed?.appliesTo === 'ambos' ? true : c.type === seed?.appliesTo);
 
   const fields: [string, string, { id: string; name: string }[]][] = [
-    ['category_id', 'Categoria', categoryList as any],
-    ['unit_id', 'Unidade', options.units as any],
-    ['front_id', 'Frente de negócio', options.fronts as any],
-    ['partner_id', 'Parceiro', options.partners as any],
+    ['category_id', 'Categoria', categoryList],
+    ['unit_id', 'Unidade', options.units],
+    ['front_id', 'Frente de negócio', options.fronts],
+    ['partner_id', 'Parceiro', options.partners],
   ];
 
   return (

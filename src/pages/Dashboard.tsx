@@ -300,8 +300,8 @@ export default function Dashboard() {
   const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
-  const activeUnits = (units as any[])?.filter((u) => u.active) ?? [];
-  const activeFronts = (fronts as any[])?.filter((f) => f.active) ?? [];
+  const activeUnits = (units)?.filter((u) => u.active) ?? [];
+  const activeFronts = (fronts)?.filter((f) => f.active) ?? [];
 
   const fmtPct = (v: number | null) => v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '';
 

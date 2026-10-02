@@ -39,12 +39,12 @@ export default function ReconciliationRules() {
         supabase.from('accounts').select('id, name, default_unit_id').eq('active', true).order('name'),
       ]);
       setOptions({
-        categories: (cat.data ?? []) as any,
-        units: (uni.data ?? []) as any,
-        fronts: (fro.data ?? []) as any,
-        partners: (par.data ?? []) as any,
+        categories: (cat.data ?? []),
+        units: (uni.data ?? []),
+        fronts: (fro.data ?? []),
+        partners: (par.data ?? []),
       });
-      setAccounts((acc.data ?? []) as any);
+      setAccounts((acc.data ?? []));
     })();
   }, [reloadRules]);
 
