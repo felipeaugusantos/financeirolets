@@ -345,7 +345,7 @@ export default function BulkCreateDialog({
                             checked={!skipped.has(e.id)}
                             onCheckedChange={() => setSkipped(prev => {
                               const next = new Set(prev);
-                              next.has(e.id) ? next.delete(e.id) : next.add(e.id);
+                              if (next.has(e.id)) next.delete(e.id); else next.add(e.id);
                               return next;
                             })}
                             aria-label={`Incluir linha de ${br(e.posted_at)}`}

@@ -143,7 +143,7 @@ export function useDashboard(filters?: DashboardFilters) {
       const queryStart = prevStart;
       const queryEnd = rangeEnd;
 
-      let txQuery = supabase
+      const txQuery = supabase
         .from('transactions')
         .select('id, type, net_amount, payment_date, status, category_id, due_date, competence_date, unit_id, front_id, affects_dre, affects_cashflow')
         .or(`and(competence_date.gte.${queryStart},competence_date.lte.${queryEnd}),and(payment_date.gte.${queryStart},payment_date.lte.${queryEnd})`)
@@ -323,7 +323,7 @@ export function useDashboard(filters?: DashboardFilters) {
       }
 
       // Saldo total (snapshot, independente do período)
-      let saldoQuery = supabase
+      const saldoQuery = supabase
         .from('transactions')
         .select('id, type, net_amount, status, unit_id, front_id, account_id, payment_date')
         .in('status', ['pago', 'recebido'] as any)
@@ -367,7 +367,7 @@ export function useDashboard(filters?: DashboardFilters) {
       const saldoTotal = movimentacaoCalculada + saldoInicialTotal;
 
       // Overdue / due-today (snapshot)
-      let alertQuery = supabase
+      const alertQuery = supabase
         .from('transactions')
         .select('id, description, net_amount, due_date, type, unit_id, front_id, partner:partners(name)')
         .in('status', ['pendente', 'agendado'] as any)

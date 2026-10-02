@@ -41,7 +41,7 @@ export default function CategorySplitsPanel({ categories, units, accounts, canEd
   const name = (list: Opt[], id?: string | null) => list.find(x => x.id === id)?.name ?? '—';
   const sorted = useMemo(
     () => [...rows].sort((a, b) => name(categories, a.category_id).localeCompare(name(categories, b.category_id))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [rows, categories]
   );
 

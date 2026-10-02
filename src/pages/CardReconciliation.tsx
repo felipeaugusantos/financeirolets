@@ -363,7 +363,7 @@ export default function CardReconciliation() {
                             checked={selected.has(e.id)}
                             onCheckedChange={() => setSelected(prev => {
                               const next = new Set(prev);
-                              next.has(e.id) ? next.delete(e.id) : next.add(e.id);
+                              if (next.has(e.id)) next.delete(e.id); else next.add(e.id);
                               return next;
                             })}
                             aria-label={`Selecionar linha de ${br(e.posted_at)}`}

@@ -180,8 +180,10 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
       if (p.unit !== unitSel) continue;
       const r = rows[idx.get(p.month) ?? -1];
       if (!r) continue;
-      if (p.type === 'receita') p.realized ? (r.recR += p.value) : (r.recP += p.value);
-      else p.realized ? (r.desR += p.value) : (r.desP += p.value);
+      if (p.type === 'receita') {
+        if (p.realized) r.recR += p.value; else r.recP += p.value;
+      } else if (p.realized) r.desR += p.value;
+      else r.desP += p.value;
     }
     let acc = 0;
     return rows.map(r => {

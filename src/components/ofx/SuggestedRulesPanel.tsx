@@ -24,7 +24,7 @@ const IGNORAR = new Set(['ltda', 'me', 'epp', 'sa', 'eireli', 'cnpj', 'cpf']);
  */
 export function nomeDoHistorico(memo: string): string | null {
   const palavras = normalizeText(memo)
-    .replace(/\b\d{1,2}[\/.-]\d{1,2}([\/.-]\d{2,4})?\b/g, ' ')
+    .replace(/\b\d{1,2}[/.-]\d{1,2}([/.-]\d{2,4})?\b/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 3 && !/\d/.test(w) && !IGNORAR.has(w));
   const nome = palavras.filter(w => !PREFIXOS.has(w));

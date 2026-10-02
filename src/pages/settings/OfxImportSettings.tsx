@@ -56,6 +56,9 @@ const basisLabel: Record<string, string> = {
   bruto: 'valor bruto',
 };
 
+// Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15).
+const SHOW_SUGGESTED_RULES = false;
+
 export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -289,7 +292,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const toggle = (id: string) =>
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
@@ -772,7 +775,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       )}
 
       {/* Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15). */}
-      {false && accountId && <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />}
+      {SHOW_SUGGESTED_RULES && accountId && <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />}
 
       {accountId && view === 'lista' && (
         <DuplicatePairingPanel groups={duplicateGroups} />

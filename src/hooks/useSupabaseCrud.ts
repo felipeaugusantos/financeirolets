@@ -21,7 +21,7 @@ export function useSupabaseCrud<T extends { id: string }>(table: TableName, orde
       setData(rows ?? []);
     }
     setLoading(false);
-  }, [table, orderBy]);
+  }, [table, orderBy, toast]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
