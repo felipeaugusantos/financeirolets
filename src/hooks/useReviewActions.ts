@@ -66,7 +66,7 @@ export function useReviewStatus() {
       return;
     }
     const next: Record<string, ReviewEntry> = {};
-    (data ?? []).forEach((r: any) => {
+    (data ?? []).forEach((r) => {
       next[r.transaction_id] = {
         status: FROM_DB[r.status as DbStatus] ?? 'pendente',
         note: r.note ?? null,

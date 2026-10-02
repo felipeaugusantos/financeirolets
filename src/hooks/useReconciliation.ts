@@ -304,12 +304,12 @@ export function useReconciliation() {
       }
 
       const mapTx = new Map<string, any>();
-      (byComp ?? []).forEach((t: any) => mapTx.set(t.id, t));
-      (byPay ?? []).forEach((t: any) => mapTx.set(t.id, t));
+      (byComp ?? []).forEach((t) => mapTx.set(t.id, t));
+      (byPay ?? []).forEach((t) => mapTx.set(t.id, t));
 
       const catIds = new Set<string>();
       const frontIds = new Set<string>();
-      mapTx.forEach((tx: any) => {
+      mapTx.forEach((tx) => {
         if (tx.category_id) catIds.add(tx.category_id);
         if (tx.front_id) frontIds.add(tx.front_id);
       });
@@ -321,8 +321,8 @@ export function useReconciliation() {
           ? supabase.from('business_fronts').select('id, name').in('id', Array.from(frontIds))
           : Promise.resolve({ data: [] as any[] }),
       ]);
-      const catName = new Map<string, string>(((cRes.data ?? []) as any[]).map((c: any) => [c.id, c.name]));
-      const frontName = new Map<string, string>(((fRes.data ?? []) as any[]).map((f: any) => [f.id, f.name]));
+      const catName = new Map<string, string>(((cRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
+      const frontName = new Map<string, string>(((fRes.data ?? []) as any[]).map((f) => [f.id, f.name]));
 
       const init = (): SideData => ({
         dashboard: 0, dreCompetenciaRealizado: 0, dreCompetenciaFull: 0, dreCaixa: 0,

@@ -53,12 +53,12 @@ export function useUserRoles() {
       return;
     }
 
-    const mapped: UserWithRoles[] = (profiles ?? []).map((p: any) => ({
+    const mapped: UserWithRoles[] = (profiles ?? []).map((p) => ({
       id: p.id,
       email: p.email,
       full_name: p.full_name || '(sem nome)',
-      roles: (roles ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => r.role as AppRole),
-      unit_ids: (uu ?? []).filter((u: any) => u.user_id === p.id).map((u: any) => u.unit_id),
+      roles: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role as AppRole),
+      unit_ids: (uu ?? []).filter((u) => u.user_id === p.id).map((u) => u.unit_id),
     }));
     setUsers(mapped);
     setLoading(false);
@@ -128,7 +128,7 @@ export function useCurrentUserRoles() {
       }
       const { data } = await supabase.from('user_roles').select('role').eq('user_id', userData.user.id);
       if (!cancelled) {
-        setRoles((data ?? []).map((r: any) => r.role as AppRole));
+        setRoles((data ?? []).map((r) => r.role as AppRole));
         setLoading(false);
       }
     })();

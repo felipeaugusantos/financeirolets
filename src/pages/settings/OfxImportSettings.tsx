@@ -1151,7 +1151,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
               )}
               <div className="space-y-1.5">
                 <Label>Descrição</Label>
-                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f: any) => ({ ...f, description: ev.target.value }))} />
+                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f: Record<string, unknown>) => ({ ...f, description: ev.target.value }))} />
               </div>
               {([
                 ['category_id', 'Categoria', options.categories.filter(c =>
@@ -1164,12 +1164,12 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   <Label>{label}</Label>
                   <Select
                     value={createForm[key] ?? NONE}
-                    onValueChange={v => setCreateForm((f: any) => ({ ...f, [key]: v === NONE ? null : v }))}
+                    onValueChange={v => setCreateForm((f: Record<string, unknown>) => ({ ...f, [key]: v === NONE ? null : v }))}
                   >
                     <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
                     <SelectContent className="max-h-64">
                       <SelectItem value={NONE}>Nenhuma</SelectItem>
-                      {list.map((o: any) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                      {list.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

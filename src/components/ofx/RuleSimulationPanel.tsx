@@ -70,7 +70,7 @@ export default function RuleSimulationPanel({
       .limit(1000);
     setLoading(false);
     if (error) { toast({ title: 'Erro ao carregar extrato', description: error.message, variant: 'destructive' }); return; }
-    const parsed = (data ?? []).map((d: any) => ({ ...d, amount: Number(d.amount) })) as StatementLine[];
+    const parsed = (data ?? []).map((d) => ({ ...d, amount: Number(d.amount) })) as StatementLine[];
     setLines(parsed);
     setLabel(`${accounts.find(a => a.id === accountId)?.name ?? 'Conta'} · ${parsed.length} linhas`);
   };

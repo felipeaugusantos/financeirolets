@@ -61,7 +61,7 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
         supabase.from('categories').select('id, name'),
       ]);
       setUnits((u.data ?? []) as any);
-      setCats(new Map((c.data ?? []).map((x: any) => [x.id, x.name])));
+      setCats(new Map((c.data ?? []).map((x) => [x.id, x.name])));
       if (u.data?.[0]) setUnitSel(u.data[0].id);
     })();
   }, []);

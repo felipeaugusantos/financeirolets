@@ -83,7 +83,7 @@ export default function AllocationAssistant({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Label className="text-xs">Tipo de rateio</Label>
-            <Select value={mode} onValueChange={(v: any) => setMode(v)}>
+            <Select value={mode} onValueChange={(v) => setMode(v as 'percentual' | 'valor')}>
               <SelectTrigger className="w-40 h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="percentual">Percentual (%)</SelectItem>

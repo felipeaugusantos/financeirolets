@@ -213,7 +213,7 @@ export default function DreGerencial({ onBack }: { onBack: () => void }) {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Regime</Label>
-              <Select value={filters.regime} onValueChange={(v: any) => setFilters(f => ({ ...f, regime: v }))}>
+              <Select value={filters.regime} onValueChange={(v) => setFilters(f => ({ ...f, regime: v as DreGerencialFilters['regime'] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="competencia">Competência</SelectItem>
@@ -223,7 +223,7 @@ export default function DreGerencial({ onBack }: { onBack: () => void }) {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Comparação</Label>
-              <Select value={filters.comparison} onValueChange={(v: any) => setFilters(f => ({ ...f, comparison: v }))}>
+              <Select value={filters.comparison} onValueChange={(v) => setFilters(f => ({ ...f, comparison: v as DreGerencialFilters['comparison'] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sem comparação</SelectItem>

@@ -163,7 +163,7 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
 
       const rows = (txs ?? []) as unknown as QualityTx[];
       const allocUnits = new Set(
-        (allocs ?? []).filter((a: any) => a.unit_id).map((a: any) => a.transaction_id)
+        (allocs ?? []).filter((a) => a.unit_id).map((a) => a.transaction_id)
       );
 
       // Possíveis duplicados (mesma natureza + data + valor + descrição)
@@ -199,7 +199,7 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
       const transfersInDre = active.filter((t) => looksLikeTransfer(t) && t.affects_dre !== false);
 
       const orphanCatIds = new Map<string, string>();
-      (cats ?? []).forEach((c: any) => {
+      (cats ?? []).forEach((c) => {
         if (!c.dre_line_id) orphanCatIds.set(c.id, c.name);
       });
       const orphanMap = new Map<string, QualityTx[]>();
@@ -239,9 +239,9 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         if (t.category_id) usage.set(t.category_id, (usage.get(t.category_id) || 0) + 1);
       });
       const categoryIssues: CategoryIssue[] = [];
-      const dreLineMap = new Map((dreLines ?? []).map((l: any) => [l.id, l.name as string]));
+      const dreLineMap = new Map((dreLines ?? []).map((l) => [l.id, l.name as string]));
       const perDreLine = new Map<string, string[]>();
-      (cats ?? []).forEach((c: any) => {
+      (cats ?? []).forEach((c) => {
         const used = usage.get(c.id) || 0;
         if (!c.dre_line_id) {
           categoryIssues.push({ id: c.id, name: c.name, type: c.type, problem: 'sem-dre', usageCount: used });
@@ -281,9 +281,9 @@ export function useDataQuality(range?: { from?: string; to?: string }) {
         units: (unitRows ?? []) as any,
         accounts: (accountRows ?? []) as any,
         dreLines: (dreLines ?? []) as any,
-        categoryNameById: new Map((cats ?? []).map((c: any) => [c.id, c.name as string])),
-        unitNameById: new Map((unitRows ?? []).map((u: any) => [u.id, u.name as string])),
-        accountNameById: new Map((accountRows ?? []).map((a: any) => [a.id, a.name as string])),
+        categoryNameById: new Map((cats ?? []).map((c) => [c.id, c.name as string])),
+        unitNameById: new Map((unitRows ?? []).map((u) => [u.id, u.name as string])),
+        accountNameById: new Map((accountRows ?? []).map((a) => [a.id, a.name as string])),
         total:
           duplicates.reduce((s, g) => s + g.items.length, 0) +
           typeStatusMismatch.length +

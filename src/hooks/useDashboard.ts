@@ -162,8 +162,8 @@ export function useDashboard(filters?: DashboardFilters) {
         const { data: allocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
-          .in('transaction_id', rows.map((r: any) => r.id));
-        allocMap = buildAllocationMap(allocs as any);
+          .in('transaction_id', rows.map((r) => r.id));
+        allocMap = buildAllocationMap(allocs);
       }
 
       /** Valor do lançamento atribuível aos filtros atuais (rateio-aware). */
@@ -192,7 +192,7 @@ export function useDashboard(filters?: DashboardFilters) {
       const inRange = (d: string | null | undefined, s: string, e: string) =>
         !!d && d >= s && d <= e;
 
-      rows.forEach((tx: any) => {
+      rows.forEach((tx) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
         const val = filteredValue(tx);
@@ -307,7 +307,7 @@ export function useDashboard(filters?: DashboardFilters) {
       let nameMap = new Map<string, string>();
       if (allCatIds.length > 0) {
         const { data: cats } = await supabase.from('categories').select('id, name').in('id', allCatIds);
-        nameMap = new Map((cats ?? []).map((c: any) => [c.id, c.name]));
+        nameMap = new Map((cats ?? []).map((c) => [c.id, c.name]));
       }
       if (catMap.size > 0) {
         categoryData = Array.from(catMap.entries()).map(([id, value]) => ({
@@ -338,8 +338,8 @@ export function useDashboard(filters?: DashboardFilters) {
         const { data: saldoAllocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
-          .in('transaction_id', (allTxs ?? []).map((t: any) => t.id));
-        saldoAllocMap = buildAllocationMap(saldoAllocs as any);
+          .in('transaction_id', (allTxs ?? []).map((t) => t.id));
+        saldoAllocMap = buildAllocationMap(saldoAllocs);
       }
 
       // Saldo inicial: nunca inventar. Só soma o que estiver configurado.
@@ -347,10 +347,10 @@ export function useDashboard(filters?: DashboardFilters) {
         .from('accounts')
         .select('id, initial_balance, initial_balance_date')
         .eq('active', true);
-      const openingMap = buildOpeningMap(accountRows as any);
+      const openingMap = buildOpeningMap(accountRows);
 
       let movimentacaoCalculada = 0;
-      (allTxs ?? []).forEach((tx: any) => {
+      (allTxs ?? []).forEach((tx) => {
         // Movimento até a data-base já está embutido no saldo inicial informado.
         if (!isAfterOpening(tx, openingMap)) return;
         const val = valueForFilters(tx, saldoAllocMap, unitFilter, frontFilter);
@@ -384,14 +384,14 @@ export function useDashboard(filters?: DashboardFilters) {
         const { data: alertAllocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
-          .in('transaction_id', (alertBills ?? []).map((b: any) => b.id));
-        alertAllocMap = buildAllocationMap(alertAllocs as any);
+          .in('transaction_id', (alertBills ?? []).map((b) => b.id));
+        alertAllocMap = buildAllocationMap(alertAllocs);
       }
 
       const overdueBills: OverdueBill[] = [];
       const dueTodayBills: OverdueBill[] = [];
       let vencendoHoje = 0;
-      (alertBills ?? []).forEach((b: any) => {
+      (alertBills ?? []).forEach((b) => {
         if ((unitFilter || frontFilter) && valueForFilters(b, alertAllocMap, unitFilter, frontFilter) === 0) return;
         const bill: OverdueBill = {
           id: b.id, description: b.description, net_amount: b.net_amount,
@@ -416,7 +416,7 @@ export function useDashboard(filters?: DashboardFilters) {
 
       // Unit ranking — período
       const unitDespMap = new Map<string, { despesas: number; receitas: number }>();
-      rows.forEach((tx: any) => {
+      rows.forEach((tx) => {
         const isPaid = tx.status === 'pago' || tx.status === 'recebido';
         const isProvisioned = tx.status === 'pendente' || tx.status === 'agendado';
         const paidInPeriod = isPaid && inRange(tx.payment_date, rangeStart, rangeEnd);
@@ -437,7 +437,7 @@ export function useDashboard(filters?: DashboardFilters) {
       if (unitDespMap.size > 0) {
         const unitIds = Array.from(unitDespMap.keys()).filter((k) => k !== NO_UNIT_KEY);
         const { data: unitRows } = await supabase.from('units').select('id, name').in('id', unitIds);
-        const uNameMap = new Map((unitRows ?? []).map((u: any) => [u.id, u.name]));
+        const uNameMap = new Map((unitRows ?? []).map((u) => [u.id, u.name]));
         unitRanking = Array.from(unitDespMap.entries())
           .map(([id, v]) => ({
             unitId: id,

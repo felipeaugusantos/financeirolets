@@ -332,7 +332,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Situação da conferência</Label>
-            <Select value={reviewFilter} onValueChange={(v: any) => setReviewFilter(v)}>
+            <Select value={reviewFilter} onValueChange={(v) => setReviewFilter(v as ReviewStatus | 'todos')}>
               <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="pendente" className="text-xs">Pendente ({reviewCounts.pendente})</SelectItem>

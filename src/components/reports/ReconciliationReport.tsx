@@ -27,7 +27,7 @@ const fmtDateTime = (d: string) => {
   } catch { return d; }
 };
 
-const AUDIT_FIELDS: Array<{ key: string; label: string; format?: (v: any) => string }> = [
+const AUDIT_FIELDS: Array<{ key: string; label: string; format?: (v: string | null) => string }> = [
   { key: 'status', label: 'Status' },
   { key: 'payment_date', label: 'Data pgto.', format: (v) => fmtDate(v) },
   { key: 'competence_date', label: 'Competência', format: (v) => fmtDate(v) },
@@ -87,7 +87,7 @@ function AuditHistory({ refreshKey }: { refreshKey: number }) {
           .from('profiles')
           .select('id, full_name, email')
           .in('id', userIds);
-        (profs ?? []).forEach((p: any) => names.set(p.id, p.full_name || p.email || p.id.slice(0, 8)));
+        (profs ?? []).forEach((p) => names.set(p.id, p.full_name || p.email || p.id.slice(0, 8)));
       }
       if (!cancel) {
         setEntries(list.map((e) => ({ ...e, user_name: e.user_id ? (names.get(e.user_id) || e.user_id.slice(0, 8)) : 'Sistema' })));

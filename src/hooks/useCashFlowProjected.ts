@@ -69,14 +69,14 @@ export function useCashFlowProjected() {
       if (e2) throw e2;
 
       // Allocations
-      const allTxIds = [...(realized ?? []), ...(projected ?? [])].map((t: any) => t.id);
+      const allTxIds = [...(realized ?? []), ...(projected ?? [])].map((t) => t.id);
       let allocMap = new Map<string, AllocationRow[]>();
       if (filters.unit_id && allTxIds.length) {
         const { data: allocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, allocation_type, percentage, amount')
           .in('transaction_id', allTxIds);
-        allocMap = buildAllocationMap(allocs as any);
+        allocMap = buildAllocationMap(allocs);
       }
 
       const valueForUnit = (tx: any): number => valueForUnitFilter(tx, allocMap, filters.unit_id);
@@ -108,7 +108,7 @@ export function useCashFlowProjected() {
         return `${shortMonth[Number(mo) - 1]}/${y.slice(2)}`;
       };
 
-      (realized ?? []).forEach((tx: any) => {
+      (realized ?? []).forEach((tx) => {
         const v = valueForUnit(tx);
         if (v === 0) return;
         const k = tx.payment_date.substring(0, 7);
@@ -117,7 +117,7 @@ export function useCashFlowProjected() {
         else m.despesasRealizadas += v;
       });
 
-      (projected ?? []).forEach((tx: any) => {
+      (projected ?? []).forEach((tx) => {
         const v = valueForUnit(tx);
         if (v === 0) return;
         const k = tx.due_date.substring(0, 7);

@@ -94,7 +94,7 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
       .in('status', ['pendente', 'agendado'] as any);
 
     const s: BillSummary = { totalPagar: 0, totalReceber: 0, vencidasPagar: 0, vencidasReceber: 0, vencendoHoje: 0 };
-    (allPending ?? []).forEach((tx: any) => {
+    (allPending ?? []).forEach((tx) => {
       const val = Number(tx.net_amount) || 0;
       const overdue = tx.due_date && tx.due_date < today;
       const dueToday = tx.due_date === today;

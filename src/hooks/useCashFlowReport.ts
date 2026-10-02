@@ -56,25 +56,25 @@ export function useCashFlowReport() {
         .from('accounts')
         .select('id, initial_balance, initial_balance_date')
         .eq('active', true);
-      const openingMap = buildOpeningMap(accountRows as any);
+      const openingMap = buildOpeningMap(accountRows);
       const saldoInicial = openingBalanceTotal(openingMap, filters.dateFrom);
 
       // Fetch allocations if filtering by unit
       let allocMap = new Map<string, AllocationRow[]>();
       const needsAllocs = !!filters.unit_id && !!rows && rows.length > 0;
       if (needsAllocs) {
-        const txIds = (rows ?? []).map((r: any) => r.id);
+        const txIds = (rows ?? []).map((r) => r.id);
         const { data: allocs } = await supabase
           .from('transaction_allocations')
           .select('transaction_id, unit_id, allocation_type, percentage, amount')
           .in('transaction_id', txIds);
-        allocMap = buildAllocationMap(allocs as any);
+        allocMap = buildAllocationMap(allocs);
       }
 
       // Group by month
       const monthMap = new Map<string, { receitas: number; despesas: number }>();
 
-      (rows ?? []).forEach((tx: any) => {
+      (rows ?? []).forEach((tx) => {
         // Movimento até a data-base do saldo inicial já está embutido nele.
         if (!isAfterOpening(tx, openingMap)) return;
         const m = tx.payment_date.substring(0, 7);

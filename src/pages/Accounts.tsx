@@ -363,7 +363,7 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
                 <SelectWithAdd
                   value={selectedAccount}
                   onValueChange={setSelectedAccount}
-                  options={(accounts as any[])?.filter((a: any) => a.active).map((a: any) => ({ id: a.id, name: a.name })) ?? []}
+                  options={(accounts as any[])?.filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })) ?? []}
                   placeholder="Selecione..."
                   noneLabel="Selecione..."
                   addLabel="+ Nova Conta"
