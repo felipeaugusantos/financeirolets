@@ -533,7 +533,7 @@ export function ruleDivergences(
   ];
   const out: string[] = [];
   for (const [field, current] of compare) {
-    const expected = (outcome as any)[field] as string | null;
+    const expected = outcome[field as keyof RuleOutcome] as string | null;
     if (expected && (current ?? null) !== expected) out.push(FIELD_LABEL[field]);
   }
   return out;

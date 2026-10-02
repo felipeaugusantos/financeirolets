@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO, errorMessage } from '@/lib/utils';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface ReconciliationFilters {
   dateFrom: string;
@@ -303,7 +304,7 @@ export function useReconciliation() {
         console.warn('[useReconciliation] Possível truncamento: 10.000 transações retornadas — números podem estar incompletos.');
       }
 
-      const mapTx = new Map<string, any>();
+      const mapTx = new Map<string, NonNullable<typeof byComp>[number]>();
       (byComp ?? []).forEach((t) => mapTx.set(t.id, t));
       (byPay ?? []).forEach((t) => mapTx.set(t.id, t));
 
@@ -316,13 +317,13 @@ export function useReconciliation() {
       const [cRes, fRes] = await Promise.all([
         catIds.size > 0
           ? supabase.from('categories').select('id, name').in('id', Array.from(catIds))
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
         frontIds.size > 0
           ? supabase.from('business_fronts').select('id, name').in('id', Array.from(frontIds))
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
-      const catName = new Map<string, string>(((cRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
-      const frontName = new Map<string, string>(((fRes.data ?? []) as any[]).map((f) => [f.id, f.name]));
+      const catName = new Map<string, string>(((cRes.data ?? [])).map((c) => [c.id, c.name]));
+      const frontName = new Map<string, string>(((fRes.data ?? [])).map((f) => [f.id, f.name]));
 
       const init = (): SideData => ({
         dashboard: 0, dreCompetenciaRealizado: 0, dreCompetenciaFull: 0, dreCaixa: 0,
@@ -448,10 +449,10 @@ export function useReconciliation() {
 
     // Write audit log entry (non-blocking on failure)
     try {
-      await supabase.rpc('log_reconciliation_fix' as any, {
+      await supabase.rpc('log_reconciliation_fix', {
         _record_id: id,
-        _old_data: before ?? {},
-        _new_data: after ?? patch,
+        _old_data: (before ?? {}) as Json,
+        _new_data: (after ?? patch) as Json,
       });
     } catch (e) {
       console.warn('[useReconciliation] audit log failed', e);

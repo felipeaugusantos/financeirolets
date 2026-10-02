@@ -5,17 +5,18 @@ import { Badge } from '@/components/ui/badge';
 import { Pencil, Trash2, ToggleLeft, ToggleRight, Plus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export interface ColumnConfig {
+export interface ColumnConfig<T extends { id: string } = { id: string }> {
   key: string;
   label: string;
-  render?: (value: any, row: any) => React.ReactNode;
+  /** `value` é `never` para que cada coluna declare o tipo do próprio campo (v: number, v: string...). */
+  render?: (value: never, row: T) => React.ReactNode;
 }
 
-interface CrudTableProps {
-  columns: ColumnConfig[];
-  data: any[];
+interface CrudTableProps<T extends { id: string; active?: boolean }> {
+  columns: ColumnConfig<T>[];
+  data: T[];
   loading: boolean;
-  onEdit: (row: any) => void;
+  onEdit: (row: T) => void;
   onDelete: (id: string) => void;
   onToggleActive?: (id: string, active: boolean) => void;
   onAdd: () => void;
@@ -23,7 +24,7 @@ interface CrudTableProps {
   hasActive?: boolean;
 }
 
-export function CrudTable({ columns, data, loading, onEdit, onDelete, onToggleActive, onAdd, title, hasActive = true }: CrudTableProps) {
+export function CrudTable<T extends { id: string; active?: boolean }>({ columns, data, loading, onEdit, onDelete, onToggleActive, onAdd, title, hasActive = true }: CrudTableProps<T>) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -56,7 +57,7 @@ export function CrudTable({ columns, data, loading, onEdit, onDelete, onToggleAc
               <TableRow key={row.id}>
                 {columns.map(c => (
                   <TableCell key={c.key} className="text-sm">
-                    {c.render ? c.render(row[c.key], row) : row[c.key]}
+                    {c.render ? c.render(row[c.key as keyof T] as never, row) : (row[c.key as keyof T] as React.ReactNode)}
                   </TableCell>
                 ))}
                 {hasActive && (
@@ -64,7 +65,7 @@ export function CrudTable({ columns, data, loading, onEdit, onDelete, onToggleAc
                     <Badge
                       variant={row.active ? 'default' : 'secondary'}
                       className="cursor-pointer rounded-full text-xs"
-                      onClick={() => onToggleActive?.(row.id, row.active)}
+                      onClick={() => onToggleActive?.(row.id, !!row.active)}
                     >
                       {row.active ? 'Ativo' : 'Inativo'}
                     </Badge>

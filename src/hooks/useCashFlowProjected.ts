@@ -79,7 +79,7 @@ export function useCashFlowProjected() {
         allocMap = buildAllocationMap(allocs);
       }
 
-      const valueForUnit = (tx: any): number => valueForUnitFilter(tx, allocMap, filters.unit_id);
+      const valueForUnit = (tx: Parameters<typeof valueForUnitFilter>[0]): number => valueForUnitFilter(tx, allocMap, filters.unit_id);
 
       const monthMap = new Map<string, CashFlowProjectedMonth>();
       const ensure = (key: string, label: string): CashFlowProjectedMonth => {

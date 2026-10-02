@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { todayLocalISO, errorMessage } from '@/lib/utils';
 import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
 import { transactionFingerprint } from '@/lib/finance';
+import type { DbTxType, DbTxStatus } from '@/lib/dbTypes';
 
 /** Divide uma linha CSV respeitando aspas, aceitando ';' ou ',' como delimitador. */
 const normUnit = (s: string) =>
@@ -235,13 +236,13 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
         }
 
         const { data: created, error } = await supabase.from('transactions').insert({
-          type: type as any,
+          type: type as DbTxType,
           description,
           amount,
           tax_amount: 0,
           net_amount: amount,
           competence_date,
-          status: 'pendente' as any,
+          status: 'pendente' as DbTxStatus,
           created_by: user.id,
           unit_id: unitIds.length === 1 ? unitIds[0] : null,
         }).select('id').single();

@@ -26,6 +26,7 @@ import {
 } from '@/lib/reviewSuggestions';
 import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
 import { toLocalISODate, todayLocalISO } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 
 const fmt = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (d?: string | null) => (d ? d.split('-').reverse().join('/') : '—');
@@ -104,7 +105,7 @@ function ReviewBadge({
 function Section({
   icon: Icon, title, hint, count, children, onExport, tone = 'warning',
 }: {
-  icon: any; title: string; hint: string; count: number;
+  icon: LucideIcon; title: string; hint: string; count: number;
   children: React.ReactNode; onExport?: () => void; tone?: 'warning' | 'destructive' | 'muted';
 }) {
   const [open, setOpen] = useState(false);

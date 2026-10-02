@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { DeletedCapture as TxCapture } from '@/hooks/useTransactions';
 
-export type DeletedCapture = {
-  row: any;
-  allocations: any[];
+export type DeletedCapture = TxCapture & {
   deletedAt: string;
   label?: string;
 };

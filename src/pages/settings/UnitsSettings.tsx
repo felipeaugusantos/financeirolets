@@ -7,7 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Tables } from '@/integrations/supabase/types';
 
-const columns: ColumnConfig[] = [
+const columns: ColumnConfig<Tables<'units'>>[] = [
   { key: 'name', label: 'Nome' },
   { key: 'code', label: 'Código' },
 ];
@@ -20,7 +20,7 @@ const fields: FieldConfig[] = [
 export default function UnitsSettings({ onBack }: { onBack: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'units'>>('units');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Tables<'units'> | null>(null);
 
   return (
     <div className="space-y-4">

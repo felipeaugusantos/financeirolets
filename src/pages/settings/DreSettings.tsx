@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
-import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
+import { CrudDialog, type FormValues, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +11,9 @@ import type { Tables } from '@/integrations/supabase/types';
 export default function DreSettings({ onBack }: { onBack: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'dre_lines'>>('dre_lines', 'sort_order');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Tables<'dre_lines'> | null>(null);
 
-  const columns: ColumnConfig[] = [
+  const columns: ColumnConfig<Tables<'dre_lines'>>[] = [
     { key: 'sort_order', label: '#' },
     { key: 'code', label: 'Código' },
     { key: 'name', label: 'Nome' },
@@ -47,9 +47,9 @@ export default function DreSettings({ onBack }: { onBack: () => void }) {
     ]},
   ];
 
-  const handleSave = async (formData: Record<string, any>) => {
-    const clean: Record<string, any> = {
-      ...formData,
+  const handleSave = async (formData: FormValues) => {
+    const clean: Partial<Tables<'dre_lines'>> = {
+      ...(formData as Partial<Tables<'dre_lines'>>),
       sort_order: Number(formData.sort_order) || 0,
       sign: Number(formData.sign) || 1,
       is_subtotal: formData.is_subtotal === 'true',

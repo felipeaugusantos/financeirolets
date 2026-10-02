@@ -8,7 +8,8 @@ export interface KaikinMessage {
 
 export interface KaikinPageContext {
   scope?: string;
-  [key: string]: any;
+  period?: { from?: string; to?: string };
+  [key: string]: unknown;
 }
 
 interface KaikinCtx {

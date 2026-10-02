@@ -153,8 +153,8 @@ export default function OfxRulesPanel({
       active: form.active !== false,
       account_id: form.account_id ?? null,
       exclude_pattern: (form.exclude_pattern ?? '').trim() || null,
-      min_amount: form.min_amount == null || form.min_amount === ('' as any) ? null : Number(form.min_amount),
-      max_amount: form.max_amount == null || form.max_amount === ('' as any) ? null : Number(form.max_amount),
+      min_amount: form.min_amount == null || (form.min_amount as unknown) === '' ? null : Number(form.min_amount),
+      max_amount: form.max_amount == null || (form.max_amount as unknown) === '' ? null : Number(form.max_amount),
       use_statement_unit: !!form.use_statement_unit,
       allocations: (allocs.length ? allocs : null) as unknown as Json,
     };
@@ -426,7 +426,7 @@ export default function OfxRulesPanel({
               <div key={key} className="space-y-1.5">
                 <Label>{label}</Label>
                 <Select
-                  value={(form as any)[key] ?? NONE}
+                  value={(form[key] as string | null | undefined) ?? NONE}
                   disabled={key === 'unit_id' && !!form.use_statement_unit}
                   onValueChange={v => setField(key, v === NONE ? null : v)}
                 >

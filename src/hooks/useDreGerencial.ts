@@ -10,6 +10,7 @@ import {
   txValue,
   type AllocationRow,
 } from '@/lib/finance';
+import type { Tables } from '@/integrations/supabase/types';
 
 /**
  * DRE Gerencial (visão contábil).
@@ -81,13 +82,13 @@ function previousWindow(from: string, to: string) {
  *  - soma dos filhos, para subtotais;
  *  - valor lançado × sinal, para linhas analíticas.
  */
-function resolveValues(allLines: any[], lineValues: Map<string, number>) {
-  const byCode = new Map<string, any>();
+function resolveValues(allLines: Tables<'dre_lines'>[], lineValues: Map<string, number>) {
+  const byCode = new Map<string, Tables<'dre_lines'>>();
   allLines.forEach((l) => { if (l.code) byCode.set(l.code, l); });
   const computed = new Map<string, number>();
   const visiting = new Set<string>();
 
-  const get = (line: any): number => {
+  const get = (line: Tables<'dre_lines'>): number => {
     if (computed.has(line.id)) return computed.get(line.id)!;
     if (visiting.has(line.id)) return 0; // proteção contra fórmula circular
     visiting.add(line.id);
@@ -220,7 +221,7 @@ export function useDreGerencial() {
       const lineById = new Map<string, { code: string | null; name: string }>();
       (allDreLines ?? []).forEach((l) => lineById.set(l.id, { code: l.code, name: l.name }));
 
-      const allLinesRaw = (dreLines ?? []) as any[];
+      const allLinesRaw = (dreLines ?? []);
       /** Linha contábil por código (C1.02, C6.05, ...) para o vínculo automático. */
       const contabilByCode = new Map<string, string>();
       allLinesRaw.forEach((l) => { if (l.code) contabilByCode.set(l.code, l.id); });

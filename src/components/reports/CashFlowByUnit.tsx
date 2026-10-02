@@ -32,7 +32,7 @@ const monthLabel = (m: string) => {
 };
 const nowMonth = () => new Date().toISOString().slice(0, 7);
 
-async function fetchAll<T>(build: (from: number, to: number) => any): Promise<T[]> {
+async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await build(from, from + 999);
@@ -60,7 +60,7 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
         supabase.from('units').select('id, name').eq('active', true).order('name'),
         supabase.from('categories').select('id, name'),
       ]);
-      setUnits((u.data ?? []) as any);
+      setUnits((u.data ?? []));
       setCats(new Map((c.data ?? []).map((x) => [x.id, x.name])));
       if (u.data?.[0]) setUnitSel(u.data[0].id);
     })();
@@ -88,7 +88,7 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
         const { data } = await supabase.from('transaction_allocations')
           .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
           .in('transaction_id', ids.slice(i, i + 200));
-        allocs.push(...((data ?? []) as any));
+        allocs.push(...((data ?? [])));
       }
       const map = buildAllocationMap(allocs);
       const out: Part[] = [];

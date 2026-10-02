@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, toLocalISODate } from '@/lib/utils';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
+import type { Tables } from '@/integrations/supabase/types';
 
 export interface BillFiltersState {
   dateFrom: string | null;
@@ -29,8 +30,8 @@ export const emptyFilters: BillFiltersState = {
 };
 
 export default function BillFilters({ filters, onChange }: BillFiltersProps) {
-  const { data: partners } = useSupabaseCrud('partners');
-  const { data: units } = useSupabaseCrud('units');
+  const { data: partners } = useSupabaseCrud<Tables<'partners'>>('partners');
+  const { data: units } = useSupabaseCrud<Tables<'units'>>('units');
   const [open, setOpen] = useState(false);
 
   const activeCount = [filters.dateFrom, filters.dateTo, filters.partnerId, filters.unitId].filter(Boolean).length;
@@ -119,7 +120,7 @@ export default function BillFilters({ filters, onChange }: BillFiltersProps) {
               <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Todos</SelectItem>
-                {(partners as any[])?.filter((p) => p.active).map((p) => (
+                {(partners)?.filter((p) => p.active).map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -133,7 +134,7 @@ export default function BillFilters({ filters, onChange }: BillFiltersProps) {
               <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Todas</SelectItem>
-                {(units as any[])?.filter((u) => u.active).map((u) => (
+                {(units)?.filter((u) => u.active).map((u) => (
                   <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                 ))}
               </SelectContent>

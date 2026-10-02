@@ -165,7 +165,10 @@ function TreemapChart({ data }: { data: Array<{ name: string; value: number }> }
   );
 }
 
-function TreemapNode(props: any) {
+/** Props injetadas pelo Recharts via content={<TreemapNode />}. */
+interface TreemapNodeProps { x?: number; y?: number; width?: number; height?: number; name?: string; value?: number; fill?: string }
+
+function TreemapNode(props: TreemapNodeProps) {
   const { x, y, width, height, name, value, fill } = props;
   const showLabel = width > 60 && height > 28;
   const showValue = width > 80 && height > 44;
@@ -300,8 +303,8 @@ export default function Dashboard() {
   const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
-  const activeUnits = (units as any[])?.filter((u) => u.active) ?? [];
-  const activeFronts = (fronts as any[])?.filter((f) => f.active) ?? [];
+  const activeUnits = (units)?.filter((u) => u.active) ?? [];
+  const activeFronts = (fronts)?.filter((f) => f.active) ?? [];
 
   const fmtPct = (v: number | null) => v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '';
 

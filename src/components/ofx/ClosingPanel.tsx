@@ -44,7 +44,7 @@ export default function ClosingPanel({
           .limit(10000),
       ]);
       const initial = Number(acc?.initial_balance ?? 0);
-      const movement = (tx ?? []).reduce((s, t: any) => {
+      const movement = (tx ?? []).reduce((s, t) => {
         const v = Math.abs(Number(t.net_amount ?? t.amount) || 0);
         return s + (t.type === 'receita' ? v : -v);
       }, 0);

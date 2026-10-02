@@ -288,8 +288,8 @@ export default function Transactions() {
           unit_id: editingTx.unit_id || undefined,
           front_id: editingTx.front_id || undefined,
           notes: editingTx.notes || undefined,
-          affects_dre: (editingTx as any).affects_dre,
-          affects_cashflow: (editingTx as any).affects_cashflow,
+          affects_dre: editingTx.affects_dre,
+          affects_cashflow: editingTx.affects_cashflow,
         } : undefined}
       />
 

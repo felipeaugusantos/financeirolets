@@ -19,18 +19,37 @@ import {
 
 } from '@/lib/ofxMatch';
 import { errorMessage } from '@/lib/utils';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { DbTxType, DbTxStatus, DbPaymentMethod } from '@/lib/dbTypes';
 
+
+/** Campos do lançamento criado a partir de uma linha do extrato. */
+export interface TransactionPatch {
+    description: string;
+    category_id: string | null;
+    unit_id: string | null;
+    front_id: string | null;
+    partner_id: string | null;
+    /** Conta do lançamento; por padrão, a conta do extrato. */
+    account_id?: string | null;
+    /** Forma de pagamento (sugerida pelo texto do extrato). */
+    payment_method?: string | null;
+    /** Rateio por unidade/frente. */
+    allocations?: OfxAllocation[];
+    /** Se false, não aplica o rateio da regra (usuário escolheu a unidade manualmente). */
+    useRuleAllocations?: boolean;
+}
 
 /** Busca FITIDs já gravados em lotes (evita o limite de 1.000 do .in()). */
-async function fetchExistingByFitid(accountId: string, fitids: string[], cols: string): Promise<any[]> {
+async function fetchExistingByFitid(accountId: string, fitids: string[], cols: string): Promise<Partial<Tables<'bank_statement_entries'>>[]> {
   const unique = Array.from(new Set(fitids));
-  const out: any[] = [];
+  const out: Partial<Tables<'bank_statement_entries'>>[] = [];
   for (let i = 0; i < unique.length; i += 200) {
     const { data, error } = await supabase
       .from('bank_statement_entries').select(cols)
       .eq('account_id', accountId).in('fitid', unique.slice(i, i + 200));
     if (error) throw error;
-    out.push(...(data ?? []));
+    out.push(...((data ?? []) as unknown as Partial<Tables<'bank_statement_entries'>>[]));
   }
   return out;
 }
@@ -159,7 +178,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       toast({ title: 'Erro ao carregar extrato', description: entriesRes.error.message, variant: 'destructive' });
     }
     setEntries((entriesRes.data ?? []) as StatementEntry[]);
-    setCandidates(((txRes.data ?? []) as any[]).map(t => ({
+    setCandidates(((txRes.data ?? [])).map(t => ({
       ...t,
       partner_name: t.partner?.name ?? null,
     })) as CandidateTransaction[]);
@@ -315,7 +334,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       );
 
       const seen = new Set<string>();
-      const newRows: any[] = [];
+      const newRows: TablesInsert<'bank_statement_entries'>[] = [];
       let refreshed = 0;
 
       for (const l of lines) {
@@ -441,21 +460,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   /** Cria o lançamento correspondente a uma linha. Não recarrega nem vincula. */
   const insertTransactionFor = useCallback(async (
     entry: StatementEntry,
-    patch: {
-      description: string;
-      category_id: string | null;
-      unit_id: string | null;
-      front_id: string | null;
-      partner_id: string | null;
-      /** Conta do lançamento; por padrão, a conta do extrato. */
-      account_id?: string | null;
-      /** Forma de pagamento (sugerida pelo texto do extrato). */
-      payment_method?: string | null;
-      /** Rateio por unidade/frente. */
-      allocations?: OfxAllocation[];
-      /** Se false, não aplica o rateio da regra (usuário escolheu a unidade manualmente). */
-      useRuleAllocations?: boolean;
-    }
+    patch: TransactionPatch
   ): Promise<{ id: string } | { error: string }> => {
     const amount = Math.abs(entry.amount);
     const type = entry.amount >= 0 ? 'receita' : 'despesa';
@@ -474,7 +479,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     const { data: created, error } = await supabase
       .from('transactions')
       .insert({
-        type: type as any,
+        type: type as DbTxType,
         description: patch.description || entry.memo || 'Lançamento do extrato',
         amount,
         tax_amount: 0,
@@ -482,13 +487,13 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         competence_date: entry.posted_at,
         due_date: entry.posted_at,
         payment_date: entry.posted_at,
-        status: (type === 'receita' ? 'recebido' : 'pago') as any,
+        status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
         account_id: patch.account_id ?? entry.account_id,
         category_id: patch.category_id,
         unit_id: patch.unit_id,
         front_id: patch.front_id,
         partner_id: patch.partner_id,
-        payment_method: (patch.payment_method || null) as any,
+        payment_method: (patch.payment_method || null) as DbPaymentMethod | null,
         notes: `Importado do extrato OFX (${entry.source_file ?? 'arquivo'}) — FITID ${entry.fitid}`,
         created_by: user?.id ?? null,
       })
@@ -595,7 +600,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     const { data: created, error } = await supabase
       .from('transactions')
       .insert({
-        type: type as any,
+        type: type as DbTxType,
         description: patch.description || 'Lançamento agrupado do extrato',
         amount,
         tax_amount: 0,
@@ -603,13 +608,13 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         competence_date: date,
         due_date: date,
         payment_date: date,
-        status: (type === 'receita' ? 'recebido' : 'pago') as any,
+        status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
         account_id: patch.account_id ?? items[0].account_id,
         category_id: patch.category_id,
         unit_id: patch.unit_id,
         front_id: patch.front_id,
         partner_id: patch.partner_id,
-        payment_method: (patch.payment_method || null) as any,
+        payment_method: (patch.payment_method || null) as DbPaymentMethod | null,
         notes: `Agrupamento de ${items.length} linha(s) do extrato OFX (${files.join(', ') || 'arquivo'}) — FITIDs ${items.map(e => e.fitid).join(', ')}`,
         created_by: user?.id ?? null,
       })

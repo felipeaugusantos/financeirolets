@@ -13,12 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useOfxImport, EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
+import { useOfxImport, EnrichedEntry, StatementEntry, TransactionPatch } from '@/hooks/useOfxImport';
+import type { Tables } from '@/integrations/supabase/types';
 import { pickAutoLinkable, normalizeText } from '@/lib/ofxMatch';
 import { OptionList } from '@/components/ofx/OfxRulesPanel';
 import DuplicatePairingPanel from '@/components/ofx/DuplicatePairingPanel';
 import OfxPeriodReport from '@/components/ofx/OfxPeriodReport';
-import BulkCreateDialog from '@/components/ofx/BulkCreateDialog';
+import BulkCreateDialog, { type BulkCreatePatch } from '@/components/ofx/BulkCreateDialog';
 import ClassicReconciliation from '@/components/ofx/ClassicReconciliation';
 import InternalTransfersPanel from '@/components/ofx/InternalTransfersPanel';
 import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
@@ -65,14 +66,14 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const reprocessRef = useRef<HTMLInputElement>(null);
 
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<Tables<'accounts'>[]>([]);
   const [accountId, setAccountId] = useState<string>('');
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(todayLocalISO());
   const [statusFilter, setStatusFilter] = useState<'pendente' | 'vinculado' | 'ignorado' | 'todos'>('pendente');
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
   const [createFor, setCreateFor] = useState<EnrichedEntry | null>(null);
-  const [createForm, setCreateForm] = useState<any>({});
+  const [createForm, setCreateForm] = useState<Partial<TransactionPatch>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const [ignoreReason, setIgnoreReason] = useState('');
@@ -111,10 +112,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       setAccounts(acc.data ?? []);
       if (!accountId && acc.data?.length) setAccountId(acc.data[0].id);
       setOptions({
-        categories: (cat.data ?? []) as any,
-        units: (uni.data ?? []) as any,
-        fronts: (fro.data ?? []) as any,
-        partners: (par.data ?? []) as any,
+        categories: (cat.data ?? []),
+        units: (uni.data ?? []),
+        fronts: (fro.data ?? []),
+        partners: (par.data ?? []),
       });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,7 +145,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         .neq('status', 'cancelado')
         .limit(5000);
       const map = new Map<string, string[]>();
-      for (const t of (data ?? []) as any[]) {
+      for (const t of (data ?? [])) {
         const desc = normalizeText(t.description || '');
         if (!desc) continue;
         const values = [t.amount, t.net_amount]
@@ -369,7 +370,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   /** Cria os lançamentos revisados no diálogo em lote. */
   const confirmBulkCreate = async (
-    payload: { entryId: string; patch: any }[],
+    payload: { entryId: string; patch: BulkCreatePatch }[],
     grouped?: { description: string; competence_date: string },
   ) => {
     const byId = new Map(bulkItems.map(v => [v.entry.id, v]));
@@ -432,7 +433,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
    * Ajusta o período da tela para cobrir as datas do arquivo importado.
    * Sem isso, importar um extrato de agosto no dia 02/09 mostra a lista vazia.
    */
-  const widenPeriodTo = (summary: { statements: { transactions: { posted_at: string }[] }[]; fileName: string }) => {
+  const widenPeriodTo = (summary: { statements: { transactions: { posted_at: string }[] }[]; fileName?: string }) => {
     const dates = summary.statements.flatMap(s => s.transactions.map(t => t.posted_at)).sort();
     if (dates.length === 0) return;
     const first = dates[0];
@@ -494,7 +495,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       await supabase.from('accounts').update({
         ofx_acctid: acct,
         ofx_bankid: summary.statements[0].bankid || null,
-      } as any).eq('id', accountId);
+      }).eq('id', accountId);
       setAccounts(list => list.map(a => (a.id === accountId ? { ...a, ofx_acctid: acct } : a)));
     }
   };
@@ -511,7 +512,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     const file = e.target.files?.[0];
     if (!file || !accountId) return;
     const summary = await reprocessFile(file, accountId);
-    if (summary) widenPeriodTo(summary as any);
+    if (summary) widenPeriodTo(summary);
 
     if (reprocessRef.current) reprocessRef.current.value = '';
     clearSelection();
@@ -531,7 +532,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   const confirmCreate = async () => {
     if (!createFor) return;
-    const ok = await createFromEntry(createFor.entry as StatementEntry, { ...createForm, useRuleAllocations: false });
+    const ok = await createFromEntry(createFor.entry as StatementEntry, { ...createForm, useRuleAllocations: false } as TransactionPatch);
     if (ok) setCreateFor(null);
   };
 
@@ -1151,7 +1152,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
               )}
               <div className="space-y-1.5">
                 <Label>Descrição</Label>
-                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f: Record<string, unknown>) => ({ ...f, description: ev.target.value }))} />
+                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f) => ({ ...f, description: ev.target.value }))} />
               </div>
               {([
                 ['category_id', 'Categoria', options.categories.filter(c =>
@@ -1163,8 +1164,8 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                 <div key={key} className="space-y-1.5">
                   <Label>{label}</Label>
                   <Select
-                    value={createForm[key] ?? NONE}
-                    onValueChange={v => setCreateForm((f: Record<string, unknown>) => ({ ...f, [key]: v === NONE ? null : v }))}
+                    value={(createForm[key] as string | null | undefined) ?? NONE}
+                    onValueChange={v => setCreateForm((f) => ({ ...f, [key]: v === NONE ? null : v }))}
                   >
                     <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
                     <SelectContent className="max-h-64">

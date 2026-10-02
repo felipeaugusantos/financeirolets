@@ -37,7 +37,9 @@ const AUDIT_FIELDS: Array<{ key: string; label: string; format?: (v: string | nu
   { key: 'front_id', label: 'Frente' },
 ];
 
-function diffFields(oldData: any, newData: any) {
+type AuditData = Record<string, unknown> | null;
+
+function diffFields(oldData: AuditData, newData: AuditData) {
   const out: Array<{ label: string; from: string; to: string }> = [];
   if (!oldData || !newData) return out;
   for (const f of AUDIT_FIELDS) {
@@ -46,8 +48,8 @@ function diffFields(oldData: any, newData: any) {
     if (a === b) continue;
     out.push({
       label: f.label,
-      from: a == null ? '—' : (f.format ? f.format(a) : String(a)),
-      to: b == null ? '—' : (f.format ? f.format(b) : String(b)),
+      from: a == null ? '—' : (f.format ? f.format(a as string) : String(a)),
+      to: b == null ? '—' : (f.format ? f.format(b as string) : String(b)),
     });
   }
   return out;
@@ -57,8 +59,8 @@ interface AuditEntry {
   id: string;
   created_at: string;
   record_id: string;
-  old_data: any;
-  new_data: any;
+  old_data: AuditData;
+  new_data: AuditData;
   user_id: string | null;
   user_name?: string;
 }
@@ -128,7 +130,7 @@ function AuditHistory({ refreshKey }: { refreshKey: number }) {
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {entries.map((e) => {
                 const diff = diffFields(e.old_data, e.new_data);
-                const desc = e.new_data?.description || e.old_data?.description || e.record_id.slice(0, 8);
+                const desc = String(e.new_data?.description || e.old_data?.description || e.record_id.slice(0, 8));
                 return (
                   <div key={e.id} className="rounded-xl border border-border p-3 bg-card">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -528,7 +530,7 @@ function RulesBreakdown({ title, side, color, kind }: { title: string; side: Sid
 function DetailPanel({
   detail, kind, side, lookups, api,
 }: {
-  detail: { count: number; items: TxDetail[]; byCategory: any[]; byFront: any[] };
+  detail: Pick<BucketDetail, 'count' | 'items' | 'byCategory' | 'byFront'>;
   kind?: FixKind;
   side?: 'receita' | 'despesa';
   lookups?: Lookups;

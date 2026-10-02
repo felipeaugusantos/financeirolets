@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database, Json, Tables, TablesInsert } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import type { FilterableQuery } from '@/lib/finance';
 import { EMPTY_TOTALS, PAGE_SIZE, sumAllPages, sumTotals, Totals, TotalsRow } from '@/lib/transactionTotals';
 
 type Enums = Database['public']['Enums'];
@@ -12,16 +13,6 @@ type Enums = Database['public']['Enums'];
 export interface DeletedCapture {
   row: (Tables<'transactions'> & Record<string, unknown>) | null;
   allocations: Tables<'transaction_allocations'>[];
-}
-
-/** Subconjunto do query builder do Supabase usado por applyFilters (cada método devolve o builder encadeável). */
-interface FilterableQuery {
-  eq(column: string, value: unknown): FilterableQuery;
-  is(column: string, value: null): FilterableQuery;
-  gte(column: string, value: string): FilterableQuery;
-  lte(column: string, value: string): FilterableQuery;
-  ilike(column: string, pattern: string): FilterableQuery;
-  or(filters: string): FilterableQuery;
 }
 
 export interface TransactionRow {

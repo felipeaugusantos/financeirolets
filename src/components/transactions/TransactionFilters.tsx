@@ -157,7 +157,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
-            <Select value={filters.payment_method || '__none__'} onValueChange={v => set('payment_method' as any, v === '__none__' ? undefined : v)}>
+            <Select value={filters.payment_method || '__none__'} onValueChange={v => set('payment_method', v === '__none__' ? undefined : v)}>
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>

@@ -4,10 +4,10 @@ import { exportToCsv, csvNumber, csvDate, csvCode, csvIndent } from '@/lib/expor
 let captured = '';
 beforeEach(() => {
   captured = '';
-  global.Blob = class { constructor(parts: any[]) { captured = parts.join(''); } } as any;
+  global.Blob = class { constructor(parts: BlobPart[]) { captured = parts.join(''); } } as unknown as typeof Blob;
   global.URL.createObjectURL = vi.fn(() => 'blob:x');
   global.URL.revokeObjectURL = vi.fn();
-  vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn(), set href(_v: string) {}, set download(_v: string) {} } as any);
+  vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn(), set href(_v: string) {}, set download(_v: string) {} } as unknown as HTMLElement);
 });
 
 describe('exportToCsv pt-BR', () => {

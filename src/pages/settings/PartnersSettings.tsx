@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
-import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
+import { CrudDialog, type FormValues, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import type { Tables } from '@/integrations/supabase/types';
 
 const typeLabels: Record<string, string> = { fornecedor: 'Fornecedor', cliente: 'Cliente', ambos: 'Ambos' };
 
-const columns: ColumnConfig[] = [
+const columns: ColumnConfig<Tables<'partners'>>[] = [
   { key: 'name', label: 'Nome' },
   { key: 'type', label: 'Tipo', render: (v: string) => <Badge variant="outline" className="rounded-full text-xs">{typeLabels[v] || v}</Badge> },
   { key: 'document', label: 'CPF/CNPJ' },
@@ -46,9 +46,9 @@ const fields: FieldConfig[] = [
 export default function PartnersSettings({ onBack }: { onBack: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'partners'>>('partners');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Tables<'partners'> | null>(null);
 
-  const handleSave = async (formData: Record<string, any>) => {
+  const handleSave = async (formData: FormValues) => {
     const clean = { ...formData };
     if (!clean.pix_key_type || clean.pix_key_type === '__none__') clean.pix_key_type = null;
     return editing ? update(editing.id, clean) : create(clean);

@@ -15,7 +15,7 @@ const br = (iso: string) => iso.split('-').reverse().join('/');
 /** Regras de baixo risco: tarifas, antecipações/débito de cartão, telefone, contabilidade etc. */
 const SAFE_RULE = /tarifa|antecipacao|stone .*debito|telefone|contabilidade|rentab|sindicato|odonto/;
 export function isSafeRule(v: EnrichedEntry): boolean {
-  const txt = `${(v as any).ruleLabel ?? ''} ${v.entry.memo ?? ''}`
+  const txt = `${v.ruleLabel ?? ''} ${v.entry.memo ?? ''}`
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return SAFE_RULE.test(txt);
 }
@@ -126,13 +126,13 @@ export default function AutoPostDialog({
                     <td className="p-2 max-w-[140px] truncate" title={v.ruleLabel ?? ''}>
                       <Badge variant="outline" className="rounded-lg">{v.ruleLabel}</Badge>
                     </td>
-                    <td className="p-2">{name(options.categories as any, v.ruleCategoryId)}</td>
+                    <td className="p-2">{name(options.categories, v.ruleCategoryId)}</td>
                     <td className="p-2">
                       {alloc.length > 0
-                        ? alloc.map(a => `${name(options.units as any, a.unit_id)} ${a.value}%`).join(' · ')
-                        : name(options.units as any, v.ruleUnitId)}
+                        ? alloc.map(a => `${name(options.units, a.unit_id)} ${a.value}%`).join(' · ')
+                        : name(options.units, v.ruleUnitId)}
                     </td>
-                    <td className="p-2">{name(options.fronts as any, v.ruleFrontId)}</td>
+                    <td className="p-2">{name(options.fronts, v.ruleFrontId)}</td>
                     <td className="p-2">{pm ? PAYMENT_METHOD_LABELS[pm] : '—'}</td>
                   </tr>
                 );

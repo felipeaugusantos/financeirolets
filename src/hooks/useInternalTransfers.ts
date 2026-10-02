@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { findInternalTransfers, TransferCandidateEntry, TransferPair } from '@/lib/internalTransfers';
 import { errorMessage } from '@/lib/utils';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 /**
  * Busca linhas pendentes de TODAS as contas no período e sugere pares de
@@ -26,7 +27,7 @@ export function useInternalTransfers(from: string, to: string) {
       .gte('posted_at', from)
       .lte('posted_at', to)
       .limit(3000);
-    setRows(((data ?? []) as any[]).map(r => ({
+    setRows(((data ?? [])).map(r => ({
       id: r.id,
       account_id: r.account_id,
       account_name: r.account?.name ?? 'Conta',
@@ -89,7 +90,7 @@ export function useInternalTransfers(from: string, to: string) {
       for (const { entryId, ...leg } of legs) {
         const { data, error } = await supabase
           .from('transactions')
-          .insert(leg as any)
+          .insert(leg as TablesInsert<'transactions'>)
           .select('id')
           .single();
         if (error || !data) throw error ?? new Error('Falha ao criar a perna da transferência');

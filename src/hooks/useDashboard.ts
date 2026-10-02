@@ -168,7 +168,7 @@ export function useDashboard(filters?: DashboardFilters) {
       }
 
       /** Valor do lançamento atribuível aos filtros atuais (rateio-aware). */
-      const filteredValue = (tx: any): number =>
+      const filteredValue = (tx: Parameters<typeof valueForFilters>[0]): number =>
         valueForFilters(tx, allocMap, unitFilter, frontFilter);
 
       let receitasMes = 0;

@@ -8,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Tables } from '@/integrations/supabase/types';
 
-const columns: ColumnConfig[] = [
+const columns: ColumnConfig<Tables<'accounts'>>[] = [
   { key: 'name', label: 'Nome' },
   { key: 'type', label: 'Tipo' },
   { key: 'initial_balance', label: 'Saldo Inicial', render: (v: number) => `R$ ${(v ?? 0).toFixed(2)}` },
@@ -62,12 +62,12 @@ function buildFields(units: { id: string; name: string }[]): FieldConfig[] {
 export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
   const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'accounts'>>('accounts');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Tables<'accounts'> | null>(null);
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     supabase.from('units').select('id, name').eq('active', true).order('name')
-      .then(({ data }) => setUnits((data ?? []) as any));
+      .then(({ data }) => setUnits((data ?? [])));
   }, []);
 
   return (
@@ -100,7 +100,7 @@ export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
             ...data,
             initial_balance_date: data.initial_balance_date || null,
             default_unit_id: data.default_unit_id || null,
-          };
+          } as Partial<Tables<'accounts'>>;
           return editing ? update(editing.id, payload) : create(payload);
         }}
       />
