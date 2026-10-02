@@ -1,9 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
-import { todayLocalISO, toLocalISODate } from '@/lib/utils';
+import { todayLocalISO, toLocalISODate, errorMessage } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database, Json, Tables, TablesInsert } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { EMPTY_TOTALS, PAGE_SIZE, sumAllPages, sumTotals, Totals } from '@/lib/transactionTotals';
+import { EMPTY_TOTALS, PAGE_SIZE, sumAllPages, sumTotals, Totals, TotalsRow } from '@/lib/transactionTotals';
+
+type Enums = Database['public']['Enums'];
+
+/** Linha de transactions + alocações capturadas antes de excluir (para desfazer). */
+export interface DeletedCapture {
+  row: (Tables<'transactions'> & Record<string, unknown>) | null;
+  allocations: Tables<'transaction_allocations'>[];
+}
+
+/** Subconjunto do query builder do Supabase usado por applyFilters (cada método devolve o builder encadeável). */
+interface FilterableQuery {
+  eq(column: string, value: unknown): FilterableQuery;
+  is(column: string, value: null): FilterableQuery;
+  gte(column: string, value: string): FilterableQuery;
+  lte(column: string, value: string): FilterableQuery;
+  ilike(column: string, pattern: string): FilterableQuery;
+  or(filters: string): FilterableQuery;
+}
 
 export interface TransactionRow {
   id: string;
@@ -104,16 +123,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const { user } = useAuth();
 
   /** Aplica exatamente os mesmos filtros na listagem e na agregação de totais. */
-  const applyFilters = useCallback((q: any) => {
-    let query = q;
-    if (filters.type) query = query.eq('type', filters.type as any);
-    if (filters.status) query = query.eq('status', filters.status as any);
+  const applyFilters = useCallback(<Q,>(q: Q): Q => {
+    // O tipo recursivo do builder estoura o compilador; trabalhamos no subconjunto acima.
+    let query = q as unknown as FilterableQuery;
+    if (filters.type) query = query.eq('type', filters.type as Enums['transaction_type']);
+    if (filters.status) query = query.eq('status', filters.status as Enums['transaction_status']);
     if (filters.category_id) query = filters.category_id === '__null__' ? query.is('category_id', null) : query.eq('category_id', filters.category_id);
     if (filters.account_id) query = filters.account_id === '__null__' ? query.is('account_id', null) : query.eq('account_id', filters.account_id);
     if (filters.unit_id) query = filters.unit_id === '__null__' ? query.is('unit_id', null) : query.eq('unit_id', filters.unit_id);
     if (filters.front_id) query = filters.front_id === '__null__' ? query.is('front_id', null) : query.eq('front_id', filters.front_id);
     if (filters.partner_id) query = filters.partner_id === '__null__' ? query.is('partner_id', null) : query.eq('partner_id', filters.partner_id);
-    if (filters.payment_method) query = filters.payment_method === '__null__' ? query.is('payment_method', null) : query.eq('payment_method', filters.payment_method as any);
+    if (filters.payment_method) query = filters.payment_method === '__null__' ? query.is('payment_method', null) : query.eq('payment_method', filters.payment_method as Enums['payment_method']);
     if (filters.dateFrom) query = query.gte('competence_date', filters.dateFrom);
     if (filters.dateTo) query = query.lte('competence_date', filters.dateTo);
     if (filters.search) {
@@ -132,7 +152,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
     }
 
-    return query;
+    return query as unknown as Q;
   }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
 
   const fetchData = useCallback(async () => {
@@ -167,13 +187,13 @@ export function useTransactions(filters: TransactionFilters = {}) {
         .order('id', { ascending: false })
         .range(fromIdx, toIdx);
       if (error) throw error;
-      return (rows ?? []) as any[];
+      return (rows ?? []) as TotalsRow[];
     });
 
     const [listRes, aggregated] = await Promise.all([
       listQuery,
-      totalsPromise.catch((err: any) => {
-        toast({ title: 'Erro ao somar os totais', description: err.message, variant: 'destructive' });
+      totalsPromise.catch((err: unknown) => {
+        toast({ title: 'Erro ao somar os totais', description: errorMessage(err), variant: 'destructive' });
         return null;
       }),
     ]);
@@ -188,7 +208,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setData(typed);
       const complete = typed.length < PAGE_SIZE;
       setListComplete(complete);
-      setTotals(aggregated ?? sumTotals(typed as any));
+      setTotals(aggregated ?? sumTotals(typed));
     }
     setLoading(false);
   }, [applyFilters, toast]);
@@ -205,10 +225,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
     const perNet = Math.round((net / count) * 100) / 100;
 
     const baseRow = {
-      type: input.type as any,
+      type: input.type as Enums['transaction_type'],
       description: input.description,
-      status: input.status as any,
-      payment_method: (input.payment_method || null) as any,
+      status: input.status as Enums['transaction_status'],
+      payment_method: (input.payment_method || null) as Enums['payment_method'] | null,
       category_id: input.category_id || null,
       account_id: input.account_id || null,
       partner_id: input.partner_id || null,
@@ -243,7 +263,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
         installment_number: count > 1 ? i + 1 : null,
         installment_total: count > 1 ? count : null,
         is_recurring: i === 0 && isRecurring,
-        recurrence_frequency: i === 0 && isRecurring ? (input.recurrence_frequency as any) : null,
+        recurrence_frequency: i === 0 && isRecurring ? (input.recurrence_frequency as Enums['recurrence_frequency']) : null,
         recurrence_end_date: i === 0 && isRecurring ? (input.recurrence_end_date || null) : null,
       };
     });
@@ -263,7 +283,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
           transaction_id: tx.id,
           unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
           front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
-          allocation_type: a.allocation_type as any,
+          allocation_type: a.allocation_type as Enums['allocation_type'],
           percentage: a.percentage ?? null,
           amount: a.amount != null
             ? Math.round((a.amount / count) * 100) / 100
@@ -351,8 +371,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
         const factor = newNet / oldNet;
         await Promise.all(
           (olds ?? [])
-            .filter((a: any) => a.allocation_type === 'valor' && a.amount != null)
-            .map((a: any) =>
+            .filter((a) => a.allocation_type === 'valor' && a.amount != null)
+            .map((a) =>
               supabase
                 .from('transaction_allocations')
                 .update({ amount: Math.round(Number(a.amount) * factor * 100) / 100 })
@@ -370,7 +390,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
           transaction_id: id,
           unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
           front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
-          allocation_type: a.allocation_type as any,
+          allocation_type: a.allocation_type as Enums['allocation_type'],
           percentage: a.percentage ?? null,
           amount: a.amount ?? null,
         }));
@@ -386,7 +406,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return true;
   };
 
-  const remove = async (id: string, opts?: { action?: 'DELETE' | 'REDO_DELETE' }): Promise<{ row: any; allocations: any[] } | null> => {
+  const remove = async (id: string, opts?: { action?: 'DELETE' | 'REDO_DELETE' }): Promise<DeletedCapture | null> => {
     const backup = [...data];
     // Capture row + allocations BEFORE deleting so we can undo
     const { data: rowFull } = await supabase.from('transactions').select('*').eq('id', id).maybeSingle();
@@ -407,11 +427,11 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
     // Audit log (DELETE / REDO_DELETE)
     try {
-      await supabase.rpc('log_transaction_action' as any, {
+      await supabase.rpc('log_transaction_action', {
         _record_id: id,
         _action: opts?.action ?? 'DELETE',
-        _old_data: { row: rowFull, allocations: allocs ?? [] } as any,
-        _new_data: null as any,
+        _old_data: { row: rowFull, allocations: allocs ?? [] } as unknown as Json,
+        _new_data: null,
         _context: 'transactions',
       });
     } catch (e) {
@@ -419,26 +439,26 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
     // Totais vêm sempre da agregação no banco — nunca das linhas em memória.
     await fetchData();
-    return { row: rowFull, allocations: allocs ?? [] };
+    return { row: rowFull as DeletedCapture['row'], allocations: allocs ?? [] };
   };
 
-  const restore = async (captured: { row: any; allocations: any[] }) => {
+  const restore = async (captured: DeletedCapture) => {
     if (!captured?.row) return false;
     const { category, account, partner, unit, front, ...rowOnly } = captured.row;
-    const { error } = await supabase.from('transactions').insert(rowOnly as any);
+    const { error } = await supabase.from('transactions').insert(rowOnly as TablesInsert<'transactions'>);
     if (error) {
       toast({ title: 'Erro ao restaurar', description: error.message, variant: 'destructive' });
       return false;
     }
     if (captured.allocations.length > 0) {
-      await supabase.from('transaction_allocations').insert(captured.allocations as any);
+      await supabase.from('transaction_allocations').insert(captured.allocations);
     }
     try {
-      await supabase.rpc('log_transaction_action' as any, {
-        _record_id: rowOnly.id,
+      await supabase.rpc('log_transaction_action', {
+        _record_id: rowOnly.id as string,
         _action: 'UNDO_DELETE',
-        _old_data: null as any,
-        _new_data: { row: rowOnly, allocations: captured.allocations } as any,
+        _old_data: null,
+        _new_data: { row: rowOnly, allocations: captured.allocations } as unknown as Json,
         _context: 'transactions',
       });
     } catch (e) {
@@ -461,12 +481,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
   };
 
   const generateRecurring = async () => {
-    const { data, error } = await supabase.rpc('generate_recurring_transactions' as any);
+    const { data, error } = await supabase.rpc('generate_recurring_transactions');
     if (error) {
       toast({ title: 'Erro ao gerar recorrências', description: error.message, variant: 'destructive' });
       return 0;
     }
-    const count = (data as number) ?? 0;
+    const count = data ?? 0;
     toast({
       title: count > 0 ? `${count} lançamento(s) gerados` : 'Tudo em dia',
       description: count > 0 ? 'Próximas ocorrências de lançamentos recorrentes foram criadas.' : 'Nenhuma nova ocorrência a gerar.',

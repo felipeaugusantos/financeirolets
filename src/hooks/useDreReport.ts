@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { toLocalISODate } from '@/lib/utils';
+import { toLocalISODate, errorMessage } from '@/lib/utils';
+import type { Database, Tables } from '@/integrations/supabase/types';
 import {
   applyDreBase,
   applyCategoryFilter,
@@ -12,6 +13,17 @@ import {
   NO_UNIT_KEY,
   type AllocationRow,
 } from '@/lib/finance';
+
+type DreLineRow = Tables<'dre_lines'>;
+
+/** Campos de transactions usados para somar o DRE. */
+interface DreTxRow {
+  id: string;
+  net_amount: number | string | null;
+  category_id: string | null;
+  unit_id: string | null;
+  type: string;
+}
 
 export interface DreLineResult {
   id: string;
@@ -48,7 +60,7 @@ function shiftDateBackOneYear(d: string) {
 
 // Compute totals per dre_line_id from a set of transactions, given allocations and filter
 function computeLineValues(
-  transactions: any[],
+  transactions: DreTxRow[],
   allocMap: Map<string, AllocationRow[]>,
   catToDre: Map<string, string>,
   unitFilter: string | undefined
@@ -61,7 +73,7 @@ function computeLineValues(
   let outOfDreTotal = 0;
   let outOfDreCount = 0;
 
-  transactions.forEach((tx: any) => {
+  transactions.forEach((tx) => {
     const totalVal = txValue(tx);
     const dreLineId = tx.category_id ? catToDre.get(tx.category_id) : undefined;
     if (!dreLineId) {
@@ -101,34 +113,34 @@ function computeLineValues(
   return { lineValues, unallocTotal, unallocCount, outOfDreTotal, outOfDreCount };
 }
 
-function buildSubtotals(allLines: any[], lineValues: Map<string, number>) {
+function buildSubtotals(allLines: DreLineRow[], lineValues: Map<string, number>) {
   const computed = new Map<string, number>();
-  const get = (line: any): number => {
+  const get = (line: DreLineRow): number => {
     if (computed.has(line.id)) return computed.get(line.id)!;
     let val: number;
     if (!line.is_subtotal) {
       val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
     } else {
-      const children = allLines.filter((c: any) => c.parent_id === line.id);
+      const children = allLines.filter((c) => c.parent_id === line.id);
       if (children.length > 0) {
-        val = children.reduce((s: number, c: any) => s + get(c), 0);
+        val = children.reduce((s: number, c) => s + get(c), 0);
       } else {
         const code = line.code;
         if (code === '3') {
-          const g1 = allLines.find((l: any) => l.code === '1');
-          const g2 = allLines.find((l: any) => l.code === '2');
+          const g1 = allLines.find((l) => l.code === '1');
+          const g2 = allLines.find((l) => l.code === '2');
           val = (g1 ? get(g1) : 0) + (g2 ? get(g2) : 0);
         } else if (code === '5') {
-          const g3 = allLines.find((l: any) => l.code === '3');
-          const g4 = allLines.find((l: any) => l.code === '4');
+          const g3 = allLines.find((l) => l.code === '3');
+          const g4 = allLines.find((l) => l.code === '4');
           val = (g3 ? get(g3) : 0) + (g4 ? get(g4) : 0);
         } else if (code === '8') {
-          const g5 = allLines.find((l: any) => l.code === '5');
+          const g5 = allLines.find((l) => l.code === '5');
           // Pró-labore/honorários da diretoria ficam fora do resultado operacional,
           // mas continuam impactando o caixa retido.
-          const g51 = allLines.find((l: any) => l.code === '5.1');
-          const g6 = allLines.find((l: any) => l.code === '6');
-          const g7 = allLines.find((l: any) => l.code === '7');
+          const g51 = allLines.find((l) => l.code === '5.1');
+          const g6 = allLines.find((l) => l.code === '6');
+          const g7 = allLines.find((l) => l.code === '7');
           val = (g5 ? get(g5) : 0) + (g51 ? get(g51) : 0) + (g6 ? get(g6) : 0) + (g7 ? get(g7) : 0);
         } else {
           val = 0;
@@ -160,7 +172,7 @@ async function fetchPeriodValues(
   if (filters.payment_method) {
     txQuery = (filters.payment_method === '__none__' || filters.payment_method === '__null__')
       ? txQuery.is('payment_method', null)
-      : txQuery.eq('payment_method', filters.payment_method as any);
+      : txQuery.eq('payment_method', filters.payment_method as Database['public']['Enums']['payment_method']);
   }
   const { data: transactions, error } = await txQuery;
   if (error) throw error;
@@ -168,14 +180,14 @@ async function fetchPeriodValues(
     console.warn('[useDreReport] Possível truncamento: 10.000 transações retornadas em', { dateFrom, dateTo, filters });
   }
 
-  const txIds = (transactions ?? []).map((t: any) => t.id);
+  const txIds = (transactions ?? []).map((t) => t.id);
   let allocMap = new Map<string, AllocationRow[]>();
   if (txIds.length > 0) {
     const { data: allocs } = await supabase
       .from('transaction_allocations')
       .select('transaction_id, unit_id, allocation_type, percentage, amount')
       .in('transaction_id', txIds);
-    allocMap = buildAllocationMap(allocs as any);
+    allocMap = buildAllocationMap(allocs);
   }
 
   return computeLineValues(transactions ?? [], allocMap, catToDre, filters.unit_id);
@@ -185,7 +197,7 @@ async function fetchBudgetValues(
   dateFrom: string,
   dateTo: string,
   unitId: string | undefined,
-  allLines: any[]
+  allLines: DreLineRow[]
 ): Promise<Map<string, number>> {
   // Sum budget rows for months within [dateFrom..dateTo]
   const start = new Date(dateFrom + 'T12:00:00');
@@ -214,7 +226,7 @@ async function fetchBudgetValues(
 
   const wanted = new Set(months.map(m => `${m.year}-${m.month}`));
   const sums = new Map<string, number>();
-  (data ?? []).forEach((b: any) => {
+  (data ?? []).forEach((b) => {
     if (!wanted.has(`${b.year}-${b.month}`)) return;
     sums.set(b.dre_line_id, (sums.get(b.dre_line_id) || 0) + Number(b.planned_amount));
   });
@@ -251,7 +263,7 @@ export function useDreReport() {
       if (catErr) throw catErr;
 
       const catToDre = new Map<string, string>();
-      (categories ?? []).forEach((c: any) => {
+      (categories ?? []).forEach((c) => {
         if (c.dre_line_id) catToDre.set(c.id, c.dre_line_id);
       });
 
@@ -261,13 +273,13 @@ export function useDreReport() {
       const depthMap = new Map<string, number>();
       const getDepth = (id: string): number => {
         if (depthMap.has(id)) return depthMap.get(id)!;
-        const line = allLines.find((l: any) => l.id === id);
+        const line = allLines.find((l) => l.id === id);
         if (!line || !line.parent_id) { depthMap.set(id, 0); return 0; }
         const d = getDepth(line.parent_id) + 1;
         depthMap.set(id, d);
         return d;
       };
-      allLines.forEach((l: any) => getDepth(l.id));
+      allLines.forEach((l) => getDepth(l.id));
 
       // Current period
       const current = await fetchPeriodValues(filters.dateFrom, filters.dateTo, filters, catToDre);
@@ -290,7 +302,7 @@ export function useDreReport() {
         budgetTotals = buildSubtotals(allLines, raw);
       }
 
-      const result: DreLineResult[] = allLines.map((l: any) => ({
+      const result: DreLineResult[] = allLines.map((l) => ({
         id: l.id,
         code: l.code,
         name: l.name,
@@ -309,8 +321,8 @@ export function useDreReport() {
       setUnallocatedCount(current.unallocCount);
       setOutOfDreTotal(current.outOfDreTotal);
       setOutOfDreCount(current.outOfDreCount);
-    } catch (err: any) {
-      toast({ title: 'Erro ao gerar DRE', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao gerar DRE', description: errorMessage(err), variant: 'destructive' });
       setLines([]);
     } finally {
       setLoading(false);
