@@ -7,6 +7,59 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Tipos mínimos do que esta função lê. O client aqui não usa o Database tipado do app
+// (a função é implantada isoladamente), então as linhas são declaradas localmente.
+interface UnitRow { id?: string; name: string; code: string | null }
+interface FrontRow { name: string }
+interface AccountRow { name: string; type: string | null }
+interface CategoryRow { name: string; type: string }
+interface TxSummaryRow {
+  type: string;
+  status: string;
+  net_amount: number | string | null;
+  competence_date: string | null;
+  payment_date: string | null;
+}
+interface AccountBalanceRow { id: string; name: string; initial_balance: number | string | null; initial_balance_date: string | null }
+interface AccountMoveRow { account_id: string; type: string; net_amount: number | string | null; payment_date: string }
+interface AmountRow { net_amount: number | string | null }
+interface TopCategoryRow { type: string; net_amount: number | string | null; category: { name: string } | null }
+
+/** Argumentos que o modelo pode enviar às ferramentas (todos opcionais, validados no uso). */
+interface ToolArgs {
+  limit?: number | string;
+  date_field?: string;
+  date_from?: string;
+  date_to?: string;
+  type?: string;
+  unit_id?: string;
+  account_id?: string;
+  dre_line_id?: string;
+  id?: string;
+  code?: string;
+  kind?: string;
+  regime?: string;
+  status?: string[];
+  due_from?: string;
+  due_to?: string;
+  missing_category?: boolean;
+  missing_unit?: boolean;
+  overdue_only?: boolean;
+}
+
+interface ToolCall { id: string; function?: { name?: string; arguments?: string } }
+interface ChatMessage {
+  role: string;
+  content?: unknown;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
+
+function errorMessage(e: unknown, fallback: string): string {
+  const m = typeof e === 'object' && e !== null ? (e as { message?: unknown }).message : undefined;
+  return m == null ? fallback : String(m);
+}
+
 const SYSTEM_PROMPT = `Você é o Kaikin, contador-assistente do ERP Let's Finance.
 
 Estilo:
@@ -225,15 +278,16 @@ async function buildGlossary(supabase: ReturnType<typeof makeClient>): Promise<s
       supabase.from('categories').select('name, type').eq('active', true).order('name').limit(200),
     ]);
 
-    const list = (rows: any[] | null, fmt: (r: any) => string) =>
+    const list = <R,>(rows: R[] | null, fmt: (r: R) => string) =>
       (rows ?? []).map(fmt).join(', ') || '(nenhum cadastrado)';
 
-    const receitas = (categories.data ?? []).filter((c: any) => c.type === 'receita');
-    const despesas = (categories.data ?? []).filter((c: any) => c.type === 'despesa');
+    const categoryRows = (categories.data ?? []) as CategoryRow[];
+    const receitas = categoryRows.filter((c) => c.type === 'receita');
+    const despesas = categoryRows.filter((c) => c.type === 'despesa');
 
-    const unitsTxt = list(units.data, (u) => (u.code ? u.name + ' (' + u.code + ')' : u.name));
-    const frontsTxt = list(fronts.data, (f) => f.name);
-    const accountsTxt = list(accounts.data, (a) => (a.type ? a.name + ' [' + a.type + ']' : a.name));
+    const unitsTxt = list(units.data as UnitRow[] | null, (u) => (u.code ? u.name + ' (' + u.code + ')' : u.name));
+    const frontsTxt = list(fronts.data as FrontRow[] | null, (f) => f.name);
+    const accountsTxt = list(accounts.data as AccountRow[] | null, (a) => (a.type ? a.name + ' [' + a.type + ']' : a.name));
     const receitasTxt = list(receitas, (c) => c.name);
     const despesasTxt = list(despesas, (c) => c.name);
 
@@ -251,7 +305,7 @@ async function buildGlossary(supabase: ReturnType<typeof makeClient>): Promise<s
   }
 }
 
-async function runTool(name: string, args: any, supabase: ReturnType<typeof makeClient>) {
+async function runTool(name: string | undefined, args: ToolArgs, supabase: ReturnType<typeof makeClient>) {
   try {
     if (name === 'list_transactions') {
       const limit = Math.min(Number(args.limit) || 25, 50);
@@ -298,8 +352,8 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
       const { data, error } = await q;
       if (error) return { error: error.message };
       const agg = { receita: { dashboard: 0, provisionado: 0, caixa: 0, count: 0 }, despesa: { dashboard: 0, provisionado: 0, caixa: 0, count: 0 } };
-      const f = args.date_from, t = args.date_to;
-      (data ?? []).forEach((tx: any) => {
+      const f = args.date_from as string, t = args.date_to as string;
+      ((data ?? []) as TxSummaryRow[]).forEach((tx) => {
         const v = Number(tx.net_amount) || 0;
         const side = tx.type === 'receita' ? agg.receita : agg.despesa;
         side.count++;
@@ -333,7 +387,7 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
 
     if (name === 'list_entities') {
       const kind = args.kind || 'all';
-      const out: any = {};
+      const out: { units?: unknown[]; fronts?: unknown[]; accounts?: unknown[] } = {};
       if (kind === 'all' || kind === 'units') {
         const { data } = await supabase.from('units').select('id, name, code').eq('active', true).order('name');
         out.units = data ?? [];
@@ -369,12 +423,12 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
 
       return {
         date_to: dateTo,
-        accounts: (accounts ?? []).map((a: any) => {
-          const moves = (txs ?? []).filter(
-            (t: any) => t.account_id === a.id && (!a.initial_balance_date || t.payment_date >= a.initial_balance_date)
+        accounts: ((accounts ?? []) as AccountBalanceRow[]).map((a) => {
+          const moves = ((txs ?? []) as AccountMoveRow[]).filter(
+            (t) => t.account_id === a.id && (!a.initial_balance_date || t.payment_date >= a.initial_balance_date)
           );
           const delta = moves.reduce(
-            (s: number, t: any) => s + (t.type === 'receita' ? 1 : -1) * (Number(t.net_amount) || 0),
+            (s: number, t) => s + (t.type === 'receita' ? 1 : -1) * (Number(t.net_amount) || 0),
             0
           );
           return {
@@ -403,7 +457,7 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
       if (args.overdue_only) q = q.lt('due_date', todaySaoPaulo());
       const { data, error } = await q;
       if (error) return { error: error.message };
-      const total = (data ?? []).reduce((s: number, t: any) => s + (Number(t.net_amount) || 0), 0);
+      const total = ((data ?? []) as AmountRow[]).reduce((s: number, t) => s + (Number(t.net_amount) || 0), 0);
       return { hoje: todaySaoPaulo(), count: data?.length ?? 0, total, items: data ?? [] };
     }
 
@@ -423,7 +477,7 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
       const { data, error } = await q;
       if (error) return { error: error.message };
       const map = new Map<string, { categoria: string; tipo: string; total: number; count: number }>();
-      (data ?? []).forEach((t: any) => {
+      ((data ?? []) as unknown as TopCategoryRow[]).forEach((t) => {
         const nome = t.category?.name ?? 'Sem categoria';
         const key = `${t.type}|${nome}`;
         const cur = map.get(key) ?? { categoria: nome, tipo: t.type, total: 0, count: 0 };
@@ -438,8 +492,8 @@ async function runTool(name: string, args: any, supabase: ReturnType<typeof make
     }
 
     return { error: `tool desconhecida: ${name}` };
-  } catch (e: any) {
-    return { error: e?.message ?? 'erro desconhecido' };
+  } catch (e: unknown) {
+    return { error: errorMessage(e, 'erro desconhecido') };
   }
 }
 
@@ -455,10 +509,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { messages = [], pageContext = null } = await req.json();
+    const { messages = [], pageContext = null } = (await req.json()) as {
+      messages?: { role?: string; content?: unknown }[];
+      pageContext?: unknown;
+    };
     const supabase = makeClient(req.headers.get('Authorization'));
 
-    const chatMessages: any[] = [
+    const chatMessages: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'system', content: `Hoje (America/Sao_Paulo) é ${todaySaoPaulo()}. Sempre use essa data como "hoje".` },
     ];
@@ -517,7 +574,7 @@ Deno.serve(async (req) => {
       }
       chatMessages.push({ role: 'assistant', content: msg.content ?? null, tool_calls: toolCalls });
       for (const tc of toolCalls) {
-        let args: any = {};
+        let args: ToolArgs = {};
         try { args = JSON.parse(tc.function?.arguments ?? '{}'); } catch { /* ignore */ }
         console.log('[kaikin] tool', tc.function?.name, args);
         const result = await runTool(tc.function?.name, args, supabase);
@@ -554,9 +611,9 @@ Deno.serve(async (req) => {
     return new Response(stream, {
       headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('kaikin fatal', e);
-    return new Response(JSON.stringify({ error: e?.message ?? 'erro' }), {
+    return new Response(JSON.stringify({ error: errorMessage(e, 'erro') }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
