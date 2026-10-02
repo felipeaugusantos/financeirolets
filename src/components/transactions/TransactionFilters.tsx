@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import type { TransactionFilters as TFilters } from '@/hooks/useTransactions';
+import type { Tables } from '@/integrations/supabase/types';
 
 const PAYMENT_METHODS = [
   { value: 'dinheiro', label: 'Dinheiro' },
@@ -29,11 +30,11 @@ interface Props {
 
 export default function TransactionFilters({ filters, onChange }: Props) {
   const [open, setOpen] = useState(false);
-  const { data: categories } = useSupabaseCrud<any>('categories', 'name');
-  const { data: accounts } = useSupabaseCrud<any>('accounts', 'name');
-  const { data: units } = useSupabaseCrud<any>('units', 'name');
-  const { data: fronts } = useSupabaseCrud<any>('business_fronts', 'name');
-  const { data: partners } = useSupabaseCrud<any>('partners', 'name');
+  const { data: categories } = useSupabaseCrud<Tables<'categories'>>('categories', 'name');
+  const { data: accounts } = useSupabaseCrud<Tables<'accounts'>>('accounts', 'name');
+  const { data: units } = useSupabaseCrud<Tables<'units'>>('units', 'name');
+  const { data: fronts } = useSupabaseCrud<Tables<'business_fronts'>>('business_fronts', 'name');
+  const { data: partners } = useSupabaseCrud<Tables<'partners'>>('partners', 'name');
 
   const set = (key: keyof TFilters, value: string | undefined) => {
     onChange({ ...filters, [key]: value });
@@ -106,7 +107,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
                 <SelectItem value="__null__">Sem categoria</SelectItem>
-                {categories.filter((c: any) => c.active).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                {categories.filter((c) => c.active).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -117,7 +118,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
                 <SelectItem value="__null__">Sem conta</SelectItem>
-                {accounts.filter((a: any) => a.active).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                {accounts.filter((a) => a.active).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -128,7 +129,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
                 <SelectItem value="__null__">Sem unidade</SelectItem>
-                {units.filter((u: any) => u.active).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                {units.filter((u) => u.active).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -139,7 +140,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectContent>
                 <SelectItem value="__none__">Todas</SelectItem>
                 <SelectItem value="__null__">Sem frente</SelectItem>
-                {fronts.filter((f: any) => f.active).map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                {fronts.filter((f) => f.active).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -150,7 +151,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
               <SelectContent>
                 <SelectItem value="__none__">Todos</SelectItem>
                 <SelectItem value="__null__">Sem parceiro</SelectItem>
-                {partners.filter((p: any) => p.active).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                {partners.filter((p) => p.active).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

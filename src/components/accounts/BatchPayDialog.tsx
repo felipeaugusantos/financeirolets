@@ -16,6 +16,7 @@ import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO } from '@/lib/utils';
+import type { Tables } from '@/integrations/supabase/types';
 
 interface Props {
   open: boolean;
@@ -37,7 +38,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function BatchPayDialog({ open, onOpenChange, ids, tab, onDone }: Props) {
-  const { data: accounts, create: createAccount } = useSupabaseCrud<any>('accounts');
+  const { data: accounts, create: createAccount } = useSupabaseCrud<Tables<'accounts'>>('accounts');
   const [accountId, setAccountId] = useState('');
   const [method, setMethod] = useState('pix');
   const [date, setDate] = useState(todayLocalISO());

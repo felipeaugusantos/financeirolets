@@ -6,6 +6,7 @@ import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { Tables } from '@/integrations/supabase/types';
 
 const columns: ColumnConfig[] = [
   { key: 'name', label: 'Nome' },
@@ -59,7 +60,7 @@ function buildFields(units: { id: string; name: string }[]): FieldConfig[] {
 
 
 export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
-  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('accounts');
+  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'accounts'>>('accounts');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);

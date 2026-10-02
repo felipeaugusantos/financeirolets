@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 
 export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
-  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('categories');
+  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'categories'>>('categories');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [dreLines, setDreLines] = useState<any[]>([]);
@@ -34,7 +35,7 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
       return line ? `${line.code} - ${line.name}` : '-';
     }},
     { key: 'parent_id', label: 'Categoria Pai', render: (v: string) => {
-      const parent = data.find((c: any) => c.id === v);
+      const parent = data.find((c) => c.id === v);
       return parent ? parent.name : '-';
     }},
   ];
@@ -47,7 +48,7 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
     ]},
     { name: 'parent_id', label: 'Categoria Pai (opcional)', type: 'select', options: [
       { value: '__none__', label: 'Nenhuma (raiz)' },
-      ...data.map((c: any) => ({ value: c.id, label: c.name })),
+      ...data.map((c) => ({ value: c.id, label: c.name })),
     ]},
     { name: 'dre_line_id', label: 'Linha do DRE', type: 'select', options: [
       { value: '__none__', label: 'Nenhuma' },
@@ -66,9 +67,9 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
 
   const term = search.trim().toLowerCase();
   const filtered = term
-    ? data.filter((c: any) => {
+    ? data.filter((c) => {
         const line = dreLines.find(l => l.id === c.dre_line_id);
-        const parent = data.find((p: any) => p.id === c.parent_id);
+        const parent = data.find((p) => p.id === c.parent_id);
         return [
           c.name,
           c.type === 'receita' ? 'receita' : 'despesa',

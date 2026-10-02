@@ -6,9 +6,10 @@ import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import type { Tables } from '@/integrations/supabase/types';
 
 export default function DreSettings({ onBack }: { onBack: () => void }) {
-  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('dre_lines', 'sort_order');
+  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'dre_lines'>>('dre_lines', 'sort_order');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
 
@@ -23,7 +24,7 @@ export default function DreSettings({ onBack }: { onBack: () => void }) {
     )},
     { key: 'sign', label: 'Sinal', render: (v: number) => v === 1 ? '+' : '−' },
     { key: 'parent_id', label: 'Pai', render: (v: string) => {
-      const p = data.find((d: any) => d.id === v);
+      const p = data.find((d) => d.id === v);
       return p ? p.name : '-';
     }},
   ];
@@ -42,7 +43,7 @@ export default function DreSettings({ onBack }: { onBack: () => void }) {
     ]},
     { name: 'parent_id', label: 'Linha Pai (opcional)', type: 'select', options: [
       { value: '', label: 'Nenhuma (raiz)' },
-      ...data.map((d: any) => ({ value: d.id, label: `${d.code} - ${d.name}` })),
+      ...data.map((d) => ({ value: d.id, label: `${d.code} - ${d.name}` })),
     ]},
   ];
 

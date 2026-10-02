@@ -14,6 +14,7 @@ import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Tables } from '@/integrations/supabase/types';
 
 interface Props {
   open: boolean;
@@ -33,9 +34,9 @@ const MODALIDADES = [
 export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { data: categories } = useSupabaseCrud<any>('categories', 'name');
-  const { data: accounts } = useSupabaseCrud<any>('accounts', 'name');
-  const { data: units } = useSupabaseCrud<any>('units', 'name');
+  const { data: categories } = useSupabaseCrud<Tables<'categories'>>('categories', 'name');
+  const { data: accounts } = useSupabaseCrud<Tables<'accounts'>>('accounts', 'name');
+  const { data: units } = useSupabaseCrud<Tables<'units'>>('units', 'name');
 
   const [date, setDate] = useState<Date>(new Date());
   const [unitId, setUnitId] = useState('');
@@ -65,9 +66,9 @@ export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props)
   const expectedNum = parseFloat(expectedFee) || 0;
   const overExpected = expectedNum > 0 && feePercent > expectedNum + 0.01;
 
-  const filteredReceitaCats = categories.filter((c: any) => c.active && c.type === 'receita');
-  const activeAccounts = accounts.filter((a: any) => a.active);
-  const activeUnits = units.filter((u: any) => u.active);
+  const filteredReceitaCats = categories.filter((c) => c.active && c.type === 'receita');
+  const activeAccounts = accounts.filter((a) => a.active);
+  const activeUnits = units.filter((u) => u.active);
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -166,7 +167,7 @@ export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props)
                   <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {activeUnits.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    {activeUnits.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -202,7 +203,7 @@ export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props)
                   <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {filteredReceitaCats.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {filteredReceitaCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -212,7 +213,7 @@ export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props)
                   <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nenhuma</SelectItem>
-                    {activeAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    {activeAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
