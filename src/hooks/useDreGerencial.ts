@@ -201,7 +201,7 @@ export function useDreGerencial() {
     setLoading(true);
     setError(null);
     try {
-      const { data: dreLines, error: dreErr } = await (supabase as any)
+      const { data: dreLines, error: dreErr } = await supabase
         .from('dre_lines')
         .select('*')
         .eq('active', true)
@@ -209,12 +209,12 @@ export function useDreGerencial() {
         .order('sort_order');
       if (dreErr) throw dreErr;
 
-      const { data: categories, error: catErr } = await (supabase as any)
+      const { data: categories, error: catErr } = await supabase
         .from('categories')
         .select('id, name, type, dre_line_contabil_id, dre_line_id');
       if (catErr) throw catErr;
 
-      const { data: allDreLines } = await (supabase as any)
+      const { data: allDreLines } = await supabase
         .from('dre_lines')
         .select('id, code, name');
       const lineById = new Map<string, { code: string | null; name: string }>();

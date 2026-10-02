@@ -18,7 +18,7 @@ export function useInternalTransfers(from: string, to: string) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('bank_statement_entries')
       .select('id, account_id, posted_at, amount, memo, status, account:accounts(name)')
       .eq('status', 'pendente')
@@ -92,7 +92,7 @@ export function useInternalTransfers(from: string, to: string) {
           .select('id')
           .single();
         if (error || !data) throw error ?? new Error('Falha ao criar a perna da transferência');
-        const { error: linkError } = await (supabase as any)
+        const { error: linkError } = await supabase
           .from('bank_statement_entries')
           .update({
             transaction_id: data.id,

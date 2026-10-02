@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import SplitEditor from './SplitEditor';
 import { cleanSplit, splitTotal, type CategorySplitRule, type SplitLine } from '@/lib/categorySplits';
+import type { Json } from '@/integrations/supabase/types';
 
 type Opt = { id: string; name: string };
 const ALL = '__all__';
@@ -33,8 +34,8 @@ export default function CategorySplitsPanel({ categories, units, accounts, canEd
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const { data } = await (supabase as any).from('category_split_rules').select('*');
-    setRows((data ?? []) as CategorySplitRule[]);
+    const { data } = await supabase.from('category_split_rules').select('*');
+    setRows((data ?? []) as unknown as CategorySplitRule[]);
   };
   useEffect(() => { load(); }, []);
 
@@ -54,13 +55,13 @@ export default function CategorySplitsPanel({ categories, units, accounts, canEd
     const payload = {
       category_id: editing.category_id,
       account_id: editing.account_id || null,
-      allocations: lines,
+      allocations: lines as unknown as Json,
       notes: editing.notes || null,
       active: editing.active ?? true,
     };
     const { error } = editing.id
-      ? await (supabase as any).from('category_split_rules').update(payload).eq('id', editing.id)
-      : await (supabase as any).from('category_split_rules').insert({ ...payload, created_by: user?.id ?? null });
+      ? await supabase.from('category_split_rules').update(payload).eq('id', editing.id)
+      : await supabase.from('category_split_rules').insert({ ...payload, created_by: user?.id ?? null });
     setSaving(false);
     if (error) {
       const dup = String(error.message).includes('uniq');
@@ -77,13 +78,13 @@ export default function CategorySplitsPanel({ categories, units, accounts, canEd
 
   const remove = async (r: CategorySplitRule) => {
     if (!confirm(`Excluir a divisão de "${name(categories, r.category_id)}"?`)) return;
-    const { error } = await (supabase as any).from('category_split_rules').delete().eq('id', r.id);
+    const { error } = await supabase.from('category_split_rules').delete().eq('id', r.id);
     if (error) return toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
     load();
   };
 
   const toggle = async (r: CategorySplitRule, active: boolean) => {
-    await (supabase as any).from('category_split_rules').update({ active }).eq('id', r.id);
+    await supabase.from('category_split_rules').update({ active }).eq('id', r.id);
     load();
   };
 

@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
@@ -111,7 +112,7 @@ export default function CardReconciliation() {
   const load = useCallback(async (accId: string) => {
     if (!accId) return;
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('card_statement_entries')
       .select('*')
       .eq('account_id', accId)
@@ -171,7 +172,7 @@ export default function CardReconciliation() {
       }
       if (payload.length === 0) throw new Error('Nenhuma linha válida encontrada na planilha.');
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('card_statement_entries')
         .upsert(payload, { onConflict: 'row_hash', ignoreDuplicates: true });
       if (error) throw error;
@@ -191,7 +192,7 @@ export default function CardReconciliation() {
 
   const patchEntry = async (id: string, patch: Partial<CardEntry>) => {
     setEntries(prev => prev.map(e => (e.id === id ? { ...e, ...patch } as CardEntry : e)));
-    const { error } = await (supabase as any).from('card_statement_entries').update(patch).eq('id', id);
+    const { error } = await supabase.from('card_statement_entries').update(patch as TablesUpdate<'card_statement_entries'>).eq('id', id);
     if (error) toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
   };
 
@@ -229,7 +230,7 @@ export default function CardReconciliation() {
       toast({ title: 'Erro ao criar lançamento', description: error?.message, variant: 'destructive' });
       return false;
     }
-    await (supabase as any).from('card_statement_entries').update({
+    await supabase.from('card_statement_entries').update({
       transaction_id: created.id,
       status: 'conciliado',
       decided_by: user?.id ?? null,
