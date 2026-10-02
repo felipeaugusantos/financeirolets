@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { todayLocalISO } from '@/lib/utils';
+import { todayLocalISO, errorMessage } from '@/lib/utils';
 import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
 import { transactionFingerprint } from '@/lib/finance';
 
@@ -137,8 +137,8 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
 
       exportToCsv(`lancamentos_${todayLocalISO()}.csv`, headers, csvRows);
       toast({ title: 'CSV exportado com sucesso' });
-    } catch (err: any) {
-      toast({ title: 'Erro ao exportar', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao exportar', description: errorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -270,8 +270,8 @@ export default function ImportExportSettings({ onBack }: { onBack: () => void })
         title: `Importação concluída: ${success} lançamentos criados`,
         description: skipped.length ? `${skipped.length} linha(s) ignorada(s) por suspeita de duplicidade.` : undefined,
       });
-    } catch (err: any) {
-      toast({ title: 'Erro na importação', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro na importação', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = '';

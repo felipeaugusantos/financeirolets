@@ -23,8 +23,8 @@ const fmtPct = (v: number) =>
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
   const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount } = useDreReport();
-  const [units, setUnits] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
     dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
     dateTo: todayLocalISO(),

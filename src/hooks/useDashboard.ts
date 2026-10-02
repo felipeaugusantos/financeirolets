@@ -13,6 +13,7 @@ import {
   isAfterOpening,
   type AllocationRow,
 } from '@/lib/finance';
+import type { Database } from '@/integrations/supabase/types';
 
 export interface OverdueBill {
   id: string;
@@ -326,7 +327,7 @@ export function useDashboard(filters?: DashboardFilters) {
       const saldoQuery = supabase
         .from('transactions')
         .select('id, type, net_amount, status, unit_id, front_id, account_id, payment_date')
-        .in('status', ['pago', 'recebido'] as any)
+        .in('status', ['pago', 'recebido'] as Database['public']['Enums']['transaction_status'][])
         .eq('affects_cashflow', true)
         .limit(10000);
       const { data: allTxs } = await saldoQuery;
@@ -370,7 +371,7 @@ export function useDashboard(filters?: DashboardFilters) {
       const alertQuery = supabase
         .from('transactions')
         .select('id, description, net_amount, due_date, type, unit_id, front_id, partner:partners(name)')
-        .in('status', ['pendente', 'agendado'] as any)
+        .in('status', ['pendente', 'agendado'] as Database['public']['Enums']['transaction_status'][])
         .not('due_date', 'is', null)
         .lte('due_date', today)
         .order('due_date', { ascending: true })

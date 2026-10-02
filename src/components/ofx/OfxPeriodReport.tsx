@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { StatementEntry } from '@/hooks/useOfxImport';
 import { exportToCsv, csvDate, csvNumber } from '@/lib/exportCsv';
 import { exportToPdf } from '@/lib/exportPdf';
+import { errorMessage } from '@/lib/utils';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
@@ -122,8 +123,8 @@ export default function OfxPeriodReport({
         filename: `${fileBase}.pdf`,
         element: printRef.current,
       });
-    } catch (err: any) {
-      toast({ title: 'Erro ao gerar PDF', description: err?.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao gerar PDF', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setExporting(false);
     }

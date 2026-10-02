@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
 import type { TablesUpdate } from '@/integrations/supabase/types';
+import { errorMessage } from '@/lib/utils';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
@@ -182,8 +183,8 @@ export default function CardReconciliation() {
         description: `${payload.length} linha(s) processada(s)${ignored ? ` · ${ignored} ignorada(s) por dados incompletos` : ''}. Linhas repetidas não são duplicadas.`,
       });
       await load(accountId);
-    } catch (err: any) {
-      toast({ title: 'Erro ao importar planilha', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao importar planilha', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';

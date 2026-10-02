@@ -18,6 +18,7 @@ import {
   DuplicatePairGroup,
 
 } from '@/lib/ofxMatch';
+import { errorMessage } from '@/lib/utils';
 
 
 /** Busca FITIDs já gravados em lotes (evita o limite de 1.000 do .in()). */
@@ -287,8 +288,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       });
       await load();
       return summary;
-    } catch (err: any) {
-      toast({ title: 'Erro ao importar OFX', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao importar OFX', description: errorMessage(err), variant: 'destructive' });
       return null;
     } finally {
       setImporting(false);
@@ -361,8 +362,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         description: `${refreshed} linha(s) pendente(s) atualizadas e ${newRows.length} nova(s). Regras de conciliação reaplicadas.`,
       });
       return { refreshed, inserted: newRows.length, statements };
-    } catch (err: any) {
-      toast({ title: 'Erro ao reprocessar OFX', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao reprocessar OFX', description: errorMessage(err), variant: 'destructive' });
       return null;
     } finally {
       setImporting(false);

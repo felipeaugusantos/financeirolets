@@ -799,10 +799,10 @@ function Bridge({ title, side, color, kind, lookups, api }: { title: string; sid
 
 export default function ReconciliationReport({ onBack }: { onBack: () => void }) {
   const { data, loading, generate, fixTransaction, fixing } = useReconciliation();
-  const [units, setUnits] = useState<any[]>([]);
-  const [fronts, setFronts] = useState<any[]>([]);
-  const [catReceita, setCatReceita] = useState<any[]>([]);
-  const [catDespesa, setCatDespesa] = useState<any[]>([]);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [fronts, setFronts] = useState<{ id: string; name: string }[]>([]);
+  const [catReceita, setCatReceita] = useState<{ id: string; name: string }[]>([]);
+  const [catDespesa, setCatDespesa] = useState<{ id: string; name: string }[]>([]);
   const today = new Date();
   const firstOfMonth = toLocalISODate(new Date(today.getFullYear(), today.getMonth(), 1));
   const lastOfMonth = toLocalISODate(new Date(today.getFullYear(), today.getMonth() + 1, 0));

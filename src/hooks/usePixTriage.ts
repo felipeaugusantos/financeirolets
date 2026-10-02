@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PixSuggestion, PixTx, detectTransferPairs, readNatureTag, suggestNature } from '@/lib/pixTriage';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Carrega os PIX que precisam de triagem de natureza (somente leitura).
@@ -61,8 +62,8 @@ export function usePixTriage(range: { from: string; to: string }, term = 'Martin
       setRows(
         (data ?? []).map((t) => ({ ...t, net_amount: Number(t.net_amount) || 0 })) as PixTx[]
       );
-    } catch (e: any) {
-      toast({ title: 'Erro ao carregar PIX', description: e.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      toast({ title: 'Erro ao carregar PIX', description: errorMessage(e), variant: 'destructive' });
       setRows([]);
     } finally {
       setLoading(false);

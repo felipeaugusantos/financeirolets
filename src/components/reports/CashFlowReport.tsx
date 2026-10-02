@@ -31,8 +31,8 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
   const { data: realizedData, loading: loadingReal, generate: genRealized } = useCashFlowReport();
   const { data: projectedData, loading: loadingProj, generate: genProjected } = useCashFlowProjected();
   const [mode, setMode] = useState<Mode>('realizado');
-  const [units, setUnits] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<CashFlowFilters>({
     dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
     dateTo: toLocalISODate(new Date(new Date().getFullYear(), 11, 31)),

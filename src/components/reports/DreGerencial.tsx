@@ -63,8 +63,8 @@ function Variation({ current, previous }: { current: number; previous?: number }
 
 export default function DreGerencial({ onBack }: { onBack: () => void }) {
   const { lines, loading, error, generate, outOfDreTotal, outOfDreCount, missingCategories } = useDreGerencial();
-  const [units, setUnits] = useState<any[]>([]);
-  const [fronts, setFronts] = useState<any[]>([]);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [fronts, setFronts] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<DreGerencialFilters>(defaultFilters);
   const [applied, setApplied] = useState<DreGerencialFilters | null>(null);
   const [generated, setGenerated] = useState(false);

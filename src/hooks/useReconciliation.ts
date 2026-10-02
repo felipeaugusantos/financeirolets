@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { todayLocalISO } from '@/lib/utils';
+import { todayLocalISO, errorMessage } from '@/lib/utils';
 
 export interface ReconciliationFilters {
   dateFrom: string;
@@ -414,8 +414,8 @@ export function useReconciliation() {
 
       const checklist = buildChecklist(rec, des);
       setData({ receitas: rec, despesas: des, checklist });
-    } catch (err: any) {
-      toast({ title: 'Erro ao gerar reconciliação', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao gerar reconciliação', description: errorMessage(err), variant: 'destructive' });
       setData(null);
     } finally {
       setLoading(false);

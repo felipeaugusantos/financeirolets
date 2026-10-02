@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { errorMessage } from '@/lib/utils';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -33,8 +34,8 @@ export default function Login() {
         if (error) throw error;
         navigate('/');
       }
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

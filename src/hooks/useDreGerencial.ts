@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { toLocalISODate } from '@/lib/utils';
+import { toLocalISODate, errorMessage } from '@/lib/utils';
 import {
   applyDreBase,
   buildAllocationMap,
@@ -325,11 +325,11 @@ export function useDreGerencial() {
           })
           .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
       );
-    } catch (err: any) {
-      setError(err.message ?? 'Erro desconhecido');
+    } catch (err: unknown) {
+      setError(errorMessage(err) ?? 'Erro desconhecido');
       setLines([]);
       setMissingCategories([]);
-      toast({ title: 'Erro ao gerar DRE Gerencial', description: err.message, variant: 'destructive' });
+      toast({ title: 'Erro ao gerar DRE Gerencial', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

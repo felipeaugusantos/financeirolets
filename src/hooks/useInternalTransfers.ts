@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { findInternalTransfers, TransferCandidateEntry, TransferPair } from '@/lib/internalTransfers';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Busca linhas pendentes de TODAS as contas no período e sugere pares de
@@ -107,8 +108,8 @@ export function useInternalTransfers(from: string, to: string) {
       toast({ title: 'Transferência registrada', description: `${label} — fora do DRE, só no caixa.` });
       await load();
       return true;
-    } catch (err: any) {
-      toast({ title: 'Erro ao registrar transferência', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao registrar transferência', description: errorMessage(err), variant: 'destructive' });
       return false;
     } finally {
       setSaving(false);

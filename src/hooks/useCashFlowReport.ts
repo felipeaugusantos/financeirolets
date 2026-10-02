@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { toLocalISODate } from '@/lib/utils';
+import { toLocalISODate, errorMessage } from '@/lib/utils';
 import {
   applyCashRealizedBase,
   applyCategoryFilter,
@@ -121,8 +121,8 @@ export function useCashFlowReport() {
       });
 
       setData(result);
-    } catch (err: any) {
-      toast({ title: 'Erro ao gerar fluxo de caixa', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao gerar fluxo de caixa', description: errorMessage(err), variant: 'destructive' });
       setData([]);
     } finally {
       setLoading(false);

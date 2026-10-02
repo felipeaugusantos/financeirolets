@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Ações MANUAIS da Conferência de lançamentos.
@@ -177,10 +178,10 @@ export function useReviewActions(onDone?: () => void) {
         toast({ title: label, description: `${ok} lançamento(s) atualizado(s).` });
         onDone?.();
         return true;
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast({
           title: 'Não foi possível concluir',
-          description: `${e.message}. ${ok} registro(s) já haviam sido alterados.`,
+          description: `${errorMessage(e)}. ${ok} registro(s) já haviam sido alterados.`,
           variant: 'destructive',
         });
         onDone?.();
@@ -221,8 +222,8 @@ export function useReviewActions(onDone?: () => void) {
         toast({ title: 'Lançamento excluído', description: `${ids.length} registro(s) removido(s).` });
         onDone?.();
         return true;
-      } catch (e: any) {
-        toast({ title: 'Não foi possível excluir', description: e.message, variant: 'destructive' });
+      } catch (e: unknown) {
+        toast({ title: 'Não foi possível excluir', description: errorMessage(e), variant: 'destructive' });
         return false;
       } finally {
         setBusy(false);
@@ -262,8 +263,8 @@ export function useReviewActions(onDone?: () => void) {
         toast({ title: 'Rateio salvo', description: 'O valor do lançamento não foi alterado.' });
         onDone?.();
         return true;
-      } catch (e: any) {
-        toast({ title: 'Não foi possível salvar o rateio', description: e.message, variant: 'destructive' });
+      } catch (e: unknown) {
+        toast({ title: 'Não foi possível salvar o rateio', description: errorMessage(e), variant: 'destructive' });
         return false;
       } finally {
         setBusy(false);
