@@ -106,7 +106,7 @@ export function normalizeText(s: string): string {
  */
 export function stripDateSuffix(s: string): string {
   const semData = decodeEntities(s || '')
-    .replace(/(\s+\d{1,2}[\/.-]\d{1,2}([\/.-]\d{2,4})?)+\s*$/g, '');
+    .replace(/(\s+\d{1,2}[/.-]\d{1,2}([/.-]\d{2,4})?)+\s*$/g, '');
   return normalizeText(semData);
 }
 

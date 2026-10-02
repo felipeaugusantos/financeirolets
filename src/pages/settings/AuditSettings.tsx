@@ -119,14 +119,14 @@ export default function AuditSettings({ onBack }: Props) {
         setRows([]);
       } else {
         setRows((data ?? []) as AuditRow[]);
-        const userIds = Array.from(new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean)));
+        const userIds = Array.from(new Set((data ?? []).map((r) => r.user_id).filter(Boolean)));
         if (userIds.length > 0) {
           const { data: profs } = await supabase
             .from('profiles')
             .select('id, full_name, email')
             .in('id', userIds);
           const map: Record<string, string> = {};
-          (profs ?? []).forEach((p: any) => {
+          (profs ?? []).forEach((p) => {
             map[p.id] = p.full_name || p.email || p.id.slice(0, 8);
           });
           setProfiles(map);

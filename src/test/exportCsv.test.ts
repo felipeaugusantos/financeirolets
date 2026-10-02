@@ -4,11 +4,8 @@ import { exportToCsv, csvNumber, csvDate, csvCode, csvIndent } from '@/lib/expor
 let captured = '';
 beforeEach(() => {
   captured = '';
-  // @ts-ignore
   global.Blob = class { constructor(parts: any[]) { captured = parts.join(''); } } as any;
-  // @ts-ignore
   global.URL.createObjectURL = vi.fn(() => 'blob:x');
-  // @ts-ignore
   global.URL.revokeObjectURL = vi.fn();
   vi.spyOn(document, 'createElement').mockReturnValue({ click: vi.fn(), set href(_v: string) {}, set download(_v: string) {} } as any);
 });

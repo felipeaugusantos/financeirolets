@@ -29,3 +29,9 @@ export function todayLocalISO(): string {
     day: '2-digit',
   }).format(new Date());
 }
+
+/** Mensagem de qualquer valor lançado (inclui o PostgrestError do Supabase, que não é instância de Error). */
+export function errorMessage(e: unknown): string {
+  if (typeof e === 'object' && e !== null && 'message' in e) return String((e as { message: unknown }).message);
+  return String(e);
+}

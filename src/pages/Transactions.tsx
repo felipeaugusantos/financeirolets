@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Search, TrendingUp, TrendingDown, Wallet, AlertTriangle, CreditCard, Undo2, Redo2, History, Trash2 } from 'lucide-react';
-import { useTransactions, TransactionFilters as TFilters, TransactionRow } from '@/hooks/useTransactions';
+import { useTransactions, TransactionFilters as TFilters, TransactionRow, TransactionInput } from '@/hooks/useTransactions';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import CardSaleDialog from '@/components/transactions/CardSaleDialog';
 import TransactionFilters from '@/components/transactions/TransactionFilters';
@@ -48,7 +48,7 @@ export default function Transactions() {
     setDialogOpen(true);
   };
 
-  const handleSave = async (input: any) => {
+  const handleSave = async (input: TransactionInput) => {
     if (editingTx) {
       return update(editingTx.id, input);
     }

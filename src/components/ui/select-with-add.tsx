@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, errorMessage } from '@/lib/utils';
 
 interface SelectOption {
   id: string;
@@ -74,8 +74,8 @@ export default function SelectWithAdd({
         setName('');
         setExtras({});
       }
-    } catch (err: any) {
-      toast.error('Erro ao adicionar', { description: err?.message || 'Tente novamente' });
+    } catch (err: unknown) {
+      toast.error('Erro ao adicionar', { description: errorMessage(err) || 'Tente novamente' });
     } finally {
       setSaving(false);
     }

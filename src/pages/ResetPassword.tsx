@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { errorMessage } from '@/lib/utils';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -27,8 +28,8 @@ export default function ResetPassword() {
       if (error) throw error;
       toast({ title: 'Senha atualizada!' });
       navigate('/');
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

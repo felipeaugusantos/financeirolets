@@ -54,7 +54,7 @@ export default function SimpleRuleDialog({ open, onOpenChange, categories, units
       return toast({ title: 'Escolha 2 ou mais unidades somando 100%', variant: 'destructive' });
 
     setSaving(true);
-    const { error } = await (supabase as any).from('ofx_import_rules').insert({
+    const { error } = await supabase.from('ofx_import_rules').insert({
       pattern,
       match_type: 'contains',
       applies_to: appliesTo,

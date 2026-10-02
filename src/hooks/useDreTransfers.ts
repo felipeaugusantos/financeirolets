@@ -42,10 +42,15 @@ export function useDreTransfers(range: { from: string; to: string }) {
         .limit(5000);
 
       const { data: accs } = await supabase.from('accounts').select('id, name');
-      setAccountNameById(new Map((accs ?? []).map((a: any) => [a.id, a.name])));
+      setAccountNameById(new Map((accs ?? []).map((a) => [a.id, a.name])));
 
-      const mapped: DreTransferRow[] = (data ?? [])
-        .map((t: any) => ({
+      // O select usa string não-literal (sel) e não é inferido pelo Supabase; formato declarado aqui.
+      type RawRow = Omit<DreTransferRow, 'net_amount' | 'categoryName' | 'dreCode' | 'dreName'> & {
+        net_amount: number | string;
+        categories: { name: string; dre_lines: { code: string; name: string } | null } | null;
+      };
+      const mapped: DreTransferRow[] = ((data ?? []) as unknown as RawRow[])
+        .map((t) => ({
           id: t.id,
           description: t.description,
           net_amount: Number(t.net_amount) || 0,

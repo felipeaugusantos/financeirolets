@@ -20,14 +20,13 @@ jobs:
       - name: Build
         run: bun run build
 
-  # Ainda não bloqueia: há dívida existente (472 `no-explicit-any` e 4 erros de tipo).
-  # Remover `continue-on-error` quando zerar.
+  # Lint sem erros e sem aumentar o teto de avisos (dívida legada de `any`).
+  # Ao tipar usos de `any`, baixar o valor de --max-warnings.
   lint-types:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run lint
+      - run: bun run lint --max-warnings 196
       - run: bunx tsc -p tsconfig.app.json --noEmit

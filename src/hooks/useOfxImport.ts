@@ -18,6 +18,7 @@ import {
   DuplicatePairGroup,
 
 } from '@/lib/ofxMatch';
+import { errorMessage } from '@/lib/utils';
 
 
 /** Busca FITIDs já gravados em lotes (evita o limite de 1.000 do .in()). */
@@ -25,7 +26,7 @@ async function fetchExistingByFitid(accountId: string, fitids: string[], cols: s
   const unique = Array.from(new Set(fitids));
   const out: any[] = [];
   for (let i = 0; i < unique.length; i += 200) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('bank_statement_entries').select(cols)
       .eq('account_id', accountId).in('fitid', unique.slice(i, i + 200));
     if (error) throw error;
@@ -95,11 +96,11 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
   const loadRules = useCallback(async () => {
     const [{ data }, { data: splits }] = await Promise.all([
-      (supabase as any).from('ofx_import_rules').select('*').eq('active', true).order('priority'),
-      (supabase as any).from('category_split_rules').select('*').eq('active', true),
+      supabase.from('ofx_import_rules').select('*').eq('active', true).order('priority'),
+      supabase.from('category_split_rules').select('*').eq('active', true),
     ]);
-    setSplitRules((splits ?? []) as CategorySplitRule[]);
-    setRules((data ?? []) as OfxRule[]);
+    setSplitRules((splits ?? []) as unknown as CategorySplitRule[]);
+    setRules((data ?? []) as unknown as OfxRule[]);
   }, []);
 
   /** Sem rateio informado, aplica a divisão padrão da categoria (se houver). */
@@ -114,7 +115,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   useEffect(() => {
     if (!accountId) { setAccountUnitId(null); return; }
     (async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('accounts').select('default_unit_id').eq('id', accountId).maybeSingle();
       setAccountUnitId((data?.default_unit_id ?? null) as string | null);
     })();
@@ -134,7 +135,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     };
 
     const [entriesRes, txRes] = await Promise.all([
-      (supabase as any)
+      supabase
         .from('bank_statement_entries')
         .select('*')
         .eq('account_id', accountId)
@@ -261,7 +262,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
       let inserted = 0;
       if (rows.length > 0) {
-        const { error, count } = await (supabase as any)
+        const { error, count } = await supabase
           .from('bank_statement_entries')
           .upsert(rows, { onConflict: 'account_id,fitid', ignoreDuplicates: true, count: 'exact' });
         if (error) throw error;
@@ -287,8 +288,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       });
       await load();
       return summary;
-    } catch (err: any) {
-      toast({ title: 'Erro ao importar OFX', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao importar OFX', description: errorMessage(err), variant: 'destructive' });
       return null;
     } finally {
       setImporting(false);
@@ -323,7 +324,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         const found = byFitid.get(l.fitid);
         if (found) {
           if (found.status === 'pendente') {
-            await (supabase as any).from('bank_statement_entries').update({
+            await supabase.from('bank_statement_entries').update({
               posted_at: l.posted_at,
               amount: l.amount,
               memo: l.memo,
@@ -350,7 +351,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       }
 
       if (newRows.length > 0) {
-        const { error } = await (supabase as any).from('bank_statement_entries').upsert(newRows, { onConflict: 'account_id,fitid', ignoreDuplicates: true });
+        const { error } = await supabase.from('bank_statement_entries').upsert(newRows, { onConflict: 'account_id,fitid', ignoreDuplicates: true });
         if (error) throw error;
       }
 
@@ -361,8 +362,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         description: `${refreshed} linha(s) pendente(s) atualizadas e ${newRows.length} nova(s). Regras de conciliação reaplicadas.`,
       });
       return { refreshed, inserted: newRows.length, statements };
-    } catch (err: any) {
-      toast({ title: 'Erro ao reprocessar OFX', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao reprocessar OFX', description: errorMessage(err), variant: 'destructive' });
       return null;
     } finally {
       setImporting(false);
@@ -383,7 +384,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   }), [user]);
 
   const updateEntry = useCallback(async (entryId: string, patch: Record<string, unknown>) => {
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('bank_statement_entries')
       .update(patch)
       .eq('id', entryId);
@@ -425,7 +426,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     allocations: OfxAllocation[] | undefined,
   ) => {
     if (!allocations?.length) return;
-    await (supabase as any).from('transaction_allocations').insert(
+    await supabase.from('transaction_allocations').insert(
       allocations.map(a => ({
         transaction_id: transactionId,
         unit_id: a.unit_id ?? null,

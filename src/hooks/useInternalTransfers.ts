@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { findInternalTransfers, TransferCandidateEntry, TransferPair } from '@/lib/internalTransfers';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Busca linhas pendentes de TODAS as contas no período e sugere pares de
@@ -18,7 +19,7 @@ export function useInternalTransfers(from: string, to: string) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('bank_statement_entries')
       .select('id, account_id, posted_at, amount, memo, status, account:accounts(name)')
       .eq('status', 'pendente')
@@ -92,7 +93,7 @@ export function useInternalTransfers(from: string, to: string) {
           .select('id')
           .single();
         if (error || !data) throw error ?? new Error('Falha ao criar a perna da transferência');
-        const { error: linkError } = await (supabase as any)
+        const { error: linkError } = await supabase
           .from('bank_statement_entries')
           .update({
             transaction_id: data.id,
@@ -107,8 +108,8 @@ export function useInternalTransfers(from: string, to: string) {
       toast({ title: 'Transferência registrada', description: `${label} — fora do DRE, só no caixa.` });
       await load();
       return true;
-    } catch (err: any) {
-      toast({ title: 'Erro ao registrar transferência', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao registrar transferência', description: errorMessage(err), variant: 'destructive' });
       return false;
     } finally {
       setSaving(false);

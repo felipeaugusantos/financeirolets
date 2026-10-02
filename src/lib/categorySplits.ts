@@ -20,8 +20,8 @@ export interface CategorySplitRule {
 export function cleanSplit(lines: unknown): SplitLine[] {
   if (!Array.isArray(lines)) return [];
   return lines
-    .filter((l: any) => l && l.unit_id && Number(l.percentage) > 0)
-    .map((l: any) => ({ unit_id: String(l.unit_id), percentage: Number(l.percentage) }));
+    .filter((l) => l && l.unit_id && Number(l.percentage) > 0)
+    .map((l) => ({ unit_id: String(l.unit_id), percentage: Number(l.percentage) }));
 }
 
 export function splitTotal(lines: SplitLine[]): number {

@@ -104,7 +104,7 @@ export default function ClassicReconciliation({
 
   const toggle = (set: Set<string>, id: string, apply: (s: Set<string>) => void) => {
     const next = new Set(set);
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) next.delete(id); else next.add(id);
     apply(next);
   };
 

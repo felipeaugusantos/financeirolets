@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Columns3, Loader2, Download, FileSpreadsheet } from 'lucide-react';
-import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
+import { cn, toLocalISODate, todayLocalISO, errorMessage } from '@/lib/utils';
 import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { useToast } from '@/hooks/use-toast';
@@ -122,7 +122,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       if (txErr) throw txErr;
 
       // 3. Fetch allocations
-      const txIds = (transactions ?? []).map((t: any) => t.id);
+      const txIds = (transactions ?? []).map((t) => t.id);
       let allocMap = new Map<string, AllocationRow[]>();
 
       if (txIds.length > 0) {
@@ -130,12 +130,12 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
           .from('transaction_allocations')
           .select('transaction_id, unit_id, allocation_type, percentage, amount')
           .in('transaction_id', txIds);
-        allocMap = buildAllocationMap(allocs as any);
+        allocMap = buildAllocationMap(allocs);
       }
 
       // 4. Map category -> dre_line
       const catToDre = new Map<string, string>();
-      categories.forEach((c: any) => { if (c.dre_line_id) catToDre.set(c.id, c.dre_line_id); });
+      categories.forEach((c) => { if (c.dre_line_id) catToDre.set(c.id, c.dre_line_id); });
 
       // 5. Build columns: consolidated + each unit with data + "Sem unidade"
       // lineValues[dre_line_id][unit_key] = sum
@@ -150,7 +150,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
         if (unitKey !== NO_UNIT_KEY) unitsWithData.add(unitKey);
       };
 
-      (transactions ?? []).forEach((tx: any) => {
+      (transactions ?? []).forEach((tx) => {
         if (!tx.category_id) return;
         const dreLineId = catToDre.get(tx.category_id);
         if (!dreLineId) return;
@@ -174,13 +174,13 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       const depthMap = new Map<string, number>();
       const getDepth = (id: string): number => {
         if (depthMap.has(id)) return depthMap.get(id)!;
-        const line = dreLines.find((l: any) => l.id === id);
+        const line = dreLines.find((l) => l.id === id);
         if (!line || !line.parent_id) { depthMap.set(id, 0); return 0; }
         const d = getDepth(line.parent_id) + 1;
         depthMap.set(id, d);
         return d;
       };
-      dreLines.forEach((l: any) => getDepth(l.id));
+      dreLines.forEach((l) => getDepth(l.id));
 
       // 8. Compute values per column with subtotals
       const computedValues = new Map<string, Map<string, number>>();
@@ -196,25 +196,25 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
           const raw = lineValues.get(line.id)?.get(colId) || 0;
           val = raw * (line.sign ?? 1);
         } else {
-          const children = dreLines.filter((c: any) => c.parent_id === line.id);
+          const children = dreLines.filter((c) => c.parent_id === line.id);
           if (children.length > 0) {
-            val = children.reduce((sum: number, child: any) => sum + getLineValue(child, colId), 0);
+            val = children.reduce((sum: number, child) => sum + getLineValue(child, colId), 0);
           } else {
             const code = line.code;
             if (code === '3') {
-              const g1 = dreLines.find((l: any) => l.code === '1');
-              const g2 = dreLines.find((l: any) => l.code === '2');
+              const g1 = dreLines.find((l) => l.code === '1');
+              const g2 = dreLines.find((l) => l.code === '2');
               val = (g1 ? getLineValue(g1, colId) : 0) + (g2 ? getLineValue(g2, colId) : 0);
             } else if (code === '5') {
-              const g3 = dreLines.find((l: any) => l.code === '3');
-              const g4 = dreLines.find((l: any) => l.code === '4');
+              const g3 = dreLines.find((l) => l.code === '3');
+              const g4 = dreLines.find((l) => l.code === '4');
               val = (g3 ? getLineValue(g3, colId) : 0) + (g4 ? getLineValue(g4, colId) : 0);
             } else if (code === '8') {
-              const g5 = dreLines.find((l: any) => l.code === '5');
+              const g5 = dreLines.find((l) => l.code === '5');
               // Pró-labore fica após o resultado líquido, mas entra no caixa retido.
-              const g51 = dreLines.find((l: any) => l.code === '5.1');
-              const g6 = dreLines.find((l: any) => l.code === '6');
-              const g7 = dreLines.find((l: any) => l.code === '7');
+              const g51 = dreLines.find((l) => l.code === '5.1');
+              const g6 = dreLines.find((l) => l.code === '6');
+              const g7 = dreLines.find((l) => l.code === '7');
               val = (g5 ? getLineValue(g5, colId) : 0) + (g51 ? getLineValue(g51, colId) : 0)
                 + (g6 ? getLineValue(g6, colId) : 0) + (g7 ? getLineValue(g7, colId) : 0);
             } else {
@@ -228,7 +228,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
         return val;
       };
 
-      const result: DreLineComparative[] = dreLines.map((l: any) => {
+      const result: DreLineComparative[] = dreLines.map((l) => {
         const values: Record<string, number> = {};
         cols.forEach(col => { values[col.id] = getLineValue(l, col.id); });
         return {
@@ -241,8 +241,8 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       setLines(result);
       setUnitCols(cols);
       setGenerated(true);
-    } catch (err: any) {
-      toast({ title: 'Erro ao gerar DRE Comparativo', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao gerar DRE Comparativo', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -315,7 +315,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Regime</Label>
-              <Select value={filters.regime} onValueChange={(v: any) => setFilters(f => ({ ...f, regime: v }))}>
+              <Select value={filters.regime} onValueChange={(v) => setFilters(f => ({ ...f, regime: v as 'competencia' | 'caixa' }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="competencia">Competência</SelectItem>

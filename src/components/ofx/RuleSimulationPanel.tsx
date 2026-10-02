@@ -60,7 +60,7 @@ export default function RuleSimulationPanel({
     if (!accountId) { toast({ title: 'Escolha a conta do extrato', variant: 'destructive' }); return; }
     if (from > to) { toast({ title: 'Período inválido', description: 'A data inicial deve ser anterior à final.', variant: 'destructive' }); return; }
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('bank_statement_entries')
       .select('fitid, posted_at, amount, memo, trn_type')
       .eq('account_id', accountId)
@@ -70,7 +70,7 @@ export default function RuleSimulationPanel({
       .limit(1000);
     setLoading(false);
     if (error) { toast({ title: 'Erro ao carregar extrato', description: error.message, variant: 'destructive' }); return; }
-    const parsed = (data ?? []).map((d: any) => ({ ...d, amount: Number(d.amount) })) as StatementLine[];
+    const parsed = (data ?? []).map((d) => ({ ...d, amount: Number(d.amount) })) as StatementLine[];
     setLines(parsed);
     setLabel(`${accounts.find(a => a.id === accountId)?.name ?? 'Conta'} · ${parsed.length} linhas`);
   };

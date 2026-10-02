@@ -6,6 +6,7 @@ import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import type { Tables } from '@/integrations/supabase/types';
 
 const typeLabels: Record<string, string> = { fornecedor: 'Fornecedor', cliente: 'Cliente', ambos: 'Ambos' };
 
@@ -43,7 +44,7 @@ const fields: FieldConfig[] = [
 ];
 
 export default function PartnersSettings({ onBack }: { onBack: () => void }) {
-  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('partners');
+  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'partners'>>('partners');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
 

@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import type { OfxRule, RuleAllocation } from '@/lib/ofxMatch';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface OptionList {
   categories: { id: string; name: string; type: string }[];
@@ -155,13 +156,13 @@ export default function OfxRulesPanel({
       min_amount: form.min_amount == null || form.min_amount === ('' as any) ? null : Number(form.min_amount),
       max_amount: form.max_amount == null || form.max_amount === ('' as any) ? null : Number(form.max_amount),
       use_statement_unit: !!form.use_statement_unit,
-      allocations: allocs.length ? allocs : null,
+      allocations: (allocs.length ? allocs : null) as unknown as Json,
     };
 
     setSaving(true);
     const { error } = editing
-      ? await (supabase as any).from('ofx_import_rules').update(payload).eq('id', editing.id)
-      : await (supabase as any).from('ofx_import_rules').insert(payload);
+      ? await supabase.from('ofx_import_rules').update(payload).eq('id', editing.id)
+      : await supabase.from('ofx_import_rules').insert(payload);
     setSaving(false);
 
     if (error) {
@@ -176,7 +177,7 @@ export default function OfxRulesPanel({
 
   const remove = async () => {
     if (!confirmDelete) return;
-    const { error } = await (supabase as any).from('ofx_import_rules').delete().eq('id', confirmDelete.id);
+    const { error } = await supabase.from('ofx_import_rules').delete().eq('id', confirmDelete.id);
     setConfirmDelete(null);
     if (error) { toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Regra excluída' });
@@ -188,7 +189,7 @@ export default function OfxRulesPanel({
 
   /** Liga/desliga a regra sem apagá-la. */
   const toggleActive = async (rule: OfxRule) => {
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('ofx_import_rules').update({ active: !rule.active }).eq('id', rule.id);
     if (error) { toast({ title: 'Erro ao alterar a regra', description: error.message, variant: 'destructive' }); return; }
     toast({ title: rule.active ? 'Regra desativada' : 'Regra ativada' });
@@ -199,7 +200,7 @@ export default function OfxRulesPanel({
   const movePriority = async (rule: OfxRule, delta: number) => {
     const next = Math.min(999, Math.max(1, Number(rule.priority ?? 100) + delta));
     if (next === Number(rule.priority)) return;
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('ofx_import_rules').update({ priority: next }).eq('id', rule.id);
     if (error) { toast({ title: 'Erro ao mudar a prioridade', description: error.message, variant: 'destructive' }); return; }
     onChanged();

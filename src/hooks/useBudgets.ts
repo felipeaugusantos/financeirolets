@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { errorMessage } from '@/lib/utils';
 
 export interface Budget {
   id: string;
@@ -30,8 +31,8 @@ export function useBudgets(year: number, unitId: string | null) {
       const { data, error } = await q;
       if (error) throw error;
       setBudgets((data ?? []) as Budget[]);
-    } catch (err: any) {
-      toast({ title: 'Erro ao buscar orçamento', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Erro ao buscar orçamento', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -75,8 +76,8 @@ export function useBudgets(year: number, unitId: string | null) {
           if (error) throw error;
           setBudgets(prev => [...prev, data as Budget]);
         }
-      } catch (err: any) {
-        toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
+      } catch (err: unknown) {
+        toast({ title: 'Erro ao salvar', description: errorMessage(err), variant: 'destructive' });
       }
     },
     [budgets, year, unitId, toast]
@@ -117,8 +118,8 @@ export function useBudgets(year: number, unitId: string | null) {
 
         toast({ title: 'Orçamento copiado', description: `${rows.length} linhas importadas.` });
         await fetchBudgets();
-      } catch (err: any) {
-        toast({ title: 'Erro ao copiar', description: err.message, variant: 'destructive' });
+      } catch (err: unknown) {
+        toast({ title: 'Erro ao copiar', description: errorMessage(err), variant: 'destructive' });
       } finally {
         setLoading(false);
       }

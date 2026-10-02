@@ -5,6 +5,7 @@ import { CrudTable, ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, FieldConfig } from '@/components/settings/CrudDialog';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { Tables } from '@/integrations/supabase/types';
 
 const columns: ColumnConfig[] = [
   { key: 'name', label: 'Nome' },
@@ -17,7 +18,7 @@ const fields: FieldConfig[] = [
 ];
 
 export default function FrontsSettings({ onBack }: { onBack: () => void }) {
-  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<any>('business_fronts');
+  const { data, loading, create, update, remove, toggleActive } = useSupabaseCrud<Tables<'business_fronts'>>('business_fronts');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
 

@@ -21,11 +21,11 @@ export default function ReconciliationRules() {
 
   const reloadRules = useCallback(async () => {
     // Traz também as inativas: a tela permite ligar/desligar sem excluir.
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('ofx_import_rules')
       .select('*')
       .order('priority');
-    setRules((data ?? []) as OfxRule[]);
+    setRules((data ?? []) as unknown as OfxRule[]);
   }, []);
 
   useEffect(() => {

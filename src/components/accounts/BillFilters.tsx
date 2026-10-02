@@ -119,7 +119,7 @@ export default function BillFilters({ filters, onChange }: BillFiltersProps) {
               <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Todos</SelectItem>
-                {(partners as any[])?.filter((p: any) => p.active).map((p: any) => (
+                {(partners as any[])?.filter((p) => p.active).map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -133,7 +133,7 @@ export default function BillFilters({ filters, onChange }: BillFiltersProps) {
               <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Todas</SelectItem>
-                {(units as any[])?.filter((u: any) => u.active).map((u: any) => (
+                {(units as any[])?.filter((u) => u.active).map((u) => (
                   <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                 ))}
               </SelectContent>

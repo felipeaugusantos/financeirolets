@@ -33,12 +33,12 @@ export function FilterPresets<T>({ storageKey, currentFilters, onApply }: Props<
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) setPresets(JSON.parse(raw));
-    } catch {}
+    } catch { /* localStorage indisponível */ }
   }, [storageKey]);
 
   const persist = (list: FilterPreset<T>[]) => {
     setPresets(list);
-    try { localStorage.setItem(storageKey, JSON.stringify(list)); } catch {}
+    try { localStorage.setItem(storageKey, JSON.stringify(list)); } catch { /* localStorage indisponível */ }
   };
 
   const handleSave = () => {

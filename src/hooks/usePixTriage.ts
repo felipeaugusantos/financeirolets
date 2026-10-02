@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PixSuggestion, PixTx, detectTransferPairs, readNatureTag, suggestNature } from '@/lib/pixTriage';
+import { errorMessage } from '@/lib/utils';
 
 /**
  * Carrega os PIX que precisam de triagem de natureza (somente leitura).
@@ -52,17 +53,17 @@ export function usePixTriage(range: { from: string; to: string }, term = 'Martin
         supabase.from('units').select('id, name'),
         supabase.from('categories').select('id, name'),
       ]);
-      setAccountNameById(new Map((accs ?? []).map((a: any) => [a.id, a.name])));
-      setUnitNameById(new Map((us ?? []).map((u: any) => [u.id, u.name])));
-      setCategoryNameById(new Map((cats ?? []).map((c: any) => [c.id, c.name])));
+      setAccountNameById(new Map((accs ?? []).map((a) => [a.id, a.name])));
+      setUnitNameById(new Map((us ?? []).map((u) => [u.id, u.name])));
+      setCategoryNameById(new Map((cats ?? []).map((c) => [c.id, c.name])));
       setCandidates(
-        (pool ?? []).map((t: any) => ({ ...t, net_amount: Number(t.net_amount) || 0 })) as PixTx[]
+        (pool ?? []).map((t) => ({ ...t, net_amount: Number(t.net_amount) || 0 })) as PixTx[]
       );
       setRows(
-        (data ?? []).map((t: any) => ({ ...t, net_amount: Number(t.net_amount) || 0 })) as PixTx[]
+        (data ?? []).map((t) => ({ ...t, net_amount: Number(t.net_amount) || 0 })) as PixTx[]
       );
-    } catch (e: any) {
-      toast({ title: 'Erro ao carregar PIX', description: e.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      toast({ title: 'Erro ao carregar PIX', description: errorMessage(e), variant: 'destructive' });
       setRows([]);
     } finally {
       setLoading(false);

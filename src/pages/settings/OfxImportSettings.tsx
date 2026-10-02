@@ -56,6 +56,9 @@ const basisLabel: Record<string, string> = {
   bruto: 'valor bruto',
 };
 
+// Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15).
+const SHOW_SUGGESTED_RULES = false;
+
 export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -289,7 +292,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const toggle = (id: string) =>
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
@@ -772,7 +775,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       )}
 
       {/* Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15). */}
-      {false && accountId && <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />}
+      {SHOW_SUGGESTED_RULES && accountId && <SuggestedRulesPanel enriched={enriched} onCreateRule={setRuleSeed} />}
 
       {accountId && view === 'lista' && (
         <DuplicatePairingPanel groups={duplicateGroups} />
@@ -1148,7 +1151,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
               )}
               <div className="space-y-1.5">
                 <Label>Descrição</Label>
-                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f: any) => ({ ...f, description: ev.target.value }))} />
+                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f: Record<string, unknown>) => ({ ...f, description: ev.target.value }))} />
               </div>
               {([
                 ['category_id', 'Categoria', options.categories.filter(c =>
@@ -1161,12 +1164,12 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   <Label>{label}</Label>
                   <Select
                     value={createForm[key] ?? NONE}
-                    onValueChange={v => setCreateForm((f: any) => ({ ...f, [key]: v === NONE ? null : v }))}
+                    onValueChange={v => setCreateForm((f: Record<string, unknown>) => ({ ...f, [key]: v === NONE ? null : v }))}
                   >
                     <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
                     <SelectContent className="max-h-64">
                       <SelectItem value={NONE}>Nenhuma</SelectItem>
-                      {list.map((o: any) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                      {list.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

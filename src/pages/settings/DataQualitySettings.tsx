@@ -151,7 +151,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
   const toggle = (block: string, id: string) =>
     setSel((p) => {
       const s = new Set(p[block] ?? []);
-      s.has(id) ? s.delete(id) : s.add(id);
+      if (s.has(id)) s.delete(id); else s.add(id);
       return { ...p, [block]: s };
     });
   const setAll = (block: string, ids: string[], on: boolean) =>
@@ -332,7 +332,7 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Situação da conferência</Label>
-            <Select value={reviewFilter} onValueChange={(v: any) => setReviewFilter(v)}>
+            <Select value={reviewFilter} onValueChange={(v) => setReviewFilter(v as ReviewStatus | 'todos')}>
               <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="pendente" className="text-xs">Pendente ({reviewCounts.pendente})</SelectItem>

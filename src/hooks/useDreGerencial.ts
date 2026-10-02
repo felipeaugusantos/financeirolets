@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { toLocalISODate } from '@/lib/utils';
+import { toLocalISODate, errorMessage } from '@/lib/utils';
 import {
   applyDreBase,
   buildAllocationMap,
@@ -105,8 +105,8 @@ function resolveValues(allLines: any[], lineValues: Map<string, number>) {
         return sum + (negative ? -get(ref) : get(ref));
       }, 0);
     } else if (line.is_subtotal) {
-      const children = allLines.filter((c: any) => c.parent_id === line.id);
-      val = children.reduce((s: number, c: any) => s + get(c), 0);
+      const children = allLines.filter((c) => c.parent_id === line.id);
+      val = children.reduce((s: number, c) => s + get(c), 0);
     } else {
       val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
     }
@@ -143,14 +143,14 @@ async function fetchLineValues(
   const { data: transactions, error } = await q;
   if (error) throw error;
 
-  const txIds = (transactions ?? []).map((t: any) => t.id);
+  const txIds = (transactions ?? []).map((t) => t.id);
   let allocMap = new Map<string, AllocationRow[]>();
   if (txIds.length > 0) {
     const { data: allocs } = await supabase
       .from('transaction_allocations')
       .select('transaction_id, unit_id, front_id, allocation_type, percentage, amount')
       .in('transaction_id', txIds);
-    allocMap = buildAllocationMap(allocs as any);
+    allocMap = buildAllocationMap(allocs);
   }
 
   const lineValues = new Map<string, number>();
@@ -158,7 +158,7 @@ async function fetchLineValues(
   let outOfDreCount = 0;
   const missing = new Map<string, { categoryId: string | null; count: number; total: number }>();
 
-  (transactions ?? []).forEach((tx: any) => {
+  (transactions ?? []).forEach((tx) => {
     const total = txValue(tx);
     const share =
       filters.unit_id || filters.front_id
@@ -201,7 +201,7 @@ export function useDreGerencial() {
     setLoading(true);
     setError(null);
     try {
-      const { data: dreLines, error: dreErr } = await (supabase as any)
+      const { data: dreLines, error: dreErr } = await supabase
         .from('dre_lines')
         .select('*')
         .eq('active', true)
@@ -209,21 +209,21 @@ export function useDreGerencial() {
         .order('sort_order');
       if (dreErr) throw dreErr;
 
-      const { data: categories, error: catErr } = await (supabase as any)
+      const { data: categories, error: catErr } = await supabase
         .from('categories')
         .select('id, name, type, dre_line_contabil_id, dre_line_id');
       if (catErr) throw catErr;
 
-      const { data: allDreLines } = await (supabase as any)
+      const { data: allDreLines } = await supabase
         .from('dre_lines')
         .select('id, code, name');
       const lineById = new Map<string, { code: string | null; name: string }>();
-      (allDreLines ?? []).forEach((l: any) => lineById.set(l.id, { code: l.code, name: l.name }));
+      (allDreLines ?? []).forEach((l) => lineById.set(l.id, { code: l.code, name: l.name }));
 
       const allLinesRaw = (dreLines ?? []) as any[];
       /** Linha contábil por código (C1.02, C6.05, ...) para o vínculo automático. */
       const contabilByCode = new Map<string, string>();
-      allLinesRaw.forEach((l: any) => { if (l.code) contabilByCode.set(l.code, l.id); });
+      allLinesRaw.forEach((l) => { if (l.code) contabilByCode.set(l.code, l.id); });
 
       /**
        * Toda categoria precisa aparecer no DRE Contábil. Quando não há vínculo
@@ -246,7 +246,7 @@ export function useDreGerencial() {
         string,
         { name: string; type: string; gerencialCode: string | null; gerencialName: string | null }
       >();
-      (categories ?? []).forEach((c: any) => {
+      (categories ?? []).forEach((c) => {
         const ger = c.dre_line_id ? lineById.get(c.dre_line_id) : undefined;
         const target = c.dre_line_contabil_id ?? autoContabil(ger?.code ?? null, c.type);
         if (target) catToDre.set(c.id, target);
@@ -325,11 +325,11 @@ export function useDreGerencial() {
           })
           .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
       );
-    } catch (err: any) {
-      setError(err.message ?? 'Erro desconhecido');
+    } catch (err: unknown) {
+      setError(errorMessage(err) ?? 'Erro desconhecido');
       setLines([]);
       setMissingCategories([]);
-      toast({ title: 'Erro ao gerar DRE Gerencial', description: err.message, variant: 'destructive' });
+      toast({ title: 'Erro ao gerar DRE Gerencial', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

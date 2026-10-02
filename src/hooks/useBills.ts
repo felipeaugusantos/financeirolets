@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { todayLocalISO } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
 export interface BillRow {
   id: string;
@@ -71,7 +72,7 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
         unit:units(name)
       `)
       .eq('type', type as any)
-      .in('status', ['pendente', 'agendado'] as any);
+      .in('status', ['pendente', 'agendado'] as Database['public']['Enums']['transaction_status'][]);
 
     if (filters?.dateFrom) query = query.gte('due_date', filters.dateFrom);
     if (filters?.dateTo) query = query.lte('due_date', filters.dateTo);
@@ -91,10 +92,10 @@ export function useBills(tab: 'pagar' | 'receber', filters?: BillFilters) {
     const { data: allPending } = await supabase
       .from('transactions')
       .select('type, net_amount, due_date, status')
-      .in('status', ['pendente', 'agendado'] as any);
+      .in('status', ['pendente', 'agendado'] as Database['public']['Enums']['transaction_status'][]);
 
-    let s: BillSummary = { totalPagar: 0, totalReceber: 0, vencidasPagar: 0, vencidasReceber: 0, vencendoHoje: 0 };
-    (allPending ?? []).forEach((tx: any) => {
+    const s: BillSummary = { totalPagar: 0, totalReceber: 0, vencidasPagar: 0, vencidasReceber: 0, vencendoHoje: 0 };
+    (allPending ?? []).forEach((tx) => {
       const val = Number(tx.net_amount) || 0;
       const overdue = tx.due_date && tx.due_date < today;
       const dueToday = tx.due_date === today;

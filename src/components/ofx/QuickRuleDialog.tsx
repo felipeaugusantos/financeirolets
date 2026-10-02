@@ -57,7 +57,7 @@ export default function QuickRuleDialog({
       return;
     }
     setSaving(true);
-    const { error: err } = await (supabase as any).from('ofx_import_rules').insert({
+    const { error: err } = await supabase.from('ofx_import_rules').insert({
       pattern: text,
       match_type: 'contains',
       applies_to: seed?.appliesTo ?? 'ambos',

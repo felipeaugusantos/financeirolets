@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useKaikin, KaikinMessage, KaikinPageContext } from '@/components/kaikin/KaikinProvider';
 import { useKaikinHistory } from '@/hooks/useKaikinHistory';
+import { errorMessage } from '@/lib/utils';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kaikin`;
 
@@ -82,9 +83,9 @@ export function useKaikinStream() {
           }
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Kaikin stream error', e);
-      toast({ title: 'Erro de conexão', description: e?.message ?? 'falha desconhecida', variant: 'destructive' });
+      toast({ title: 'Erro de conexão', description: errorMessage(e) ?? 'falha desconhecida', variant: 'destructive' });
       patchLastAssistant('_Erro de conexão._');
     } finally {
       if (answer.trim()) void save({ role: 'assistant', content: answer });

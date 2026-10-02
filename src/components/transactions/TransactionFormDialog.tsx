@@ -27,6 +27,7 @@ import {
   CATEGORY_HELP,
   validateCategoryRules,
 } from '@/lib/categoryRules';
+import type { Tables } from '@/integrations/supabase/types';
 
 interface Props {
   open: boolean;
@@ -74,11 +75,11 @@ function DatePickerField({ label, value, onChange }: { label: string; value?: Da
 }
 
 export default function TransactionFormDialog({ open, onOpenChange, onSave, initialData }: Props) {
-  const { data: categories, create: createCategory, fetch: refetchCategories } = useSupabaseCrud<any>('categories', 'name');
-  const { data: accounts, create: createAccount, fetch: refetchAccounts } = useSupabaseCrud<any>('accounts', 'name');
-  const { data: partners, create: createPartner, fetch: refetchPartners } = useSupabaseCrud<any>('partners', 'name');
-  const { data: units, create: createUnit, fetch: refetchUnits } = useSupabaseCrud<any>('units', 'name');
-  const { data: fronts, create: createFront, fetch: refetchFronts } = useSupabaseCrud<any>('business_fronts', 'name');
+  const { data: categories, create: createCategory, fetch: refetchCategories } = useSupabaseCrud<Tables<'categories'>>('categories', 'name');
+  const { data: accounts, create: createAccount, fetch: refetchAccounts } = useSupabaseCrud<Tables<'accounts'>>('accounts', 'name');
+  const { data: partners, create: createPartner, fetch: refetchPartners } = useSupabaseCrud<Tables<'partners'>>('partners', 'name');
+  const { data: units, create: createUnit, fetch: refetchUnits } = useSupabaseCrud<Tables<'units'>>('units', 'name');
+  const { data: fronts, create: createFront, fetch: refetchFronts } = useSupabaseCrud<Tables<'business_fronts'>>('business_fronts', 'name');
 
   const [type, setType] = useState<'receita' | 'despesa'>('despesa');
   const [description, setDescription] = useState('');
@@ -139,7 +140,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
           .eq('transaction_id', initialData.id)
           .then(({ data: allocs }) => {
             if (allocs && allocs.length > 0) {
-              setAllocations(allocs.map((a: any) => ({
+              setAllocations(allocs.map((a) => ({
                 unit_id: a.unit_id || undefined,
                 front_id: a.front_id || undefined,
                 allocation_type: a.allocation_type || 'percentual',
@@ -190,18 +191,18 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   // Categorias legadas somem do seletor de lançamentos novos, mas continuam visíveis
   // quando o lançamento em edição já usa uma delas (para não alterar o histórico).
   const filteredCategories = categories.filter(
-    (c: any) =>
+    (c) =>
       c.active &&
       c.type === type &&
       (!isLegacyCategory(c.id) || c.id === initialData?.category_id)
   );
-  const activeAccounts = accounts.filter((a: any) => a.active);
-  const activePartners = partners.filter((p: any) => p.active);
-  const activeUnits = units.filter((u: any) => u.active);
-  const activeFronts = fronts.filter((f: any) => f.active);
+  const activeAccounts = accounts.filter((a) => a.active);
+  const activePartners = partners.filter((p) => p.active);
+  const activeUnits = units.filter((u) => u.active);
+  const activeFronts = fronts.filter((f) => f.active);
 
   const unitCodeById = new Map<string, string | null>(
-    units.map((u: any) => [u.id, u.code ?? null])
+    units.map((u) => [u.id, u.code ?? null])
   );
   const { errors: ruleErrors, warnings: ruleWarnings } = validateCategoryRules({
     categoryId: categoryId || undefined,
@@ -229,7 +230,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setAllocations(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const updateAllocation = (idx: number, field: string, value: any) => {
+  const updateAllocation = (idx: number, field: string, value: string | number | undefined) => {
     setAllocations(prev => prev.map((a, i) => i === idx ? { ...a, [field]: value } : a));
   };
 
@@ -414,7 +415,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 <SelectWithAdd
                   value={categoryId}
                   onValueChange={setCategoryId}
-                  options={filteredCategories.map((c: any) => ({ id: c.id, name: c.name }))}
+                  options={filteredCategories.map((c) => ({ id: c.id, name: c.name }))}
                   noneLabel="Nenhuma"
                   addLabel="+ Nova Categoria"
                   dialogTitle="Nova Categoria"
@@ -433,7 +434,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 <SelectWithAdd
                   value={accountId}
                   onValueChange={setAccountId}
-                  options={activeAccounts.map((a: any) => ({ id: a.id, name: a.name }))}
+                  options={activeAccounts.map((a) => ({ id: a.id, name: a.name }))}
                   noneLabel="Nenhuma"
                   addLabel="+ Nova Conta"
                   dialogTitle="Nova Conta"
@@ -457,7 +458,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 <SelectWithAdd
                   value={partnerId}
                   onValueChange={setPartnerId}
-                  options={activePartners.map((p: any) => ({ id: p.id, name: p.name }))}
+                  options={activePartners.map((p) => ({ id: p.id, name: p.name }))}
                   noneLabel="Nenhum"
                   addLabel="+ Novo Parceiro"
                   dialogTitle="Novo Parceiro"
@@ -465,7 +466,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                     { value: 'fornecedor', label: 'Fornecedor' }, { value: 'cliente', label: 'Cliente' }, { value: 'ambos', label: 'Ambos' },
                   ]}]}
                   onAdd={async (d) => {
-                    const id = await createPartner({ name: d.name, type: d.partner_type || 'fornecedor', active: true });
+                    const id = await createPartner({ name: d.name, type: (d.partner_type || 'fornecedor') as Tables<'partners'>['type'], active: true });
                     if (id) await refetchPartners();
                     return id || null;
                   }}
@@ -478,7 +479,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 <SelectWithAdd
                   value={unitId}
                   onValueChange={setUnitId}
-                  options={activeUnits.map((u: any) => ({ id: u.id, name: u.name }))}
+                  options={activeUnits.map((u) => ({ id: u.id, name: u.name }))}
                   noneLabel="Nenhuma"
                   addLabel="+ Nova Unidade"
                   dialogTitle="Nova Unidade"
@@ -494,7 +495,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 <SelectWithAdd
                   value={frontId}
                   onValueChange={setFrontId}
-                  options={activeFronts.map((f: any) => ({ id: f.id, name: f.name }))}
+                  options={activeFronts.map((f) => ({ id: f.id, name: f.name }))}
                   noneLabel="Nenhuma"
                   addLabel="+ Nova Frente"
                   dialogTitle="Nova Frente"
@@ -556,7 +557,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Frequência</Label>
-                      <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as any)}>
+                      <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as 'semanal' | 'mensal' | 'anual')}>
                         <SelectTrigger className="rounded-xl bg-card border-border"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="semanal">Semanal</SelectItem>
@@ -628,7 +629,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                           <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue placeholder="—" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">—</SelectItem>
-                            {units.filter((u: any) => u.active).map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                            {units.filter((u) => u.active).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -638,7 +639,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                           <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue placeholder="—" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">—</SelectItem>
-                            {fronts.filter((f: any) => f.active).map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                            {fronts.filter((f) => f.active).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>

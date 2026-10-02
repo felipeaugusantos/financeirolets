@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { useNavigate } from 'react-router-dom';
+import type { Tables } from '@/integrations/supabase/types';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -281,8 +282,8 @@ export default function Dashboard() {
   const [customTo, setCustomTo] = useState<string | undefined>();
   const [chartMode, setChartMode] = useState<ChartMode>('bars');
 
-  const { data: units } = useSupabaseCrud<any>('units');
-  const { data: fronts } = useSupabaseCrud<any>('business_fronts');
+  const { data: units } = useSupabaseCrud<Tables<'units'>>('units');
+  const { data: fronts } = useSupabaseCrud<Tables<'business_fronts'>>('business_fronts');
 
   const period = useMemo(
     () => resolvePeriod(periodPreset, { from: customFrom, to: customTo }),
@@ -299,8 +300,8 @@ export default function Dashboard() {
   const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
-  const activeUnits = (units as any[])?.filter((u: any) => u.active) ?? [];
-  const activeFronts = (fronts as any[])?.filter((f: any) => f.active) ?? [];
+  const activeUnits = (units as any[])?.filter((u) => u.active) ?? [];
+  const activeFronts = (fronts as any[])?.filter((f) => f.active) ?? [];
 
   const fmtPct = (v: number | null) => v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '';
 
@@ -406,7 +407,7 @@ export default function Dashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas Unidades</SelectItem>
-              {activeUnits.map((u: any) => (
+              {activeUnits.map((u) => (
                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
               ))}
             </SelectContent>
@@ -417,7 +418,7 @@ export default function Dashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas Frentes</SelectItem>
-              {activeFronts.map((f: any) => (
+              {activeFronts.map((f) => (
                 <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
               ))}
             </SelectContent>
