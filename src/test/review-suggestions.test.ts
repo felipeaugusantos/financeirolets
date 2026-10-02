@@ -3,7 +3,8 @@ import {
   classifyDuplicate, looksLikeTest, looksLikeTransfer, suggestCategory, suggestStatus, suggestUnitLabel,
 } from '@/lib/reviewSuggestions';
 
-const tx = (o: Partial<any> = {}) => ({
+type Tx = Parameters<typeof suggestUnitLabel>[0];
+const tx = (o: Partial<Tx> = {}): Tx => ({
   id: o.id || 'a', description: o.description ?? 'x', type: o.type ?? 'despesa', status: o.status ?? 'pago',
   net_amount: o.net_amount ?? 100, amount: o.amount ?? 100, competence_date: '2026-07-01',
   due_date: null, payment_date: null, category_id: null, unit_id: o.unit_id ?? null,
@@ -40,7 +41,7 @@ describe('sugestões da conferência', () => {
   });
 
   it('sugere Fábrica apenas para matéria-prima', () => {
-    expect(suggestUnitLabel(tx() as any, 'Matéria-Prima')).toBe('Fábrica');
-    expect(suggestUnitLabel(tx() as any, 'Aluguel')).toBeNull();
+    expect(suggestUnitLabel(tx(), 'Matéria-Prima')).toBe('Fábrica');
+    expect(suggestUnitLabel(tx(), 'Aluguel')).toBeNull();
   });
 });

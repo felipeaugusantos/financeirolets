@@ -96,7 +96,7 @@ export default function ClosedPeriodsSettings({ onBack }: { onBack: () => void }
       if (cancelled) return;
       const rows = data ?? [];
       const result = rows.reduce(
-        (acc, r: any) => acc + (r.type === 'receita' ? Number(r.net_amount) : -Number(r.net_amount)),
+        (acc, r) => acc + (r.type === 'receita' ? Number(r.net_amount) : -Number(r.net_amount)),
         0,
       );
       setPreview({ count: rows.length, result });

@@ -15,7 +15,7 @@ const br = (iso: string) => iso.split('-').reverse().join('/');
 /** Regras de baixo risco: tarifas, antecipações/débito de cartão, telefone, contabilidade etc. */
 const SAFE_RULE = /tarifa|antecipacao|stone .*debito|telefone|contabilidade|rentab|sindicato|odonto/;
 export function isSafeRule(v: EnrichedEntry): boolean {
-  const txt = `${(v as any).ruleLabel ?? ''} ${v.entry.memo ?? ''}`
+  const txt = `${v.ruleLabel ?? ''} ${v.entry.memo ?? ''}`
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return SAFE_RULE.test(txt);
 }

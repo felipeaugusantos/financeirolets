@@ -165,7 +165,10 @@ function TreemapChart({ data }: { data: Array<{ name: string; value: number }> }
   );
 }
 
-function TreemapNode(props: any) {
+/** Props injetadas pelo Recharts via content={<TreemapNode />}. */
+interface TreemapNodeProps { x?: number; y?: number; width?: number; height?: number; name?: string; value?: number; fill?: string }
+
+function TreemapNode(props: TreemapNodeProps) {
   const { x, y, width, height, name, value, fill } = props;
   const showLabel = width > 60 && height > 28;
   const showValue = width > 80 && height > 44;

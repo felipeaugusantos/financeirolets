@@ -14,7 +14,7 @@ import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Tables } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 interface Props {
   open: boolean;
@@ -78,7 +78,7 @@ export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props)
     const dateStr = format(date, 'yyyy-MM-dd');
     const descBase = `${bandeira} ${MODALIDADES.find(m => m.value === modalidade)?.label || ''}`.trim();
 
-    const rows = [
+    const rows: TablesInsert<'transactions'>[] = [
       // 1) Receita bruta: entra no DRE, NÃO afeta caixa
       {
         type: 'receita' as const,
@@ -121,7 +121,7 @@ export default function CardSaleDialog({ open, onOpenChange, onCreated }: Props)
       },
     ];
 
-    const { error } = await supabase.from('transactions').insert(rows as any);
+    const { error } = await supabase.from('transactions').insert(rows);
     setSaving(false);
     if (error) {
       toast({ title: 'Erro ao registrar venda', description: error.message, variant: 'destructive' });

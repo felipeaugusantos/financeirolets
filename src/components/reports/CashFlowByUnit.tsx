@@ -32,7 +32,7 @@ const monthLabel = (m: string) => {
 };
 const nowMonth = () => new Date().toISOString().slice(0, 7);
 
-async function fetchAll<T>(build: (from: number, to: number) => any): Promise<T[]> {
+async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await build(from, from + 999);

@@ -21,6 +21,7 @@ import {
   type AllocationRow,
 } from '@/lib/finance';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
+import type { Tables } from '@/integrations/supabase/types';
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -185,7 +186,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       // 8. Compute values per column with subtotals
       const computedValues = new Map<string, Map<string, number>>();
 
-      const getLineValue = (line: any, colId: string): number => {
+      const getLineValue = (line: Tables<'dre_lines'>, colId: string): number => {
         const key = `${line.id}__${colId}`;
         if (computedValues.has(line.id) && computedValues.get(line.id)!.has(colId)) {
           return computedValues.get(line.id)!.get(colId)!;

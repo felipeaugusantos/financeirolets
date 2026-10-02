@@ -42,14 +42,14 @@ const PROTECTED_TABLES = [
 describe("RLS — acesso anônimo deve ser bloqueado", () => {
   for (const table of PROTECTED_TABLES) {
     it(`SELECT em ${table} não retorna linhas para anon`, async () => {
-      const { data, error } = await anon.from(table as any).select("*").limit(1);
+      const { data, error } = await anon.from(table).select("*").limit(1);
       // Aceita: erro de permissão OU array vazio (RLS filtra tudo)
       const blocked = !!error || (Array.isArray(data) && data.length === 0);
       expect(blocked).toBe(true);
     });
 
     it(`INSERT em ${table} é rejeitado para anon`, async () => {
-      const { error } = await anon.from(table as any).insert({} as any);
+      const { error } = await anon.from(table).insert({});
       expect(error).not.toBeNull();
     });
   }
@@ -58,7 +58,7 @@ describe("RLS — acesso anônimo deve ser bloqueado", () => {
     const { error } = await anon.rpc("has_role", {
       _user_id: "00000000-0000-0000-0000-000000000000",
       _role: "admin",
-    } as any);
+    });
     expect(error).not.toBeNull();
   });
 });

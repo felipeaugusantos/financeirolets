@@ -10,6 +10,7 @@ import {
   txValue,
   type AllocationRow,
 } from '@/lib/finance';
+import type { Tables } from '@/integrations/supabase/types';
 
 /**
  * DRE Gerencial (visão contábil).
@@ -81,13 +82,13 @@ function previousWindow(from: string, to: string) {
  *  - soma dos filhos, para subtotais;
  *  - valor lançado × sinal, para linhas analíticas.
  */
-function resolveValues(allLines: any[], lineValues: Map<string, number>) {
-  const byCode = new Map<string, any>();
+function resolveValues(allLines: Tables<'dre_lines'>[], lineValues: Map<string, number>) {
+  const byCode = new Map<string, Tables<'dre_lines'>>();
   allLines.forEach((l) => { if (l.code) byCode.set(l.code, l); });
   const computed = new Map<string, number>();
   const visiting = new Set<string>();
 
-  const get = (line: any): number => {
+  const get = (line: Tables<'dre_lines'>): number => {
     if (computed.has(line.id)) return computed.get(line.id)!;
     if (visiting.has(line.id)) return 0; // proteção contra fórmula circular
     visiting.add(line.id);

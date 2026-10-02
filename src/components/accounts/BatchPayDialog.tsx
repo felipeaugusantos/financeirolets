@@ -99,7 +99,7 @@ export default function BatchPayDialog({ open, onOpenChange, ids, tab, onDone }:
             <SelectWithAdd
               value={accountId}
               onValueChange={setAccountId}
-              options={(accounts as any[]).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+              options={accounts.filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
               placeholder="Selecione..."
               noneLabel="Selecione..."
               addLabel="+ Nova Conta"
@@ -112,7 +112,7 @@ export default function BatchPayDialog({ open, onOpenChange, ids, tab, onDone }:
                 ],
               }]}
               onAdd={async (d) => {
-                const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true } as any);
+                const id = await createAccount({ name: d.name, type: d.type || 'banco', active: true });
                 return id || null;
               }}
             />

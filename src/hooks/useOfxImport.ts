@@ -23,6 +23,23 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import type { DbTxType, DbTxStatus, DbPaymentMethod } from '@/lib/dbTypes';
 
 
+/** Campos do lançamento criado a partir de uma linha do extrato. */
+export interface TransactionPatch {
+    description: string;
+    category_id: string | null;
+    unit_id: string | null;
+    front_id: string | null;
+    partner_id: string | null;
+    /** Conta do lançamento; por padrão, a conta do extrato. */
+    account_id?: string | null;
+    /** Forma de pagamento (sugerida pelo texto do extrato). */
+    payment_method?: string | null;
+    /** Rateio por unidade/frente. */
+    allocations?: OfxAllocation[];
+    /** Se false, não aplica o rateio da regra (usuário escolheu a unidade manualmente). */
+    useRuleAllocations?: boolean;
+}
+
 /** Busca FITIDs já gravados em lotes (evita o limite de 1.000 do .in()). */
 async function fetchExistingByFitid(accountId: string, fitids: string[], cols: string): Promise<Partial<Tables<'bank_statement_entries'>>[]> {
   const unique = Array.from(new Set(fitids));
@@ -443,21 +460,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   /** Cria o lançamento correspondente a uma linha. Não recarrega nem vincula. */
   const insertTransactionFor = useCallback(async (
     entry: StatementEntry,
-    patch: {
-      description: string;
-      category_id: string | null;
-      unit_id: string | null;
-      front_id: string | null;
-      partner_id: string | null;
-      /** Conta do lançamento; por padrão, a conta do extrato. */
-      account_id?: string | null;
-      /** Forma de pagamento (sugerida pelo texto do extrato). */
-      payment_method?: string | null;
-      /** Rateio por unidade/frente. */
-      allocations?: OfxAllocation[];
-      /** Se false, não aplica o rateio da regra (usuário escolheu a unidade manualmente). */
-      useRuleAllocations?: boolean;
-    }
+    patch: TransactionPatch
   ): Promise<{ id: string } | { error: string }> => {
     const amount = Math.abs(entry.amount);
     const type = entry.amount >= 0 ? 'receita' : 'despesa';

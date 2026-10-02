@@ -304,7 +304,7 @@ export function useReconciliation() {
         console.warn('[useReconciliation] Possível truncamento: 10.000 transações retornadas — números podem estar incompletos.');
       }
 
-      const mapTx = new Map<string, any>();
+      const mapTx = new Map<string, NonNullable<typeof byComp>[number]>();
       (byComp ?? []).forEach((t) => mapTx.set(t.id, t));
       (byPay ?? []).forEach((t) => mapTx.set(t.id, t));
 
@@ -317,10 +317,10 @@ export function useReconciliation() {
       const [cRes, fRes] = await Promise.all([
         catIds.size > 0
           ? supabase.from('categories').select('id, name').in('id', Array.from(catIds))
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
         frontIds.size > 0
           ? supabase.from('business_fronts').select('id, name').in('id', Array.from(frontIds))
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
       const catName = new Map<string, string>(((cRes.data ?? [])).map((c) => [c.id, c.name]));
       const frontName = new Map<string, string>(((fRes.data ?? [])).map((f) => [f.id, f.name]));
