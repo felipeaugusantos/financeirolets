@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Testes (vitest)
+        run: bun run test
+      - name: Build
+        run: bun run build
+
+  # Ainda não bloqueia: há dívida existente (472 `no-explicit-any` e 4 erros de tipo).
+  # Remover `continue-on-error` quando zerar.
+  lint-types:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bunx tsc -p tsconfig.app.json --noEmit
