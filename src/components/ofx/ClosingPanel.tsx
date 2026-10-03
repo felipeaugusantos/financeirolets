@@ -3,6 +3,7 @@ import { CheckCircle2, Scale, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { accountBalanceAt } from '@/lib/finance';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '');
@@ -21,8 +22,8 @@ interface Props {
 
 /**
  * Fechamento da conta: compara o saldo declarado pelo banco no OFX com o saldo
- * calculado pelo sistema (saldo inicial + lançamentos pagos/recebidos até a
- * data). É o que diz se a conta está realmente conciliada.
+ * calculado pelo sistema (saldo inicial + lançamentos pagos/recebidos depois da
+ * data-base e até a data). É o que diz se a conta está realmente conciliada.
  */
 export default function ClosingPanel({
   accountId, accountName, to, ledgerBalance, ledgerBalanceDate, pendentes, pendenteValor,
@@ -40,15 +41,12 @@ export default function ClosingPanel({
           .select('type, amount, net_amount, payment_date, status')
           .eq('account_id', accountId)
           .in('status', ['pago', 'recebido'])
+          .eq('affects_cashflow', true)
           .lte('payment_date', refDate)
           .limit(10000),
       ]);
-      const initial = Number(acc?.initial_balance ?? 0);
-      const movement = (tx ?? []).reduce((s, t) => {
-        const v = Math.abs(Number(t.net_amount ?? t.amount) || 0);
-        return s + (t.type === 'receita' ? v : -v);
-      }, 0);
-      setSystemBalance(initial + movement);
+      // Mesma regra do Dashboard: movimento até a data-base já está no saldo inicial.
+      setSystemBalance(accountBalanceAt(acc, tx ?? [], refDate));
     })();
   }, [accountId, refDate]);
 

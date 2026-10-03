@@ -310,6 +310,40 @@ export function isAfterOpening(
   return tx.payment_date > acc.date;
 }
 
+/** Linha mínima de lançamento para calcular o saldo de uma conta. */
+export interface BalanceTx {
+  type?: string | null;
+  net_amount?: number | string | null;
+  amount?: number | string | null;
+  payment_date?: string | null;
+}
+
+/**
+ * Saldo de UMA conta em `asOf` (YYYY-MM-DD): saldo inicial + movimentos pagos/recebidos
+ * posteriores à data-base e até `asOf`. Mesma regra do Dashboard e do Fluxo de Caixa
+ * (`isAfterOpening`): o movimento NA data-base, ou antes dela, já está embutido no saldo
+ * inicial e não pode ser somado de novo.
+ *
+ * O chamador filtra por conta, status pago/recebido e `affects_cashflow = true`
+ * (a Kaikin, em supabase/functions, replica esta mesma regra).
+ */
+export function accountBalanceAt(
+  opening: Pick<AccountOpeningRow, 'initial_balance' | 'initial_balance_date'> | null | undefined,
+  txs: BalanceTx[],
+  asOf: string
+): number {
+  const initial = Number(opening?.initial_balance) || 0;
+  const base = opening?.initial_balance_date || null;
+  let movement = 0;
+  for (const t of txs) {
+    if (!t.payment_date || t.payment_date > asOf) continue;
+    if (base && t.payment_date <= base) continue;
+    const v = Math.abs(Number(t.net_amount ?? t.amount) || 0);
+    movement += t.type === 'receita' ? v : -v;
+  }
+  return initial + movement;
+}
+
 // ---------------------------------------------------------------------------
 // Identidade de lançamento (prevenção de duplicidade em importações)
 // ---------------------------------------------------------------------------

@@ -202,7 +202,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'account_balances',
-      description: 'Saldo atual de cada conta bancária (saldo inicial + lançamentos pagos/recebidos até a data informada).',
+      description: 'Saldo atual de cada conta bancária (saldo inicial na data-base + lançamentos pagos/recebidos que afetam o caixa, posteriores à data-base e até a data informada).',
       parameters: {
         type: 'object',
         properties: {
@@ -410,10 +410,13 @@ async function runTool(name: string | undefined, args: ToolArgs, supabase: Retur
       const { data: accounts, error: accErr } = await accQ;
       if (accErr) return { error: accErr.message };
 
+      // Mesma regra de src/lib/finance.ts (accountBalanceAt): só lançamentos pagos que afetam o caixa e
+      // posteriores à data-base (o movimento até a data-base já está no saldo inicial).
       let txQ = supabase
         .from('transactions')
         .select('account_id, type, net_amount, payment_date')
         .in('status', ['pago', 'recebido'])
+        .eq('affects_cashflow', true)
         .not('payment_date', 'is', null)
         .lte('payment_date', dateTo)
         .limit(20000);
@@ -425,7 +428,7 @@ async function runTool(name: string | undefined, args: ToolArgs, supabase: Retur
         date_to: dateTo,
         accounts: ((accounts ?? []) as AccountBalanceRow[]).map((a) => {
           const moves = ((txs ?? []) as AccountMoveRow[]).filter(
-            (t) => t.account_id === a.id && (!a.initial_balance_date || t.payment_date >= a.initial_balance_date)
+            (t) => t.account_id === a.id && (!a.initial_balance_date || t.payment_date > a.initial_balance_date)
           );
           const delta = moves.reduce(
             (s: number, t) => s + (t.type === 'receita' ? 1 : -1) * (Number(t.net_amount) || 0),
