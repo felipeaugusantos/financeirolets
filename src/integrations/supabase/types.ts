@@ -1178,6 +1178,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_transaction_from_entries: {
+        Args: {
+          p_allocations?: Json
+          p_entry_ids: string[]
+          p_note?: string
+          p_tx: Json
+        }
+        Returns: string
+      }
       generate_recurring_transactions: { Args: never; Returns: number }
       has_role: {
         Args: {

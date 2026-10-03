@@ -19,7 +19,7 @@ import {
 
 } from '@/lib/ofxMatch';
 import { errorMessage } from '@/lib/utils';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { Json, Tables, TablesInsert } from '@/integrations/supabase/types';
 import type { DbTxType, DbTxStatus, DbPaymentMethod } from '@/lib/dbTypes';
 
 
@@ -440,28 +440,21 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 /** Rateio opcional aplicado ao lançamento criado pela conciliação. */
   // (tipo exportado abaixo do hook)
 
-  const insertAllocations = useCallback(async (
-    transactionId: string,
-    allocations: OfxAllocation[] | undefined,
-  ) => {
-    if (!allocations?.length) return;
-    await supabase.from('transaction_allocations').insert(
-      allocations.map(a => ({
-        transaction_id: transactionId,
-        unit_id: a.unit_id ?? null,
-        front_id: a.front_id ?? null,
-        allocation_type: a.allocation_type,
-        percentage: a.allocation_type === 'percentual' ? a.value : null,
-        amount: a.allocation_type === 'valor' ? a.value : null,
-      })),
-    );
-  }, []);
+  /** Rateio no formato aceito pela função create_transaction_from_entries. */
+  const allocationsPayload = (allocations: OfxAllocation[] | undefined): Json[] =>
+    (allocations ?? []).map(a => ({
+      unit_id: a.unit_id ?? null,
+      front_id: a.front_id ?? null,
+      allocation_type: a.allocation_type,
+      percentage: a.allocation_type === 'percentual' ? a.value : null,
+      amount: a.allocation_type === 'valor' ? a.value : null,
+    }));
 
-  /** Cria o lançamento correspondente a uma linha. Não recarrega nem vincula. */
-  const insertTransactionFor = useCallback(async (
+  /** Monta (sem gravar) o lançamento e o rateio correspondentes a uma linha do extrato. */
+  const buildTransactionFor = useCallback((
     entry: StatementEntry,
     patch: TransactionPatch
-  ): Promise<{ id: string } | { error: string }> => {
+  ): { tx: Json; allocations: Json[] } => {
     const amount = Math.abs(entry.amount);
     const type = entry.amount >= 0 ? 'receita' : 'despesa';
     // Sem rateio informado na tela, vale o rateio definido na regra do extrato.
@@ -476,9 +469,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     const allocations = ruleAllocs.length || patch.unit_id
       ? ruleAllocs
       : categorySplitFor(patch.category_id, patch.account_id ?? entry.account_id);
-    const { data: created, error } = await supabase
-      .from('transactions')
-      .insert({
+    return {
+      tx: {
         type: type as DbTxType,
         description: patch.description || entry.memo || 'Lançamento do extrato',
         amount,
@@ -489,34 +481,60 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         payment_date: entry.posted_at,
         status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
         account_id: patch.account_id ?? entry.account_id,
-        category_id: patch.category_id,
-        unit_id: patch.unit_id,
-        front_id: patch.front_id,
-        partner_id: patch.partner_id,
+        category_id: patch.category_id ?? null,
+        unit_id: patch.unit_id ?? null,
+        front_id: patch.front_id ?? null,
+        partner_id: patch.partner_id ?? null,
         payment_method: (patch.payment_method || null) as DbPaymentMethod | null,
         notes: `Importado do extrato OFX (${entry.source_file ?? 'arquivo'}) — FITID ${entry.fitid}`,
-        created_by: user?.id ?? null,
-      })
-      .select('id')
-      .single();
-    if (error || !created) return { error: error?.message ?? 'Falha ao criar lançamento' };
-    await insertAllocations(created.id, allocations);
-    return { id: created.id };
-  }, [user, insertAllocations, rules, ruleContext, categorySplitFor]);
+      },
+      allocations: allocationsPayload(allocations),
+    };
+  }, [rules, ruleContext, categorySplitFor]);
 
+  /**
+   * Cria o lançamento (com rateio) e liga a(s) linha(s) do extrato NUMA ÚNICA transação do banco
+   * (função create_transaction_from_entries). Se qualquer passo falhar, nada é gravado; e uma
+   * linha já tratada não gera um segundo lançamento numa nova tentativa.
+   */
+  const createLinked = useCallback(async (
+    entryIds: string[],
+    built: { tx: Json; allocations: Json[] },
+    note: string,
+  ): Promise<{ id: string } | { error: string }> => {
+    const { data, error } = await supabase.rpc('create_transaction_from_entries', {
+      p_entry_ids: entryIds,
+      p_tx: built.tx,
+      p_allocations: built.allocations,
+      p_note: note,
+    });
+    if (error || !data) {
+      const msg = error?.message ?? 'Falha ao criar lançamento';
+      if (error?.code === 'PGRST202') {
+        return { error: 'A função create_transaction_from_entries não existe neste banco. Aplique a migração 20261003210000 antes de usar.' };
+      }
+      return {
+        error: msg.startsWith('entry_not_pending')
+          ? 'Esta linha do extrato já foi tratada (ou você não tem permissão). Atualize a tela.'
+          : msg,
+      };
+    }
+    return { id: data };
+  }, []);
 
-  /** Cria o lançamento a partir da linha do extrato e já o vincula. */
+  /** Cria o lançamento a partir da linha do extrato e já o vincula (atômico). */
   const createFromEntry = useCallback(async (
     entry: StatementEntry,
-    patch: Parameters<typeof insertTransactionFor>[1]
+    patch: TransactionPatch
   ) => {
-    const res = await insertTransactionFor(entry, patch);
+    const res = await createLinked([entry.id], buildTransactionFor(entry, patch), 'Criado a partir do extrato');
     if ('error' in res) {
       toast({ title: 'Erro ao criar lançamento', description: res.error, variant: 'destructive' });
       return false;
     }
-    return linkEntry(entry.id, res.id, 'Criado a partir do extrato');
-  }, [insertTransactionFor, linkEntry, toast]);
+    await load();
+    return true;
+  }, [createLinked, buildTransactionFor, load, toast]);
 
   // -------------------------------------------------------------------------
   // Ações em lote — um único recarregamento no fim, com resumo de erros.
@@ -568,17 +586,17 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     })));
   }, [runBatch, updateEntry, decisionStamp, toast]);
 
-  /** Cria e vincula um lançamento para cada linha selecionada. */
+  /** Cria e vincula um lançamento para cada linha selecionada (cada um atômico). */
   const createMany = useCallback((
-    items: { entry: StatementEntry; patch: Parameters<typeof insertTransactionFor>[1] }[]
+    items: { entry: StatementEntry; patch: TransactionPatch }[]
   ) => runBatch('Lançamentos criados', items.map(item => async () => {
-    const res = await insertTransactionFor(item.entry, item.patch);
-    if ('error' in res) return res.error;
-    return updateEntry(item.entry.id, {
-      transaction_id: res.id, status: 'vinculado',
-      match_note: 'Criado a partir do extrato (lote)', ...decisionStamp(),
-    });
-  })), [runBatch, insertTransactionFor, updateEntry, decisionStamp]);
+    const res = await createLinked(
+      [item.entry.id],
+      buildTransactionFor(item.entry, item.patch),
+      'Criado a partir do extrato (lote)',
+    );
+    return 'error' in res ? res.error : null;
+  })), [runBatch, createLinked, buildTransactionFor]);
 
   /**
    * Cria UM único lançamento com o valor total das linhas selecionadas e
@@ -586,7 +604,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
    */
   const createGrouped = useCallback(async (
     items: StatementEntry[],
-    patch: Parameters<typeof insertTransactionFor>[1] & { competence_date?: string }
+    patch: TransactionPatch & { competence_date?: string }
   ) => {
     if (items.length === 0) return { ok: 0, failed: 0 };
     setBatchRunning(true);
@@ -597,66 +615,46 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       ?? items.map(e => e.posted_at).sort()[items.length - 1];
     const files = Array.from(new Set(items.map(e => e.source_file).filter(Boolean)));
 
-    const { data: created, error } = await supabase
-      .from('transactions')
-      .insert({
-        type: type as DbTxType,
-        description: patch.description || 'Lançamento agrupado do extrato',
-        amount,
-        tax_amount: 0,
-        net_amount: amount,
-        competence_date: date,
-        due_date: date,
-        payment_date: date,
-        status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
-        account_id: patch.account_id ?? items[0].account_id,
-        category_id: patch.category_id,
-        unit_id: patch.unit_id,
-        front_id: patch.front_id,
-        partner_id: patch.partner_id,
-        payment_method: (patch.payment_method || null) as DbPaymentMethod | null,
-        notes: `Agrupamento de ${items.length} linha(s) do extrato OFX (${files.join(', ') || 'arquivo'}) — FITIDs ${items.map(e => e.fitid).join(', ')}`,
-        created_by: user?.id ?? null,
-      })
-      .select('id')
-      .single();
-
-
-    if (error || !created) {
-      setBatchRunning(false);
-      toast({ title: 'Erro ao criar lançamento agrupado', description: error?.message, variant: 'destructive' });
-      return { ok: 0, failed: items.length };
-    }
-
-    await insertAllocations(
-      created.id,
-      patch.allocations?.length || patch.unit_id
-        ? patch.allocations
-        : categorySplitFor(patch.category_id, patch.account_id ?? items[0].account_id),
+    const res = await createLinked(
+      items.map(e => e.id),
+      {
+        tx: {
+          type: type as DbTxType,
+          description: patch.description || 'Lançamento agrupado do extrato',
+          amount,
+          tax_amount: 0,
+          net_amount: amount,
+          competence_date: date,
+          due_date: date,
+          payment_date: date,
+          status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
+          account_id: patch.account_id ?? items[0].account_id,
+          category_id: patch.category_id ?? null,
+          unit_id: patch.unit_id ?? null,
+          front_id: patch.front_id ?? null,
+          partner_id: patch.partner_id ?? null,
+          payment_method: (patch.payment_method || null) as DbPaymentMethod | null,
+          notes: `Agrupamento de ${items.length} linha(s) do extrato OFX (${files.join(', ') || 'arquivo'}) — FITIDs ${items.map(e => e.fitid).join(', ')}`,
+        },
+        allocations: allocationsPayload(
+          patch.allocations?.length || patch.unit_id
+            ? patch.allocations
+            : categorySplitFor(patch.category_id, patch.account_id ?? items[0].account_id),
+        ),
+      },
+      `Criado a partir do extrato (agrupado: ${items.length} linhas)`,
     );
 
-
-
-    let ok = 0;
-    const failures: string[] = [];
-    for (const e of items) {
-      const err = await updateEntry(e.id, {
-        transaction_id: created.id,
-        status: 'vinculado',
-        match_note: `Criado a partir do extrato (agrupado: ${items.length} linhas)`,
-        ...decisionStamp(),
-      });
-      if (err) failures.push(err); else ok++;
+    if ('error' in res) {
+      setBatchRunning(false);
+      toast({ title: 'Erro ao criar lançamento agrupado', description: res.error, variant: 'destructive' });
+      return { ok: 0, failed: items.length };
     }
     await load();
     setBatchRunning(false);
-    toast({
-      title: `Lançamento agrupado criado (${ok} linha(s) vinculadas)`,
-      description: failures.length ? `${failures.length} falha(s): ${failures[0]}` : undefined,
-      variant: failures.length ? 'destructive' : undefined,
-    });
-    return { ok, failed: failures.length };
-  }, [updateEntry, decisionStamp, load, toast, user, insertAllocations, categorySplitFor]);
+    toast({ title: `Lançamento agrupado criado (${items.length} linha(s) vinculadas)` });
+    return { ok: items.length, failed: 0 };
+  }, [createLinked, load, toast, categorySplitFor]);
 
   /**
    * Exclui a conciliação de várias linhas: o vínculo é desfeito e a linha volta
