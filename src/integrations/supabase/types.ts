@@ -1178,6 +1178,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_transaction_from_card_entry: { Args: { p_entry_id: string }; Returns: string }
       create_transaction_from_entries: {
         Args: {
           p_allocations?: Json

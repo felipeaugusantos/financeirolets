@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { errorMessage } from '@/lib/utils';
-import type { DbTxType, DbTxStatus, DbPaymentMethod } from '@/lib/dbTypes';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
@@ -198,46 +197,30 @@ export default function CardReconciliation() {
     if (error) toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
   };
 
-  /** Cria o lançamento financeiro da linha e a marca como conciliada. */
+  /**
+   * Cria o lançamento financeiro da linha e a marca como conciliada, NUMA ÚNICA transação do
+   * banco (função create_transaction_from_card_entry). Se a ligação falhar, nada é gravado, e
+   * uma linha já conciliada não gera um segundo lançamento numa nova tentativa.
+   */
   const createFor = async (entry: CardEntry) => {
     if (!entry.unit_id || !entry.category_id) {
       toast({ title: 'Informe unidade e categoria', description: entry.description, variant: 'destructive' });
       return false;
     }
-    const amount = Math.abs(Number(entry.amount));
-    const type = Number(entry.amount) >= 0 ? 'receita' : 'despesa';
-    const { data: created, error } = await supabase
-      .from('transactions')
-      .insert({
-        type: type as DbTxType,
-        description: entry.description,
-        amount,
-        tax_amount: 0,
-        net_amount: amount,
-        competence_date: entry.posted_at,
-        due_date: entry.posted_at,
-        payment_date: entry.posted_at,
-        status: (type === 'receita' ? 'recebido' : 'pago') as DbTxStatus,
-        account_id: entry.account_id,
-        category_id: entry.category_id,
-        unit_id: entry.unit_id,
-        front_id: entry.front_id,
-        payment_method: (entry.payment_method || 'cartao_credito') as DbPaymentMethod | null,
-        notes: `Importado da planilha de cartão (${entry.source_file ?? 'arquivo'})${entry.card_last4 ? ` — final ${entry.card_last4}` : ''}`,
-        created_by: user?.id ?? null,
-      })
-      .select('id')
-      .single();
-    if (error || !created) {
-      toast({ title: 'Erro ao criar lançamento', description: error?.message, variant: 'destructive' });
+    const { error } = await supabase.rpc('create_transaction_from_card_entry', { p_entry_id: entry.id });
+    if (error) {
+      const msg = error.message ?? '';
+      const description =
+        error.code === 'PGRST202'
+          ? 'A função create_transaction_from_card_entry não existe neste banco. Aplique a migração 20261003230000 antes de usar.'
+          : msg.startsWith('entry_not_pending')
+            ? 'Esta linha já foi conciliada (ou você não tem permissão). Atualize a tela.'
+            : msg.startsWith('missing_fields')
+              ? 'Informe unidade e categoria da linha.'
+              : msg;
+      toast({ title: 'Erro ao criar lançamento', description, variant: 'destructive' });
       return false;
     }
-    await supabase.from('card_statement_entries').update({
-      transaction_id: created.id,
-      status: 'conciliado',
-      decided_by: user?.id ?? null,
-      decided_at: new Date().toISOString(),
-    }).eq('id', entry.id);
     return true;
   };
 
@@ -253,7 +236,7 @@ export default function CardReconciliation() {
     setBusy(false);
     setSelected(new Set());
     await load(accountId);
-    toast({ title: `${ok} lançamento(s) criado(s)`, description: ok < list.length ? `${list.length - ok} linha(s) sem unidade/categoria.` : undefined });
+    toast({ title: `${ok} lançamento(s) criado(s)`, description: ok < list.length ? `${list.length - ok} linha(s) não criadas (sem unidade/categoria, já conciliadas ou com erro).` : undefined });
   };
 
   const cards = useMemo(
