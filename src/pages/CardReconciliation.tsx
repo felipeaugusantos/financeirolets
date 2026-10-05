@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { CreditCard, Upload, PlusCircle, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CreditCard, Upload, PlusCircle, Loader2, CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ import { errorMessage } from '@/lib/utils';
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
 const NONE = '__none__';
+const SELECT_CLASS = 'h-8 w-full min-w-[9rem] rounded-md border border-input bg-background px-2 text-xs disabled:opacity-50';
 /** Final de 4 dígitos aparece como •••• 1234; rótulo de bloco ("VISA INFINITY") aparece como está. */
 const cardText = (c: string) => (/^\d{4}$/.test(c) ? `•••• ${c}` : c);
 
@@ -39,6 +40,15 @@ interface CardEntry {
   category_id: string | null;
   payment_method: string | null;
   source_file: string | null;
+}
+
+/** Ajustes do usuário sobre uma linha do pré-lançamento (o que não está aqui vem da planilha). */
+interface DraftEdit {
+  include?: boolean;
+  unit_id?: string | null;
+  front_id?: string | null;
+  category_id?: string | null;
+  payment_method?: TablesInsert<'card_statement_entries'>['payment_method'];
 }
 
 async function sha1(text: string) {
@@ -64,6 +74,11 @@ export default function CardReconciliation() {
   const [cardFilter, setCardFilter] = useState<string>(NONE);
   const [pendingImport, setPendingImport] = useState<{ fileName: string; sheets: CardSheetInput[] } | null>(null);
   const [amountSign, setAmountSign] = useState<AmountSign>('compras-positivas');
+  const [edits, setEdits] = useState<Record<string, DraftEdit>>({});
+  const [existingHashes, setExistingHashes] = useState<Set<string>>(new Set());
+  const [hashes, setHashes] = useState<Record<string, string>>({});
+  const [checked, setChecked] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -139,55 +154,146 @@ export default function CardReconciliation() {
     };
   }, [pendingImport, accountId, amountSign]);
 
-  /** Grava as linhas conferidas. Linhas repetidas de uma importação anterior são ignoradas pelo hash. */
-  const confirmImport = async () => {
+  // Hash de cada linha (chave estável da importação) e quais já existem no banco.
+  useEffect(() => {
+    let cancelled = false;
+    setExistingHashes(new Set());
+    setHashes({});
+    setChecked(false);
+    if (!preview) return;
+    (async () => {
+      const map: Record<string, string> = {};
+      for (const row of preview.rows) map[row.hashKey] = await sha1(row.hashKey);
+      if (cancelled) return;
+      setHashes(map);
+      const all = Object.values(map);
+      const found = new Set<string>();
+      for (let i = 0; i < all.length; i += 200) {
+        const { data } = await supabase
+          .from('card_statement_entries')
+          .select('row_hash')
+          .in('row_hash', all.slice(i, i + 200));
+        for (const r of data ?? []) found.add((r as { row_hash: string }).row_hash);
+      }
+      if (!cancelled) { setExistingHashes(found); setChecked(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [preview]);
+
+  /** Linhas do pré-lançamento: planilha + dicas de categoria/unidade + ajustes do usuário. */
+  const drafts = useMemo(() => {
+    if (!preview) return [];
+    return preview.rows.map(row => {
+      const despesa = row.amount < 0;
+      const cats = categories.filter(c => c.type === (despesa ? 'despesa' : 'receita'));
+      const edit = edits[row.hashKey] ?? {};
+      const hash = hashes[row.hashKey];
+      const exists = !!hash && existingHashes.has(hash);
+      return {
+        row,
+        hash,
+        exists,
+        cats,
+        include: !exists && edit.include !== false,
+        unit_id: edit.unit_id !== undefined ? edit.unit_id : (matchByName(units, row.unitHint)?.id ?? null),
+        front_id: edit.front_id ?? null,
+        category_id: edit.category_id !== undefined ? edit.category_id : (matchByName(cats, row.categoryHint)?.id ?? null),
+        payment_method: edit.payment_method !== undefined
+          ? edit.payment_method
+          : (suggestPaymentMethod(row.description) ?? 'cartao_credito'),
+      };
+    });
+  }, [preview, categories, units, edits, hashes, existingHashes]);
+
+  const setEdit = (key: string, patch: DraftEdit) => setEdits(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  const applyAll = (patch: (d: (typeof drafts)[number]) => DraftEdit | null) =>
+    setEdits(prev => {
+      const next = { ...prev };
+      for (const d of drafts) {
+        if (!d.include) continue;
+        const p = patch(d);
+        if (p) next[d.row.hashKey] = { ...next[d.row.hashKey], ...p };
+      }
+      return next;
+    });
+
+  const included = drafts.filter(d => d.include);
+  const readyToLaunch = included.filter(d => d.unit_id && d.category_id);
+
+  const closeImport = () => { setPendingImport(null); setEdits({}); setProgress(null); };
+
+  /**
+   * Grava as linhas marcadas como pendentes (o hash ignora as já importadas) e, se `launch`,
+   * cria o lançamento de cada uma que tem unidade e categoria. Sem unidade/categoria a linha
+   * fica pendente na lista para ser completada depois.
+   */
+  const confirmImport = async (launch: boolean) => {
     if (!pendingImport || !preview) return;
     setBusy(true);
     try {
-      const payload: TablesInsert<'card_statement_entries'>[] = [];
-      for (const row of preview.rows) {
-        const despesa = row.amount < 0;
-        const unit = matchByName(units, row.unitHint);
-        const category = matchByName(categories.filter(c => c.type === (despesa ? 'despesa' : 'receita')), row.categoryHint);
-        payload.push({
-          account_id: accountId,
-          card_last4: row.card,
-          posted_at: row.posted_at,
-          description: row.description,
-          amount: row.amount,
-          row_hash: await sha1(row.hashKey),
-          source_file: pendingImport.fileName,
-          status: 'pendente',
-          unit_id: unit?.id ?? null,
-          category_id: category?.id ?? null,
-          note: row.note,
-          payment_method: suggestPaymentMethod(row.description) ?? 'cartao_credito',
-          imported_by: user?.id ?? null,
-        });
-      }
+      const payload: TablesInsert<'card_statement_entries'>[] = included.map(d => ({
+        account_id: accountId,
+        card_last4: d.row.card,
+        posted_at: d.row.posted_at,
+        description: d.row.description,
+        amount: d.row.amount,
+        row_hash: d.hash,
+        source_file: pendingImport.fileName,
+        status: 'pendente',
+        unit_id: d.unit_id,
+        front_id: d.front_id,
+        category_id: d.category_id,
+        note: d.row.note,
+        payment_method: d.payment_method,
+        imported_by: user?.id ?? null,
+      }));
 
-      let inserted = 0;
+      const idByHash = new Map<string, string>();
       for (let i = 0; i < payload.length; i += 500) {
         const { data, error } = await supabase
           .from('card_statement_entries')
           .upsert(payload.slice(i, i + 500), { onConflict: 'row_hash', ignoreDuplicates: true })
-          .select('id');
+          .select('id, row_hash');
         if (error) throw error;
-        inserted += data?.length ?? 0;
+        for (const r of (data ?? []) as { id: string; row_hash: string }[]) idByHash.set(r.row_hash, r.id);
       }
-      const jaExistiam = payload.length - inserted;
+      const jaExistiam = payload.length - idByHash.size;
+
+      let lancados = 0;
+      let semDados = 0;
+      let comErro = 0;
+      let primeiroErro = '';
+      if (launch) {
+        const alvo = included.filter(d => d.hash && idByHash.has(d.hash));
+        setProgress({ done: 0, total: alvo.length });
+        for (const [i, d] of alvo.entries()) {
+          if (!d.unit_id || !d.category_id) { semDados++; }
+          else {
+            const err = await launchEntry(idByHash.get(d.hash)!);
+            if (err) { comErro++; primeiroErro ||= err; } else lancados++;
+          }
+          setProgress({ done: i + 1, total: alvo.length });
+        }
+      }
+
+      const guardadas = idByHash.size - lancados;
       toast({
-        title: `${inserted} linha(s) importada(s)`,
-        description: jaExistiam > 0
-          ? `${jaExistiam} já existiam (importação anterior) e foram mantidas como estavam.`
-          : 'Nada vira lançamento sozinho: confira unidade e categoria e crie os lançamentos.',
+        title: launch ? `${lancados} lançamento(s) criado(s)` : `${idByHash.size} linha(s) salva(s) como pendentes`,
+        description: [
+          launch && guardadas > 0 ? `${guardadas} ficaram pendentes na lista` : '',
+          semDados > 0 ? `${semDados} sem unidade/categoria` : '',
+          comErro > 0 ? `${comErro} com erro: ${primeiroErro}` : '',
+          jaExistiam > 0 ? `${jaExistiam} já existiam (importação anterior) e foram mantidas` : '',
+        ].filter(Boolean).join(' · ') || undefined,
+        variant: comErro > 0 ? 'destructive' : undefined,
       });
-      setPendingImport(null);
+      closeImport();
       await load(accountId);
     } catch (err: unknown) {
       toast({ title: 'Erro ao importar planilha', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -202,23 +308,27 @@ export default function CardReconciliation() {
    * banco (função create_transaction_from_card_entry). Se a ligação falhar, nada é gravado, e
    * uma linha já conciliada não gera um segundo lançamento numa nova tentativa.
    */
+  /** Devolve a mensagem de erro (em português) ou null quando o lançamento foi criado. */
+  const launchEntry = async (entryId: string): Promise<string | null> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.rpc as any)('create_transaction_from_card_entry', { p_entry_id: entryId });
+    if (!error) return null;
+    const msg: string = error.message ?? '';
+    if (error.code === 'PGRST202') {
+      return 'A função create_transaction_from_card_entry não existe neste banco. Aplique a migração 20261003230000 antes de usar.';
+    }
+    if (msg.startsWith('entry_not_pending')) return 'Esta linha já foi conciliada (ou você não tem permissão). Atualize a tela.';
+    if (msg.startsWith('missing_fields')) return 'Informe unidade e categoria da linha.';
+    return msg;
+  };
+
   const createFor = async (entry: CardEntry) => {
     if (!entry.unit_id || !entry.category_id) {
       toast({ title: 'Informe unidade e categoria', description: entry.description, variant: 'destructive' });
       return false;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.rpc as any)('create_transaction_from_card_entry', { p_entry_id: entry.id });
-    if (error) {
-      const msg = error.message ?? '';
-      const description =
-        error.code === 'PGRST202'
-          ? 'A função create_transaction_from_card_entry não existe neste banco. Aplique a migração 20261003230000 antes de usar.'
-          : msg.startsWith('entry_not_pending')
-            ? 'Esta linha já foi conciliada (ou você não tem permissão). Atualize a tela.'
-            : msg.startsWith('missing_fields')
-              ? 'Informe unidade e categoria da linha.'
-              : msg;
+    const description = await launchEntry(entry.id);
+    if (description) {
       toast({ title: 'Erro ao criar lançamento', description, variant: 'destructive' });
       return false;
     }
@@ -264,8 +374,8 @@ export default function CardReconciliation() {
             A planilha (.xlsx ou .csv) precisa ter uma linha de cabeçalho com <strong>Data</strong> (ou Dia),{' '}
             <strong>Descrição</strong> (ou Lançamento / O que é) e <strong>Valor</strong>. O cabeçalho pode estar abaixo de
             títulos, e várias tabelas lado a lado são lidas como um cartão cada. Datas sem ano (13 AGO, 05/03) usam o
-            ano atual. Antes de gravar, você confere o resumo. Nada vira lançamento sozinho: você informa unidade e
-            categoria e confirma.
+            ano atual. Antes de gravar, você confere o pré-lançamento na tela: ajusta unidade e categoria e clica em
+            Lançar. Nada é gravado antes disso.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
@@ -419,16 +529,18 @@ export default function CardReconciliation() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!pendingImport} onOpenChange={open => { if (!open && !busy) setPendingImport(null); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <Dialog open={!!pendingImport} onOpenChange={open => { if (!open && !busy) closeImport(); }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Conferir antes de importar</DialogTitle>
-            <DialogDescription>{pendingImport?.fileName}</DialogDescription>
+            <DialogTitle>Pré-lançamento da fatura</DialogTitle>
+            <DialogDescription>
+              {pendingImport?.fileName} — nada foi gravado ainda. Confira, ajuste unidade e categoria e clique em Lançar.
+            </DialogDescription>
           </DialogHeader>
 
           {preview && (
             <div className="space-y-4 text-sm">
-              <div className="space-y-2">
+              <div className="grid gap-2 md:grid-cols-2">
                 {preview.blocks.map((b, i) => {
                   const check = preview.checks[i];
                   const dates = b.rows.map(r => r.posted_at).sort();
@@ -463,37 +575,151 @@ export default function CardReconciliation() {
                   );
                 })}
               </div>
+              {preview.warnings.map(w => <p key={w} className="text-xs text-muted-foreground">{w}</p>)}
 
-              <div className="space-y-1.5">
-                <Label>Na planilha, as compras aparecem como valores…</Label>
-                <Select value={amountSign} onValueChange={v => setAmountSign(v as AmountSign)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="compras-positivas">positivos (padrão de fatura; estornos negativos)</SelectItem>
-                    <SelectItem value="compras-negativas">negativos (créditos positivos)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Compras viram despesa e estornos viram receita. Confira os totais acima: se "compras" e "estornos" estiverem
-                  trocados, mude esta opção.
-                </p>
+              <div className="grid gap-3 md:grid-cols-3 items-end">
+                <div className="space-y-1.5">
+                  <Label>Na planilha, as compras aparecem como valores…</Label>
+                  <Select value={amountSign} onValueChange={v => { setAmountSign(v as AmountSign); setEdits({}); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="compras-positivas">positivos (estornos negativos)</SelectItem>
+                      <SelectItem value="compras-negativas">negativos (créditos positivos)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Unidade para todas as marcadas</Label>
+                  <select
+                    aria-label="Unidade para todas"
+                    className={SELECT_CLASS}
+                    value=""
+                    onChange={e => { const v = e.target.value; if (v) applyAll(() => ({ unit_id: v === NONE ? null : v })); }}
+                  >
+                    <option value="">Aplicar a todas…</option>
+                    <option value={NONE}>Sem unidade</option>
+                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Categoria para todas as marcadas</Label>
+                  <select
+                    aria-label="Categoria para todas"
+                    className={SELECT_CLASS}
+                    value=""
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v) applyAll(d => (d.cats.some(c => c.id === v) ? { category_id: v } : null));
+                    }}
+                  >
+                    <option value="">Aplicar às de mesmo tipo…</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.type})</option>)}
+                  </select>
+                </div>
               </div>
 
-              {preview.rows.some(r => r.categoryHint || r.unitHint) && (
-                <p className="text-xs text-muted-foreground">
-                  A planilha traz categoria e unidade ao lado do valor: quando o nome bate com um cadastro, a linha já
-                  entra preenchida (você ainda pode alterar antes de criar o lançamento).
-                </p>
-              )}
-              {preview.warnings.map(w => <p key={w} className="text-xs text-muted-foreground">{w}</p>)}
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-2 px-2 w-8">
+                        <Checkbox
+                          aria-label="Marcar todas"
+                          checked={drafts.some(d => !d.exists) && drafts.filter(d => !d.exists).every(d => d.include)}
+                          onCheckedChange={v => setEdits(prev => {
+                            const next = { ...prev };
+                            for (const d of drafts) if (!d.exists) next[d.row.hashKey] = { ...next[d.row.hashKey], include: !!v };
+                            return next;
+                          })}
+                        />
+                      </th>
+                      <th className="py-2 px-2 font-medium">Data</th>
+                      <th className="py-2 px-2 font-medium">Descrição</th>
+                      <th className="py-2 px-2 font-medium text-right">Valor</th>
+                      <th className="py-2 px-2 font-medium">Unidade</th>
+                      <th className="py-2 px-2 font-medium">Categoria</th>
+                      <th className="py-2 px-2 font-medium">Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drafts.map(d => {
+                      const key = d.row.hashKey;
+                      const falta = d.include && (!d.unit_id || !d.category_id);
+                      return (
+                        <tr key={key} className={`border-b border-border/60 last:border-0 ${d.exists ? 'opacity-50' : ''}`}>
+                          <td className="py-1.5 px-2">
+                            <Checkbox
+                              disabled={d.exists}
+                              checked={d.include}
+                              onCheckedChange={v => setEdit(key, { include: !!v })}
+                              aria-label={`Incluir ${d.row.description}`}
+                            />
+                          </td>
+                          <td className="py-1.5 px-2 whitespace-nowrap">{br(d.row.posted_at)}</td>
+                          <td className="py-1.5 px-2">
+                            <span className="block truncate max-w-[260px]">{d.row.description}</span>
+                            <span className="text-[10px] text-muted-foreground">{cardText(d.row.card)}</span>
+                          </td>
+                          <td className={`py-1.5 px-2 text-right font-medium whitespace-nowrap ${d.row.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
+                            {brl(d.row.amount)}
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <select
+                              aria-label={`Unidade de ${d.row.description}`}
+                              disabled={!d.include}
+                              className={SELECT_CLASS}
+                              value={d.unit_id ?? NONE}
+                              onChange={e => setEdit(key, { unit_id: e.target.value === NONE ? null : e.target.value })}
+                            >
+                              <option value={NONE}>Sem unidade</option>
+                              {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <select
+                              aria-label={`Categoria de ${d.row.description}`}
+                              disabled={!d.include}
+                              className={SELECT_CLASS}
+                              value={d.category_id ?? NONE}
+                              onChange={e => setEdit(key, { category_id: e.target.value === NONE ? null : e.target.value })}
+                            >
+                              <option value={NONE}>Sem categoria</option>
+                              {d.cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="py-1.5 px-2 whitespace-nowrap">
+                            {d.exists
+                              ? <Badge variant="outline" className="text-[10px]">Já importada</Badge>
+                              : !d.include
+                                ? <Badge variant="outline" className="text-[10px]">Ignorada</Badge>
+                                : falta
+                                  ? <Badge variant="outline" className="text-[10px] text-destructive">Falta unidade/categoria</Badge>
+                                  : <Badge className="text-[10px]">Pronta</Badge>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {included.length} marcada(s) · {readyToLaunch.length} pronta(s) para lançar · total{' '}
+                {brl(included.reduce((t, d) => t + d.row.amount, 0))}. Linhas sem unidade ou categoria ficam
+                pendentes na lista para você completar depois.
+              </p>
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" disabled={busy} onClick={() => setPendingImport(null)}>Cancelar</Button>
-            <Button disabled={busy || !preview || preview.rows.length === 0} onClick={confirmImport} className="gap-1.5">
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              Importar {preview?.rows.length ?? 0} linha(s)
+          <DialogFooter className="gap-2">
+            {!checked && preview && <span className="text-xs text-muted-foreground self-center">Verificando linhas já importadas…</span>}
+            {progress && <span className="text-xs text-muted-foreground self-center">Lançando {progress.done}/{progress.total}…</span>}
+            <Button variant="outline" disabled={busy} onClick={closeImport}>Cancelar</Button>
+            <Button variant="outline" disabled={busy || !checked || included.length === 0} onClick={() => confirmImport(false)}>
+              Salvar como pendentes
+            </Button>
+            <Button disabled={busy || !checked || readyToLaunch.length === 0} onClick={() => confirmImport(true)} className="gap-1.5">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Lançar {readyToLaunch.length} valor(es)
             </Button>
           </DialogFooter>
         </DialogContent>
