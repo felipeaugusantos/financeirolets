@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { CreditCard, Upload, PlusCircle, Loader2 } from 'lucide-react';
+import { CreditCard, Upload, PlusCircle, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -10,13 +10,20 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PAYMENT_METHOD_LABELS, suggestPaymentMethod } from '@/lib/paymentMethod';
+import {
+  parseCardSheets, prepareCardRows, checkBlockTotal, matchByName,
+  type AmountSign, type CardSheetInput,
+} from '@/lib/cardSheet';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { errorMessage } from '@/lib/utils';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
 const NONE = '__none__';
+/** Final de 4 dígitos aparece como •••• 1234; rótulo de bloco ("VISA INFINITY") aparece como está. */
+const cardText = (c: string) => (/^\d{4}$/.test(c) ? `•••• ${c}` : c);
 
 interface CardEntry {
   id: string;
@@ -32,44 +39,6 @@ interface CardEntry {
   category_id: string | null;
   payment_method: string | null;
   source_file: string | null;
-}
-
-/** Data em ISO a partir de célula do Excel (serial, Date ou texto dd/mm/aaaa). */
-function toISODate(value: unknown): string | null {
-  if (value == null || value === '') return null;
-  if (value instanceof Date) {
-    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  }
-  if (typeof value === 'number') {
-    const d = XLSX.SSF.parse_date_code(value);
-    if (!d) return null;
-    return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
-  }
-  const text = String(value).trim();
-  const brMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
-  if (brMatch) {
-    const [, d, m, y] = brMatch;
-    const year = y.length === 2 ? `20${y}` : y;
-    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return isoMatch ? isoMatch[0] : null;
-}
-
-/** Converte "1.234,56" ou "1234.56" em número. */
-function toAmount(value: unknown): number | null {
-  if (value == null || value === '') return null;
-  if (typeof value === 'number') return value;
-  const text = String(value).replace(/[^\d,.-]/g, '');
-  const normalized = text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text;
-  const n = parseFloat(normalized);
-  return Number.isFinite(n) ? n : null;
-}
-
-const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-
-function pickColumn(headers: string[], candidates: string[]) {
-  return headers.find(h => candidates.some(c => norm(h).includes(c)));
 }
 
 async function sha1(text: string) {
@@ -93,6 +62,8 @@ export default function CardReconciliation() {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [cardFilter, setCardFilter] = useState<string>(NONE);
+  const [pendingImport, setPendingImport] = useState<{ fileName: string; sheets: CardSheetInput[] } | null>(null);
+  const [amountSign, setAmountSign] = useState<AmountSign>('compras-positivas');
 
   useEffect(() => {
     (async () => {
@@ -129,6 +100,7 @@ export default function CardReconciliation() {
 
   useEffect(() => { load(accountId); }, [accountId, load]);
 
+  /** Lê a planilha e abre a conferência; nada é gravado antes de o usuário confirmar. */
   const handleFile = async (file: File) => {
     if (!accountId) {
       toast({ title: 'Escolha a conta antes de importar', variant: 'destructive' });
@@ -137,57 +109,85 @@ export default function CardReconciliation() {
     setBusy(true);
     try {
       const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-      if (rows.length === 0) throw new Error('A planilha está vazia.');
-
-      const headers = Object.keys(rows[0]);
-      const colDate = pickColumn(headers, ['data', 'date', 'venda']);
-      const colDesc = pickColumn(headers, ['descricao', 'historico', 'estabelecimento', 'description']);
-      const colAmount = pickColumn(headers, ['valor', 'amount', 'total']);
-      const colCard = pickColumn(headers, ['final', 'cartao', 'card', 'ultimos']);
-      if (!colDate || !colDesc || !colAmount) {
-        throw new Error('A planilha precisa ter as colunas Data, Descrição e Valor.');
+      const sheets: CardSheetInput[] = wb.SheetNames.map(name => ({
+        name,
+        matrix: XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, defval: '', raw: true }),
+      }));
+      const parsed = parseCardSheets(sheets, new Date());
+      if (parsed.blocks.length === 0) {
+        throw new Error(
+          'Não encontrei a tabela de lançamentos. A planilha precisa de uma linha de cabeçalho com ' +
+          'Data (ou Dia), Descrição (ou Lançamento / O que é) e Valor, seguida das compras.',
+        );
       }
+      setPendingImport({ fileName: file.name, sheets });
+    } catch (err: unknown) {
+      toast({ title: 'Não foi possível ler a planilha', description: errorMessage(err), variant: 'destructive' });
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
 
+  const preview = useMemo(() => {
+    if (!pendingImport) return null;
+    const parsed = parseCardSheets(pendingImport.sheets, new Date());
+    return {
+      ...parsed,
+      rows: prepareCardRows(parsed.blocks, accountId, amountSign),
+      checks: parsed.blocks.map(checkBlockTotal),
+    };
+  }, [pendingImport, accountId, amountSign]);
+
+  /** Grava as linhas conferidas. Linhas repetidas de uma importação anterior são ignoradas pelo hash. */
+  const confirmImport = async () => {
+    if (!pendingImport || !preview) return;
+    setBusy(true);
+    try {
       const payload: TablesInsert<'card_statement_entries'>[] = [];
-      let ignored = 0;
-      for (const r of rows) {
-        const posted_at = toISODate(r[colDate]);
-        const amount = toAmount(r[colAmount]);
-        const description = String(r[colDesc] ?? '').trim();
-        if (!posted_at || amount == null || !description) { ignored++; continue; }
-        const card_last4 = colCard ? String(r[colCard] ?? '').replace(/\D/g, '').slice(-4) || null : null;
+      for (const row of preview.rows) {
+        const despesa = row.amount < 0;
+        const unit = matchByName(units, row.unitHint);
+        const category = matchByName(categories.filter(c => c.type === (despesa ? 'despesa' : 'receita')), row.categoryHint);
         payload.push({
           account_id: accountId,
-          card_last4,
-          posted_at,
-          description,
-          amount,
-          row_hash: await sha1(`${accountId}|${posted_at}|${description}|${amount}|${card_last4 ?? ''}`),
-          source_file: file.name,
+          card_last4: row.card,
+          posted_at: row.posted_at,
+          description: row.description,
+          amount: row.amount,
+          row_hash: await sha1(row.hashKey),
+          source_file: pendingImport.fileName,
           status: 'pendente',
-          payment_method: suggestPaymentMethod(description) ?? 'cartao_credito',
+          unit_id: unit?.id ?? null,
+          category_id: category?.id ?? null,
+          note: row.note,
+          payment_method: suggestPaymentMethod(row.description) ?? 'cartao_credito',
           imported_by: user?.id ?? null,
         });
       }
-      if (payload.length === 0) throw new Error('Nenhuma linha válida encontrada na planilha.');
 
-      const { error } = await supabase
-        .from('card_statement_entries')
-        .upsert(payload, { onConflict: 'row_hash', ignoreDuplicates: true });
-      if (error) throw error;
-
+      let inserted = 0;
+      for (let i = 0; i < payload.length; i += 500) {
+        const { data, error } = await supabase
+          .from('card_statement_entries')
+          .upsert(payload.slice(i, i + 500), { onConflict: 'row_hash', ignoreDuplicates: true })
+          .select('id');
+        if (error) throw error;
+        inserted += data?.length ?? 0;
+      }
+      const jaExistiam = payload.length - inserted;
       toast({
-        title: 'Planilha importada',
-        description: `${payload.length} linha(s) processada(s)${ignored ? ` · ${ignored} ignorada(s) por dados incompletos` : ''}. Linhas repetidas não são duplicadas.`,
+        title: `${inserted} linha(s) importada(s)`,
+        description: jaExistiam > 0
+          ? `${jaExistiam} já existiam (importação anterior) e foram mantidas como estavam.`
+          : 'Nada vira lançamento sozinho: confira unidade e categoria e crie os lançamentos.',
       });
+      setPendingImport(null);
       await load(accountId);
     } catch (err: unknown) {
       toast({ title: 'Erro ao importar planilha', description: errorMessage(err), variant: 'destructive' });
     } finally {
       setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -261,9 +261,11 @@ export default function CardReconciliation() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            A planilha (.xlsx ou .csv) precisa ter as colunas <strong>Data</strong>, <strong>Descrição</strong> e{' '}
-            <strong>Valor</strong>. Se houver uma coluna com o final do cartão, as linhas ficam separadas por cartão.
-            Nada vira lançamento sozinho: você informa unidade e categoria e confirma.
+            A planilha (.xlsx ou .csv) precisa ter uma linha de cabeçalho com <strong>Data</strong> (ou Dia),{' '}
+            <strong>Descrição</strong> (ou Lançamento / O que é) e <strong>Valor</strong>. O cabeçalho pode estar abaixo de
+            títulos, e várias tabelas lado a lado são lidas como um cartão cada. Datas sem ano (13 AGO, 05/03) usam o
+            ano atual. Antes de gravar, você confere o resumo. Nada vira lançamento sozinho: você informa unidade e
+            categoria e confirma.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
@@ -281,7 +283,7 @@ export default function CardReconciliation() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent className="max-h-64">
                   <SelectItem value={NONE}>Todos</SelectItem>
-                  {cards.map(c => <SelectItem key={c} value={c}>•••• {c}</SelectItem>)}
+                  {cards.map(c => <SelectItem key={c} value={c}>{cardText(c)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -359,7 +361,7 @@ export default function CardReconciliation() {
                         <td className="py-1.5 px-2 whitespace-nowrap">{br(e.posted_at)}</td>
                         <td className="py-1.5 px-2">
                           <span className="block truncate max-w-[240px]">{e.description}</span>
-                          {e.card_last4 && <span className="text-[10px] text-muted-foreground">•••• {e.card_last4}</span>}
+                          {e.card_last4 && <span className="text-[10px] text-muted-foreground">{cardText(e.card_last4)}</span>}
                         </td>
                         <td className={`py-1.5 px-2 text-right font-medium ${Number(e.amount) >= 0 ? 'text-secondary' : 'text-destructive'}`}>
                           {brl(Number(e.amount))}
@@ -416,6 +418,86 @@ export default function CardReconciliation() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!pendingImport} onOpenChange={open => { if (!open && !busy) setPendingImport(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Conferir antes de importar</DialogTitle>
+            <DialogDescription>{pendingImport?.fileName}</DialogDescription>
+          </DialogHeader>
+
+          {preview && (
+            <div className="space-y-4 text-sm">
+              <div className="space-y-2">
+                {preview.blocks.map((b, i) => {
+                  const check = preview.checks[i];
+                  const dates = b.rows.map(r => r.posted_at).sort();
+                  const compras = b.rows.filter(r => (amountSign === 'compras-positivas' ? r.raw_amount > 0 : r.raw_amount < 0));
+                  const creditos = b.rows.filter(r => (amountSign === 'compras-positivas' ? r.raw_amount < 0 : r.raw_amount > 0));
+                  const sum = (list: typeof b.rows) => list.reduce((t, r) => t + Math.abs(r.raw_amount), 0);
+                  return (
+                    <div key={i} className="rounded-xl border border-border p-3 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{b.title ?? b.sheet}</span>
+                        <Badge variant="outline" className="text-[11px]">{b.rows.length} linha(s)</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {br(dates[0])} a {br(dates[dates.length - 1])} · compras {brl(sum(compras))} ({compras.length})
+                        {creditos.length > 0 && <> · estornos/créditos {brl(sum(creditos))} ({creditos.length})</>}
+                      </p>
+                      {check.status === 'ok' && (
+                        <p className="text-xs flex items-center gap-1 text-secondary">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> A soma confere com o total da planilha ({brl(check.informed ?? 0)}).
+                        </p>
+                      )}
+                      {check.status === 'diff' && (
+                        <p className="text-xs flex items-center gap-1 text-destructive">
+                          <AlertTriangle className="h-3.5 w-3.5" /> A soma das linhas ({brl(check.sum)}) difere do total da
+                          planilha ({brl(check.informed ?? 0)}). Confira se alguma linha ficou de fora.
+                        </p>
+                      )}
+                      {b.ignored > 0 && (
+                        <p className="text-xs text-muted-foreground">{b.ignored} linha(s) sem data, descrição ou valor foram ignoradas.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Na planilha, as compras aparecem como valores…</Label>
+                <Select value={amountSign} onValueChange={v => setAmountSign(v as AmountSign)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="compras-positivas">positivos (padrão de fatura; estornos negativos)</SelectItem>
+                    <SelectItem value="compras-negativas">negativos (créditos positivos)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Compras viram despesa e estornos viram receita. Confira os totais acima: se "compras" e "estornos" estiverem
+                  trocados, mude esta opção.
+                </p>
+              </div>
+
+              {preview.rows.some(r => r.categoryHint || r.unitHint) && (
+                <p className="text-xs text-muted-foreground">
+                  A planilha traz categoria e unidade ao lado do valor: quando o nome bate com um cadastro, a linha já
+                  entra preenchida (você ainda pode alterar antes de criar o lançamento).
+                </p>
+              )}
+              {preview.warnings.map(w => <p key={w} className="text-xs text-muted-foreground">{w}</p>)}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" disabled={busy} onClick={() => setPendingImport(null)}>Cancelar</Button>
+            <Button disabled={busy || !preview || preview.rows.length === 0} onClick={confirmImport} className="gap-1.5">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              Importar {preview?.rows.length ?? 0} linha(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
