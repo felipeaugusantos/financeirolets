@@ -502,7 +502,9 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     built: { tx: Json; allocations: Json[] },
     note: string,
   ): Promise<{ id: string } | { error: string }> => {
-    const { data, error } = await supabase.rpc('create_transaction_from_entries', {
+    // Função criada por migração própria; ainda não consta nos tipos gerados.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)('create_transaction_from_entries', {
       p_entry_ids: entryIds,
       p_tx: built.tx,
       p_allocations: built.allocations,
@@ -519,7 +521,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
           : msg,
       };
     }
-    return { id: data };
+    return { id: String(data) };
   }, []);
 
   /** Cria o lançamento a partir da linha do extrato e já o vincula (atômico). */
