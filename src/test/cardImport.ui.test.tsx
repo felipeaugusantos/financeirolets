@@ -45,6 +45,8 @@ async function clickButton(name: RegExp | string) {
 
 // --- Supabase falso: devolve cadastros fixos e registra o que o app tenta gravar ---------------------
 const upserts: { rows: Record<string, unknown>[]; options: unknown }[] = [];
+const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
+const rpcMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/integrations/supabase/client', () => {
   const lists: Record<string, unknown[]> = {
@@ -58,7 +60,7 @@ vi.mock('@/integrations/supabase/client', () => {
   };
   const chain = (data: unknown[]) => {
     const q: Record<string, unknown> = {};
-    for (const m of ['select', 'eq', 'order', 'limit']) q[m] = () => q;
+    for (const m of ['select', 'eq', 'in', 'order', 'limit']) q[m] = () => q;
     q.then = (resolve: (v: unknown) => void) => resolve({ data, error: null });
     return q;
   };
@@ -70,13 +72,13 @@ vi.mock('@/integrations/supabase/client', () => {
             ...chain([]),
             upsert: (rows: Record<string, unknown>[], options: unknown) => {
               upserts.push({ rows, options });
-              return { select: () => Promise.resolve({ data: rows.map((_, i) => ({ id: `n${i}` })), error: null }) };
+              return { select: () => Promise.resolve({ data: rows.map((r, i) => ({ id: `n${i}`, row_hash: r.row_hash })), error: null }) };
             },
           };
         }
         return chain(lists[table] ?? []);
       },
-      rpc: vi.fn(),
+      rpc: rpcMock,
     },
   };
 });
@@ -119,6 +121,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   upserts.length = 0;
+  rpcCalls.length = 0;
+  rpcMock.mockReset();
+  rpcMock.mockImplementation((fn: string, args: Record<string, unknown>) => {
+    rpcCalls.push({ fn, args });
+    return Promise.resolve({ data: 'tx', error: null });
+  });
   root?.unmount();
   host?.remove();
   root = null;
@@ -127,20 +135,25 @@ beforeEach(() => {
 });
 
 describe('importação da planilha de cartão (tela)', () => {
-  it('mostra a conferência, só grava depois de confirmar, mantém linhas repetidas e preenche unidade/categoria', async () => {
+  it('mostra o pré-lançamento, só grava ao lançar, mantém linhas repetidas, preenche unidade/categoria e lança só as prontas', async () => {
     const container = await mount(<Page />);
     await waitFor(() => expect(has('Importar planilha')).toBe(true));
 
     await chooseFile(container, workbookFile());
 
     // conferência antes de gravar
-    await waitFor(() => expect(has('Conferir antes de importar')).toBe(true));
+    await waitFor(() => expect(has('Pré-lançamento da fatura')).toBe(true));
     expect(upserts).toHaveLength(0);
     expect(has(/CARTÃO VISA INFINITY/)).toBe(true);
     expect(has(/CARTÃO MASTERCARD BLACK/)).toBe(true);
     expect(has(/A soma confere com o total da planilha/)).toBe(true);
 
-    await clickButton(/Importar 5 linha/);
+    // a linha sem unidade/categoria aparece como incompleta; as outras 4 estão prontas
+    await waitFor(() => expect(has('Falta unidade/categoria')).toBe(true));
+    expect(rpcCalls).toHaveLength(0);
+
+    await waitFor(() => expect(has('Verificando linhas')).toBe(false));
+    await clickButton(/Lançar 4 valor/);
     await waitFor(() => expect(upserts).toHaveLength(1));
 
     const rows = upserts[0].rows;
@@ -154,17 +167,35 @@ describe('importação da planilha de cartão (tela)', () => {
     expect(rows[0]).toMatchObject({ card_last4: 'VISA INFINITY', unit_id: 'u-fab', category_id: 'c-mp', account_id: 'acc1', status: 'pendente' });
     expect(rows[3]).toMatchObject({ card_last4: 'MASTERCARD BLACK', unit_id: 'u-bou', category_id: 'c-mp' });
     expect(rows[4]).toMatchObject({ unit_id: null, category_id: null });
+    // só as 4 linhas completas viram lançamento (RPC atômica); a 5ª fica pendente
+    await waitFor(() => expect(rpcCalls).toHaveLength(4));
+    expect(rpcCalls.map(c => c.fn)).toEqual(Array(4).fill('create_transaction_from_card_entry'));
+    expect(rpcCalls.map(c => c.args.p_entry_id)).toEqual(['n0', 'n1', 'n2', 'n3']);
+    await waitFor(() => expect(has('4 lançamento(s) criado(s)')).toBe(true));
     // a conferência fecha depois de gravar
-    await waitFor(() => expect(has('Conferir antes de importar')).toBe(false));
+    await waitFor(() => expect(has('Pré-lançamento da fatura')).toBe(false));
+  });
+
+  it('"Salvar como pendentes" grava tudo sem criar lançamento', async () => {
+    const container = await mount(<Page />);
+    await waitFor(() => expect(has('Importar planilha')).toBe(true));
+    await chooseFile(container, workbookFile());
+    await waitFor(() => expect(has('Pré-lançamento da fatura')).toBe(true));
+    await waitFor(() => expect(has('Verificando linhas')).toBe(false));
+    await clickButton('Salvar como pendentes');
+    await waitFor(() => expect(upserts).toHaveLength(1));
+    expect(upserts[0].rows).toHaveLength(5);
+    await waitFor(() => expect(has('5 linha(s) salva(s) como pendentes')).toBe(true));
+    expect(rpcCalls).toHaveLength(0);
   });
 
   it('cancelar não grava nada', async () => {
     const container = await mount(<Page />);
     await waitFor(() => expect(has('Importar planilha')).toBe(true));
     await chooseFile(container, workbookFile());
-    await waitFor(() => expect(has('Conferir antes de importar')).toBe(true));
+    await waitFor(() => expect(has('Pré-lançamento da fatura')).toBe(true));
     await clickButton('Cancelar');
-    await waitFor(() => expect(has('Conferir antes de importar')).toBe(false));
+    await waitFor(() => expect(has('Pré-lançamento da fatura')).toBe(false));
     expect(upserts).toHaveLength(0);
   });
 
@@ -179,6 +210,6 @@ describe('importação da planilha de cartão (tela)', () => {
     Object.defineProperty(file, 'arrayBuffer', { value: () => Promise.resolve(bytes) });
     await chooseFile(container, file);
     await waitFor(() => expect(has(/Não encontrei a tabela de lançamentos/)).toBe(true));
-    expect(has('Conferir antes de importar')).toBe(false);
+    expect(has('Pré-lançamento da fatura')).toBe(false);
   });
 });
