@@ -207,7 +207,8 @@ export default function CardReconciliation() {
       toast({ title: 'Informe unidade e categoria', description: entry.description, variant: 'destructive' });
       return false;
     }
-    const { error } = await supabase.rpc('create_transaction_from_card_entry', { p_entry_id: entry.id });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.rpc as any)('create_transaction_from_card_entry', { p_entry_id: entry.id });
     if (error) {
       const msg = error.message ?? '';
       const description =
