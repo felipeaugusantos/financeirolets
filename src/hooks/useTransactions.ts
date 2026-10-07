@@ -5,6 +5,7 @@ import type { Database, Json, Tables, TablesInsert } from '@/integrations/supaba
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FilterableQuery } from '@/lib/finance';
+import { callRpc, transactionRpcError } from '@/lib/rpc';
 import { EMPTY_TOTALS, PAGE_SIZE, sumAllPages, sumTotals, Totals, TotalsRow } from '@/lib/transactionTotals';
 
 type Enums = Database['public']['Enums'];
@@ -259,34 +260,29 @@ export function useTransactions(filters: TransactionFilters = {}) {
       };
     });
 
-    const { data: inserted, error } = await supabase.from('transactions').insert(rows).select();
-    if (error) {
-      toast({ title: 'Erro ao criar lançamento', description: error.message, variant: 'destructive' });
-      return false;
-    }
-
-    // Allocations
+    // Lançamentos e rateio entram NA MESMA transação do banco: se o rateio falhar, nada é criado.
     // Em parcelamento, o rateio em R$ precisa ser dividido pelo nº de parcelas,
     // senão cada parcela recebe o valor cheio e o rateio estoura o lançamento.
-    if (input.allocations && input.allocations.length > 0 && inserted) {
-      const allocs = inserted.flatMap(tx =>
-        input.allocations!.map(a => ({
-          transaction_id: tx.id,
-          unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
-          front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
-          allocation_type: a.allocation_type as Enums['allocation_type'],
-          percentage: a.percentage ?? null,
-          amount: a.amount != null
-            ? Math.round((a.amount / count) * 100) / 100
-            : null,
-        }))
-      );
-      const { error: allocErr } = await supabase.from('transaction_allocations').insert(allocs);
-      if (allocErr) {
-        console.error('Allocation insert error:', allocErr);
-        toast({ title: 'Erro ao salvar rateio', description: allocErr.message, variant: 'destructive' });
-      }
+    const allocations = (input.allocations ?? []).map(a => ({
+      unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
+      front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
+      allocation_type: a.allocation_type,
+      percentage: a.percentage ?? null,
+      amount: a.amount != null ? Math.round((a.amount / count) * 100) / 100 : null,
+    }));
+    const { data: insertedIds, error } = await callRpc<string[]>('create_transactions_with_allocations', {
+      p_rows: rows,
+      p_allocations: allocations,
+    });
+    if (error || !insertedIds || insertedIds.length === 0) {
+      toast({
+        title: 'Erro ao criar lançamento',
+        description: error ? transactionRpcError('create_transactions_with_allocations', error) : 'Nenhum lançamento foi criado.',
+        variant: 'destructive',
+      });
+      return false;
     }
+    const inserted = insertedIds.map(id => ({ id }));
 
     // File uploads
     if (input.files && input.files.length > 0 && inserted) {
@@ -341,56 +337,24 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (input.affects_dre !== undefined) updateData.affects_dre = input.affects_dre;
     if (input.affects_cashflow !== undefined) updateData.affects_cashflow = input.affects_cashflow;
 
-    const { error } = await supabase.from('transactions').update(updateData).eq('id', id);
-    if (error) {
-      toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
-      return false;
-    }
-
-    // Se o valor mudou e o rateio não veio no formulário, os rateios em R$
-    // ficariam desatualizados (sobra caindo em "Sem unidade"). Reajusta na
-    // mesma proporção para o rateio continuar fechando.
-    if (input.allocations === undefined && updateData.net_amount !== undefined) {
-      const prev = data.find((t) => t.id === id);
-      const oldNet = Number(prev?.net_amount) || 0;
-      const newNet = Number(updateData.net_amount) || 0;
-      if (oldNet !== 0 && newNet !== oldNet) {
-        const { data: olds } = await supabase
-          .from('transaction_allocations')
-          .select('id, allocation_type, amount')
-          .eq('transaction_id', id);
-        const factor = newNet / oldNet;
-        await Promise.all(
-          (olds ?? [])
-            .filter((a) => a.allocation_type === 'valor' && a.amount != null)
-            .map((a) =>
-              supabase
-                .from('transaction_allocations')
-                .update({ amount: Math.round(Number(a.amount) * factor * 100) / 100 })
-                .eq('id', a.id)
-            )
-        );
-      }
-    }
-
-    // Update allocations if provided
-    if (input.allocations !== undefined) {
-      await supabase.from('transaction_allocations').delete().eq('transaction_id', id);
-      if (input.allocations && input.allocations.length > 0) {
-        const allocs = input.allocations.map(a => ({
-          transaction_id: id,
+    // Campos, rateio e reajuste do rateio em R$ (quando o valor muda sem rateio novo) numa só transação.
+    const allocations = input.allocations === undefined
+      ? undefined
+      : (input.allocations ?? []).map(a => ({
           unit_id: (a.unit_id && a.unit_id !== '__none__') ? a.unit_id : null,
           front_id: (a.front_id && a.front_id !== '__none__') ? a.front_id : null,
-          allocation_type: a.allocation_type as Enums['allocation_type'],
+          allocation_type: a.allocation_type,
           percentage: a.percentage ?? null,
           amount: a.amount ?? null,
         }));
-        const { error: allocErr } = await supabase.from('transaction_allocations').insert(allocs);
-        if (allocErr) {
-          console.error('Allocation update error:', allocErr);
-          toast({ title: 'Erro ao salvar rateio', description: allocErr.message, variant: 'destructive' });
-        }
-      }
+    const { error } = await callRpc('update_transaction_with_allocations', {
+      p_id: id,
+      p_patch: updateData,
+      ...(allocations !== undefined ? { p_allocations: allocations } : {}),
+    });
+    if (error) {
+      toast({ title: 'Erro ao atualizar', description: transactionRpcError('update_transaction_with_allocations', error), variant: 'destructive' });
+      return false;
     }
     toast({ title: 'Atualizado com sucesso' });
     await fetchData();
@@ -399,23 +363,27 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   const remove = async (id: string, opts?: { action?: 'DELETE' | 'REDO_DELETE' }): Promise<DeletedCapture | null> => {
     const backup = [...data];
-    // Capture row + allocations BEFORE deleting so we can undo
-    const { data: rowFull } = await supabase.from('transactions').select('*').eq('id', id).maybeSingle();
-    const { data: allocs } = await supabase.from('transaction_allocations').select('*').eq('transaction_id', id);
 
     // Optimistic removal from UI
     setData(prev => prev.filter(t => t.id !== id));
 
-    // Delete attachments first (no CASCADE on FK)
-    await supabase.from('attachments').delete().eq('transaction_id', id);
-
-    // Delete transaction and verify it was actually removed
-    const { data: deleted, error } = await supabase.from('transactions').delete().eq('id', id).select();
-    if (error || !deleted || deleted.length === 0) {
-      toast({ title: 'Erro ao excluir', description: error?.message || 'Não foi possível excluir o lançamento. Verifique suas permissões.', variant: 'destructive' });
+    // Lançamento, rateio e anexos saem numa única transação; em mês fechado o banco recusa
+    // tudo e nada é perdido. A função devolve o que removeu, para o desfazer.
+    const { data: removed, error } = await callRpc<{
+      row: DeletedCapture['row'];
+      allocations: DeletedCapture['allocations'];
+    }>('delete_transaction_with_children', { p_id: id });
+    if (error || !removed) {
+      toast({
+        title: 'Erro ao excluir',
+        description: error ? transactionRpcError('delete_transaction_with_children', error) : 'Não foi possível excluir o lançamento. Verifique suas permissões.',
+        variant: 'destructive',
+      });
       setData(backup); // revert
       return null;
     }
+    const rowFull = removed.row;
+    const allocs = removed.allocations;
     // Audit log (DELETE / REDO_DELETE)
     try {
       await supabase.rpc('log_transaction_action', {
