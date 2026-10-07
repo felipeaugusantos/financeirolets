@@ -67,6 +67,11 @@ export interface TransactionFilters {
   front_id?: string;
   partner_id?: string;
   payment_method?: string;
+  /**
+   * Visão do Dashboard: 'caixa' = pagos/recebidos que afetam o caixa, período pela data de pagamento;
+   * 'dashboard' = o mesmo + provisionados que afetam o DRE, período pela competência.
+   */
+  regime?: 'caixa' | 'dashboard';
 }
 
 export interface AllocationInput {
@@ -126,8 +131,18 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (filters.front_id) query = filters.front_id === '__null__' ? query.is('front_id', null) : query.eq('front_id', filters.front_id);
     if (filters.partner_id) query = filters.partner_id === '__null__' ? query.is('partner_id', null) : query.eq('partner_id', filters.partner_id);
     if (filters.payment_method) query = filters.payment_method === '__null__' ? query.is('payment_method', null) : query.eq('payment_method', filters.payment_method as Enums['payment_method']);
-    if (filters.dateFrom) query = query.gte('competence_date', filters.dateFrom);
-    if (filters.dateTo) query = query.lte('competence_date', filters.dateTo);
+    if (filters.regime === 'caixa') {
+      query = query.in('status', ['pago', 'recebido']).eq('affects_cashflow', true);
+      if (filters.dateFrom) query = query.gte('payment_date', filters.dateFrom);
+      if (filters.dateTo) query = query.lte('payment_date', filters.dateTo);
+    } else if (filters.regime === 'dashboard' && filters.dateFrom && filters.dateTo) {
+      const paid = `status.in.(pago,recebido),affects_cashflow.eq.true,payment_date.gte.${filters.dateFrom},payment_date.lte.${filters.dateTo}`;
+      const prov = `status.in.(pendente,agendado),affects_dre.eq.true,competence_date.gte.${filters.dateFrom},competence_date.lte.${filters.dateTo}`;
+      query = query.not('status', 'eq', 'cancelado').or(`and(${paid}),and(${prov})`);
+    } else {
+      if (filters.dateFrom) query = query.gte('competence_date', filters.dateFrom);
+      if (filters.dateTo) query = query.lte('competence_date', filters.dateTo);
+    }
     if (filters.search) {
       const raw = filters.search.trim();
       // Tenta interpretar como valor numérico (pt-BR: "1.234,56" ou "100,50" ou "100.50" ou "100")
@@ -145,7 +160,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
 
     return query as unknown as Q;
-  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.search]);
+  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.regime, filters.search]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
