@@ -28,6 +28,7 @@ import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog
 import AutoPostDialog, { type AutoPostItem } from '@/components/ofx/AutoPostDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { reconciledPercent, matchesEntrySearch } from '@/lib/entrySearch';
+import { createdFromStatement } from '@/lib/ofxUnlink';
 import { Progress } from '@/components/ui/progress';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
@@ -285,9 +286,12 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   /** Desfaz o vínculo e exclui o lançamento (padrão). */
   const confirmUnlinkAndDelete = async () => {
     if (!deleteTarget?.transaction_id) return;
-    const ok = await unlinkAndDeleteEntry(deleteTarget.id, deleteTarget.transaction_id);
+    const target = deleteTarget;
     setDeleteTarget(null);
-    if (ok) toast({ title: 'Lançamento excluído', description: 'A linha voltou para pendente.' });
+    await unlinkAndDeleteEntry(target.id, target.transaction_id!, {
+      createdFromExtract: createdFromStatement(target),
+      matchNote: target.match_note,
+    });
   };
 
   /** Exclui todas as conciliações (linhas vinculadas) do período exibido. */
@@ -1088,10 +1092,19 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                 {br(deleteTarget.posted_at)} · {brl(Number(deleteTarget.amount))} · {deleteTarget.memo}
               </p>
               <p>
-                A linha voltará para <strong>pendente</strong>. Por padrão o lançamento ligado a ela
-                também é <strong>excluído</strong> (com rateio e anexos). Em mês fechado a exclusão é recusada
-                e nada é apagado.
+                A linha voltará para <strong>pendente</strong>. Em mês fechado a exclusão é recusada e nada é alterado.
               </p>
+              {createdFromStatement(deleteTarget) ? (
+                <p className="text-destructive">
+                  Este lançamento foi criado a partir da linha: "Desvincular e excluir" o exclui (com rateio e anexos).
+                  Se outras linhas do extrato estiverem ligadas a ele, ele é mantido até a última ser desvinculada.
+                </p>
+              ) : (
+                <p>
+                  Este lançamento já existia antes da conciliação. "Desvincular e excluir" o exclui também;
+                  "Só desvincular" o mantém.
+                </p>
+              )}
             </div>
           )}
           <DialogFooter className="gap-2">

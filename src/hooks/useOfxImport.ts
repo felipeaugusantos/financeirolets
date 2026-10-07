@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callRpc } from '@/lib/rpc';
+import { unlinkErrorText, unlinkSummaryText, type UnlinkSummary } from '@/lib/ofxUnlink';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveCategorySplit, type CategorySplitRule } from '@/lib/categorySplits';
@@ -430,9 +432,33 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
   /**
    * Desvincula a linha e exclui o lançamento ligado a ela (com rateio e anexos).
-   * Se a exclusão for recusada (mês fechado, permissão), a linha volta a ficar vinculada.
+   *
+   * - Lançamento CRIADO a partir da linha: tudo numa única transação do banco
+   *   (unlink_statement_entries). Se outra linha do extrato/cartão ainda estiver ligada a ele
+   *   (agrupamento), ele é mantido; mês fechado recusa e nada muda.
+   * - Lançamento que já existia (escolha explícita do usuário de excluí-lo): desvincula e exclui;
+   *   se a exclusão for recusada, a linha volta a ficar vinculada com a nota original.
    */
-  const unlinkAndDeleteEntry = useCallback(async (entryId: string, transactionId: string) => {
+  const unlinkAndDeleteEntry = useCallback(async (
+    entryId: string,
+    transactionId: string,
+    opts: { createdFromExtract: boolean; matchNote: string | null },
+  ) => {
+    if (opts.createdFromExtract) {
+      const { data, error } = await callRpc<UnlinkSummary>('unlink_statement_entries', { p_entry_ids: [entryId] });
+      if (error || !data) {
+        toast({
+          title: 'Lançamento não excluído',
+          description: `${error ? unlinkErrorText(error) : 'Falha ao desvincular.'} A conciliação foi mantida.`,
+          variant: 'destructive',
+        });
+        return false;
+      }
+      await load();
+      toast({ title: 'Conciliação desfeita', description: unlinkSummaryText(data) });
+      return true;
+    }
+
     const err = await updateEntry(entryId, {
       transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
     });
@@ -444,7 +470,9 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       error = res.error ?? (res.data?.length ? null : { message: 'Sem permissão para excluir este lançamento.' });
     }
     if (error) {
-      await updateEntry(entryId, { transaction_id: transactionId, status: 'vinculado', ...decisionStamp() });
+      await updateEntry(entryId, {
+        transaction_id: transactionId, status: 'vinculado', match_note: opts.matchNote, ...decisionStamp(),
+      });
       toast({
         title: 'Lançamento não excluído',
         description: `${error.message} A conciliação foi mantida.`,
