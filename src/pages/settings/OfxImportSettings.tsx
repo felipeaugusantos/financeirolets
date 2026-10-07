@@ -26,6 +26,7 @@ import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
 import ClosingPanel from '@/components/ofx/ClosingPanel';
 import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog';
 import AutoPostDialog from '@/components/ofx/AutoPostDialog';
+import { createdFromStatement, unlinkImpact } from '@/lib/ofxUnlink';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
 import { suggestPaymentMethod } from '@/lib/paymentMethod';
@@ -243,12 +244,15 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     await runAutoLinkByDescription();
   };
 
-  /** Exclui a conciliação de uma linha: o vínculo é desfeito, o lançamento fica. */
+  /**
+   * Exclui a conciliação de uma linha: o vínculo é desfeito e, se o lançamento foi criado a partir
+   * dela, ele também é excluído (um lançamento que já existia antes é preservado).
+   */
   const confirmDeleteLink = async () => {
     if (!deleteTarget) return;
-    await unlinkEntry(deleteTarget.id);
+    const target = deleteTarget;
     setDeleteTarget(null);
-    toast({ title: 'Conciliação excluída', description: 'A linha voltou para pendente. O lançamento não foi apagado.' });
+    await unlinkEntry(target.id);
   };
 
   /** Exclui todas as conciliações (linhas vinculadas) do período exibido. */
@@ -737,7 +741,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
           candidates={candidates}
           busy={batchRunning}
           onLink={(entryId, txId, note) => linkEntry(entryId, txId, note)}
-          onUnlink={(entryId) => unlinkEntry(entryId)}
+          onUnlink={(entryId) => {
+            const entry = entries.find(e => e.id === entryId);
+            if (entry) setDeleteTarget(entry);
+          }}
           onIgnore={(ids, reason) => ignoreMany(ids, reason)}
           onCreate={(id) => {
             const item = enriched.find(v => v.entry.id === id);
@@ -797,7 +804,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
           busy={batchRunning}
           onView={(e) => navigate(`/lancamentos?q=${encodeURIComponent(e.memo || '')}`)}
-          onUnlink={(e) => unlinkEntry(e.id)}
+          onUnlink={(e) => (e.status === 'vinculado' ? setDeleteTarget(e) : unlinkEntry(e.id))}
           onDeleteLink={(e) => setDeleteTarget(e)}
           onDeleteAllLinks={() => setDeleteAllOpen(true)}
           onToggle={toggle}
@@ -990,7 +997,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                       {e.ignore_reason ? `Justificativa: ${e.ignore_reason}` : (e.match_note || '—')}
                       {e.decided_at && ` · ${new Date(e.decided_at).toLocaleString('pt-BR')}`}
                     </p>
-                    <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-8" onClick={() => unlinkEntry(e.id)}>
+                    <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-8" onClick={() => (e.status === 'vinculado' ? setDeleteTarget(e) : unlinkEntry(e.id))}>
                       <Link2Off className="h-3.5 w-3.5" /> Reabrir
                     </Button>
                   </div>
@@ -1013,9 +1020,17 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                 {br(deleteTarget.posted_at)} · {brl(Number(deleteTarget.amount))} · {deleteTarget.memo}
               </p>
               <p>
-                O vínculo com o lançamento será desfeito e a linha voltará para <strong>pendente</strong>.
-                O lançamento em si <strong>não</strong> é excluído.
+                O vínculo será desfeito e a linha voltará para <strong>pendente</strong>.
               </p>
+              {createdFromStatement(deleteTarget) ? (
+                <p className="text-destructive">
+                  O lançamento criado a partir desta linha também será <strong>excluído</strong>
+                  {' '}(com rateio e anexos). Se outras linhas do extrato estiverem ligadas a ele, ele é mantido
+                  até a última ser desvinculada. Em mês fechado a exclusão é recusada.
+                </p>
+              ) : (
+                <p>O lançamento vinculado <strong>não</strong> será excluído: ele já existia antes da conciliação.</p>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -1028,10 +1043,23 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading">Excluir todas as conciliações do período</DialogTitle></DialogHeader>
-          <p className="text-xs">
-            {entries.filter(e => e.status === 'vinculado').length} linha(s) vinculada(s) voltarão para pendente.
-            Nenhum lançamento é excluído.
-          </p>
+          {(() => {
+            const impact = unlinkImpact(entries);
+            return (
+              <div className="space-y-2 text-xs">
+                <p>{impact.createdLinks + impact.existingLinks} linha(s) vinculada(s) voltarão para pendente.</p>
+                {impact.createdLinks > 0 && (
+                  <p className="text-destructive">
+                    Os lançamentos criados a partir de {impact.createdLinks} dessas linha(s) serão <strong>excluídos</strong>
+                    {' '}(com rateio e anexos). Se algum mês estiver fechado, nada é alterado.
+                  </p>
+                )}
+                {impact.existingLinks > 0 && (
+                  <p>{impact.existingLinks} linha(s) estão ligadas a lançamentos que já existiam: eles são mantidos.</p>
+                )}
+              </div>
+            );
+          })()}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleteAllOpen(false)}>Cancelar</Button>
             <Button variant="destructive" disabled={batchRunning} onClick={confirmDeleteAllLinks}>Excluir conciliações</Button>
