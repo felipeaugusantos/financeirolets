@@ -530,7 +530,9 @@ export default function CardReconciliation() {
       </Card>
 
       <Dialog open={!!pendingImport} onOpenChange={open => { if (!open && !busy) closeImport(); }}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-6xl flex-col gap-0 overflow-hidden p-0">
+          {/* Cabeçalho fixo: título, resumo por cartão e ajustes em massa. */}
+          <div className="max-h-[50%] shrink-0 space-y-3 overflow-y-auto border-b border-border p-6 pb-4 pr-12 text-sm">
           <DialogHeader>
             <DialogTitle>Pré-lançamento da fatura</DialogTitle>
             <DialogDescription>
@@ -538,8 +540,8 @@ export default function CardReconciliation() {
             </DialogDescription>
           </DialogHeader>
 
-          {preview && (
-            <div className="space-y-4 text-sm">
+            {preview && (
+              <>
               <div className="grid gap-2 md:grid-cols-2">
                 {preview.blocks.map((b, i) => {
                   const check = preview.checks[i];
@@ -618,9 +620,16 @@ export default function CardReconciliation() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-border">
+              </>
+            )}
+          </div>
+
+          {/* Conteúdo: só a lista rola; cabeçalho e rodapé ficam travados. */}
+          {preview && (
+            <div className="min-h-0 flex-1 px-6 py-3 text-sm">
+              <div className="h-full overflow-auto rounded-xl border border-border">
                 <table className="w-full text-xs">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="border-b border-border text-left text-muted-foreground">
                       <th className="py-2 px-2 w-8">
                         <Checkbox
@@ -702,26 +711,31 @@ export default function CardReconciliation() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Rodapé fixo: totais e ações. */}
+          <div className="shrink-0 space-y-2 border-t border-border bg-background px-6 py-3">
+            {preview && (
               <p className="text-xs text-muted-foreground">
                 {included.length} marcada(s) · {readyToLaunch.length} pronta(s) para lançar · total{' '}
                 {brl(included.reduce((t, d) => t + d.row.amount, 0))}. Linhas sem unidade ou categoria ficam
                 pendentes na lista para você completar depois.
               </p>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            {!checked && preview && <span className="text-xs text-muted-foreground self-center">Verificando linhas já importadas…</span>}
-            {progress && <span className="text-xs text-muted-foreground self-center">Lançando {progress.done}/{progress.total}…</span>}
-            <Button variant="outline" disabled={busy} onClick={closeImport}>Cancelar</Button>
-            <Button variant="outline" disabled={busy || !checked || included.length === 0} onClick={() => confirmImport(false)}>
-              Salvar como pendentes
-            </Button>
-            <Button disabled={busy || !checked || readyToLaunch.length === 0} onClick={() => confirmImport(true)} className="gap-1.5">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Lançar {readyToLaunch.length} valor(es)
-            </Button>
-          </DialogFooter>
+            )}
+            <DialogFooter className="gap-2">
+              {!checked && preview && <span className="text-xs text-muted-foreground self-center">Verificando linhas já importadas…</span>}
+              {progress && <span className="text-xs text-muted-foreground self-center">Lançando {progress.done}/{progress.total}…</span>}
+              <Button variant="outline" disabled={busy} onClick={closeImport}>Cancelar</Button>
+              <Button variant="outline" disabled={busy || !checked || included.length === 0} onClick={() => confirmImport(false)}>
+                Salvar como pendentes
+              </Button>
+              <Button disabled={busy || !checked || readyToLaunch.length === 0} onClick={() => confirmImport(true)} className="gap-1.5">
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Lançar {readyToLaunch.length} valor(es)
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
