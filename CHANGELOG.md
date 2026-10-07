@@ -3,6 +3,12 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.4 — 07/10/2026
+- Dashboard calculado no banco (`dashboard_summary`), erros visíveis, filtros na URL, detalhe dos cartões, Resultado e botão Atualizar.
+- Nova tela de pré-lançamento do cartão (cabeçalho/rodapé fixos) e Marcar/Desmarcar todas ao lançar linhas do extrato.
+- Desvincular e excluir remove só lançamentos criados pelo extrato (SQL 10).
+- Salvar/editar/excluir lançamentos de forma atômica (SQL 09).
+
 ## 1.2.3 — 07/10/2026
 - Desvincular conciliação exclui o lançamento (opção de só desvincular).
 - Filtros da conciliação lembrados; seleção limpa ao trocar conta/período.
