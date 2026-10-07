@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { matchesEntrySearch, reconciledPercent } from '@/lib/entrySearch';
 import { Link2, Link2Off, EyeOff, CheckSquare, Square, RotateCcw, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,9 @@ export interface ClassicReconciliationProps {
   onCreate: (entryId: string) => void;
   /** Criar lançamentos para várias linhas do extrato de uma vez. */
   onCreateMany?: (entryIds: string[]) => void;
+  /** Busca controlada pela tela (para ser lembrada ao reabrir). */
+  search?: string;
+  onSearchChange?: (q: string) => void;
 }
 
 /**
@@ -39,13 +43,18 @@ export interface ClassicReconciliationProps {
  */
 export default function ClassicReconciliation({
   accountName, from, to, enriched, candidates, accountId, busy,
-  onLink, onUnlink, onIgnore, onCreate, onCreateMany,
+  onLink, onUnlink, onIgnore, onCreate, onCreateMany, search: searchProp, onSearchChange,
 }: ClassicReconciliationProps) {
   const [tab, setTab] = useState<LeftTab>('nao');
   const [entrySel, setEntrySel] = useState<Set<string>>(new Set());
   const [txSel, setTxSel] = useState<Set<string>>(new Set());
   const [onlySimilar, setOnlySimilar] = useState(true);
-  const [search, setSearch] = useState('');
+  const [localSearch, setLocalSearch] = useState('');
+  const search = searchProp ?? localSearch;
+  const setSearch = onSearchChange ?? setLocalSearch;
+
+  // Troca de conta/período limpa a seleção.
+  useEffect(() => { setEntrySel(new Set()); setTxSel(new Set()); }, [accountId, from, to]);
   const [sortKey, setSortKey] = useState<SortKey>('data');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -67,13 +76,17 @@ export default function ClassicReconciliation({
       if (tab === 'similares') return v.entry.status === 'pendente' && v.suggestions.length > 0;
       return v.entry.status === 'pendente';
     });
-    const q = search.trim().toLowerCase();
-    return q ? base.filter(v => (v.entry.memo || '').toLowerCase().includes(q)) : base;
+    return search.trim()
+      ? base.filter(v => matchesEntrySearch(search, v.entry.memo, Number(v.entry.amount)))
+      : base;
   }, [enriched, tab, search]);
 
+  const progress = useMemo(() => reconciledPercent(enriched.map(v => v.entry)), [enriched]);
+
+  // Só conta o que está visível na aba atual (evita somar seleções "escondidas").
   const selectedEntries = useMemo(
-    () => enriched.filter(v => entrySel.has(v.entry.id)),
-    [enriched, entrySel]
+    () => leftRows.filter(v => entrySel.has(v.entry.id)),
+    [leftRows, entrySel]
   );
   const singleEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
 
@@ -157,7 +170,9 @@ export default function ClassicReconciliation({
           <CardHeader className="bg-muted/40 py-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm font-heading">Extrato bancário — {accountName}</CardTitle>
-              <span className="text-[11px] text-muted-foreground">{br(from)} a {br(to)}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {br(from)} a {br(to)} · <strong className="text-foreground">{progress.pct}% conciliado</strong> ({progress.done}/{progress.total})
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               {([
@@ -178,8 +193,8 @@ export default function ClassicReconciliation({
               <Input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar histórico"
-                className="h-7 w-40 text-[11px] rounded-xl ml-auto"
+                placeholder="Buscar descrição ou valor"
+                className="h-7 w-48 text-[11px] rounded-xl ml-auto"
               />
             </div>
           </CardHeader>
@@ -333,7 +348,10 @@ export default function ClassicReconciliation({
                   {selectedEntries.length > 1 ? `Criar ${selectedEntries.length} lançamentos` : 'Criar lançamento'}
                 </Button>
                 <span className="ml-auto text-muted-foreground">
-                  Total selecionado: <strong className="text-foreground tabular-nums">{brl(totalTxSel)}</strong>
+                  Extrato selecionado: <strong className="text-foreground tabular-nums">{brl(totalEntrySel)}</strong>
+                  {txSel.size > 0 && (
+                    <> · Lançamentos marcados: <strong className="text-foreground tabular-nums">{brl(totalTxSel)}</strong></>
+                  )}
                 </span>
                 {linkHint && (
                   <p className="w-full text-[11px] text-amber-600 dark:text-amber-400">{linkHint}</p>
