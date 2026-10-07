@@ -85,7 +85,7 @@ interface DashboardSummary {
 /** Mensagem em português para os erros de dashboard_summary. */
 export function dashboardRpcError(error: { message: string; code?: string }): string {
   if (error.code === 'PGRST202') {
-    return 'A função dashboard_summary não existe neste banco. Aplique a migração 20261008120000 (scripts/producao/11-dashboard-resumo.sql).';
+    return 'A função dashboard_summary não existe neste banco. Aplique a migração 20261008120000 (rode em ordem as partes de scripts/producao/11-dashboard/, de 11a a 11g).';
   }
   if (error.message.startsWith('invalid_period')) return 'Período inválido: a data inicial deve ser anterior à final.';
   return error.message;

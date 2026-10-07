@@ -18,6 +18,8 @@ logo abaixo; erros `ERROR:` nos casos de falha são o comportamento esperado.
 
 ## Dashboard (SQL 11)
 
+- Os scripts de produção do SQL 11 ficam em `scripts/producao/11-dashboard/` (partes 11a a 11g, rodar em ordem: o SQL Editor do
+  Supabase falha com uma função grande, então cada parte é pequena). A migração é a soma delas.
 - `11-dashboard-resumo.test.sql`: cenário conferido à mão (visão geral, filtro de unidade, provisionados, erros).
 - `dashboard-paridade.ts`: **paridade com a lógica do app em dados aleatórios** (lançamentos, rateios, contas,
   filtros, períodos). Compara a função `dashboard_summary` com um oráculo em TypeScript que usa
