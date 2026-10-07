@@ -121,6 +121,13 @@ describe('useDashboard (resumo calculado no banco)', () => {
     await waitFor(() => expect(api.error).toBeNull());
   });
 
+  it('período invertido é recusado pelo app, sem chamar o banco', async () => {
+    await render({ period: { from: '2026-09-30', to: '2026-09-01' } });
+    await waitFor(() => expect(api.loading).toBe(false));
+    expect(api.error).toMatch(/Período inválido/);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
   it('função ausente no banco orienta a aplicar a migração', async () => {
     h.rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } });
     await render();

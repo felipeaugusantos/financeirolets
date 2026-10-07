@@ -12,7 +12,9 @@
 --  * "contas em atraso" = pendentes/agendados com vencimento anterior a hoje.
 -- A paridade com a lógica do app foi verificada com dados aleatórios (scripts/testes-sql).
 --
--- SECURITY INVOKER: o RLS vale (quem não pode ler lançamentos não recebe números).
+-- SECURITY INVOKER: o RLS vale, quem não pode ler lançamentos não recebe números.
+-- Só tem permissão de execução o papel authenticated (sem login a chamada é recusada).
+-- O período é validado pelo app (data inicial anterior à final).
 -- Idempotente (CREATE OR REPLACE / IF NOT EXISTS).
 
 CREATE INDEX IF NOT EXISTS idx_transaction_allocations_transaction_id
@@ -79,23 +81,8 @@ CREATE OR REPLACE FUNCTION public.dashboard_summary(
   p_include_provisioned boolean DEFAULT false,
   p_today date DEFAULT current_date
 ) RETURNS jsonb
-LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = public
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path = public
 AS $$
-DECLARE
-  v_ps date;                         -- início do período anterior (mesma duração)
-  v_pe date;                         -- fim do período anterior
-  v_filtered boolean := p_unit IS NOT NULL OR p_front IS NOT NULL;
-  v_result jsonb;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Usuário não autenticado' USING ERRCODE = '28000';
-  END IF;
-  IF p_from IS NULL OR p_to IS NULL OR p_to < p_from THEN
-    RAISE EXCEPTION 'invalid_period: informe um período válido' USING ERRCODE = 'P0001';
-  END IF;
-  v_ps := p_from - (p_to - p_from + 1);
-  v_pe := p_from - 1;
-
   WITH
   base AS MATERIALIZED (
     SELECT t.id, t.type, COALESCE(t.net_amount, 0) AS total, t.status, t.payment_date, t.competence_date,
@@ -106,7 +93,7 @@ BEGIN
            (t.affects_dre IS DISTINCT FROM false) AS a_dre
     FROM public.transactions t
     WHERE t.status <> 'cancelado'
-      AND ((t.competence_date BETWEEN v_ps AND p_to) OR (t.payment_date BETWEEN v_ps AND p_to))
+      AND ((t.competence_date BETWEEN (p_from - (p_to - p_from + 1)) AND p_to) OR (t.payment_date BETWEEN (p_from - (p_to - p_from + 1)) AND p_to))
   ),
   valued AS MATERIALIZED (
     SELECT b.*, public.dash_filtered_value(b.id, b.total, b.unit_id, b.front_id, p_unit, p_front) AS val
@@ -116,10 +103,10 @@ BEGIN
     SELECT v.*,
       COALESCE(v.is_paid AND v.a_cash AND v.payment_date BETWEEN p_from AND p_to, false)    AS pip,
       COALESCE(v.is_prov AND v.a_dre AND v.competence_date BETWEEN p_from AND p_to, false)  AS vip,
-      COALESCE(v.is_paid AND v.a_cash AND v.payment_date BETWEEN v_ps AND v_pe, false)      AS pipv,
-      COALESCE(v.is_prov AND v.a_dre AND v.competence_date BETWEEN v_ps AND v_pe, false)    AS vipv
+      COALESCE(v.is_paid AND v.a_cash AND v.payment_date BETWEEN (p_from - (p_to - p_from + 1)) AND (p_from - 1), false)      AS pipv,
+      COALESCE(v.is_prov AND v.a_dre AND v.competence_date BETWEEN (p_from - (p_to - p_from + 1)) AND (p_from - 1), false)    AS vipv
     FROM valued v
-    WHERE NOT (v_filtered AND v.val = 0)
+    WHERE NOT ((p_unit IS NOT NULL OR p_front IS NOT NULL) AND v.val = 0)
   ),
   k AS (
     SELECT
@@ -184,7 +171,6 @@ BEGIN
     FROM rk_parts GROUP BY unit_id
   ),
   pa AS (
-    -- saldo: pagos que afetam o caixa, só os POSTERIORES à data-base da conta (regra isAfterOpening)
     SELECT t.id, t.type, COALESCE(t.net_amount, 0) AS total, t.unit_id, t.front_id
     FROM public.transactions t
     LEFT JOIN public.accounts a ON a.id = t.account_id AND a.active
@@ -208,14 +194,14 @@ BEGIN
     LEFT JOIN public.partners pr ON pr.id = t.partner_id
     WHERE t.status IN ('pendente', 'agendado')
       AND t.due_date IS NOT NULL AND t.due_date <= p_today
-      AND (NOT v_filtered OR public.dash_filtered_value(t.id, COALESCE(t.net_amount, 0), t.unit_id, t.front_id, p_unit, p_front) <> 0)
+      AND (NOT (p_unit IS NOT NULL OR p_front IS NOT NULL) OR public.dash_filtered_value(t.id, COALESCE(t.net_amount, 0), t.unit_id, t.front_id, p_unit, p_front) <> 0)
     ORDER BY t.due_date, t.id
     LIMIT 1000
   )
   SELECT jsonb_build_object(
     'movimentacaoCalculada', (SELECT m FROM mov),
-    'saldoInicialTotal', CASE WHEN v_filtered THEN 0 ELSE (SELECT total FROM op) END,
-    'saldoInicialConfigurado', CASE WHEN v_filtered THEN false ELSE (SELECT configured FROM op) END,
+    'saldoInicialTotal', CASE WHEN (p_unit IS NOT NULL OR p_front IS NOT NULL) THEN 0 ELSE (SELECT total FROM op) END,
+    'saldoInicialConfigurado', CASE WHEN (p_unit IS NOT NULL OR p_front IS NOT NULL) THEN false ELSE (SELECT configured FROM op) END,
     'receitas', k.receitas, 'despesas', k.despesas,
     'receitasProvisionadas', k.receitas_prov, 'despesasProvisionadas', k.despesas_prov,
     'prevReceitas', k.prev_receitas, 'prevDespesas', k.prev_despesas,
@@ -245,11 +231,8 @@ BEGIN
         'id', id, 'description', description, 'net_amount', net_amount, 'due_date', due_date,
         'type', type, 'partner_name', partner_name) ORDER BY id), '[]'::jsonb)
       FROM al WHERE due_date = p_today)
-  ) INTO v_result
-  FROM k;
-
-  RETURN v_result;
-END;
+  )
+  FROM k
 $$;
 
 REVOKE ALL ON FUNCTION public.dash_filtered_value(uuid, numeric, uuid, uuid, uuid, uuid) FROM PUBLIC, anon;

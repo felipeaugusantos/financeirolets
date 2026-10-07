@@ -48,13 +48,13 @@ begin; set local role authenticated; set local request.jwt.claim.sub='11111111-1
 select 'ranking=' || (select string_agg((x->>'unitName') || ':' || (x->>'despesas'), ' | ' order by ord) from jsonb_array_elements(r->'unitRanking') with ordinality t(x,ord)) || ' cat_desp=' || (r->'categoryData'->0->>'value') from (select pg_temp.s(null,null,true) r) q;
 commit;
 
-\echo ===== 4) período inválido, sem login e operador sem papel (esperado: 2 erros e 1 resposta vazia/zero)
-begin; set local role authenticated; set local request.jwt.claim.sub='11111111-1111-1111-1111-111111111111';
-select public.dashboard_summary('2026-09-30','2026-09-01');
-rollback;
-begin; set local role authenticated; set local request.jwt.claim.sub='';
+\echo ===== 4) sem login (papel anon) e período invertido (esperado: permissão negada; período invertido devolve vazio, o app valida antes)
+begin; set local role anon;
 select pg_temp.s();
 rollback;
+begin; set local role authenticated; set local request.jwt.claim.sub='11111111-1111-1111-1111-111111111111';
+select 'invertido: rec=' || (r->>'receitas') || ' meses=' || jsonb_array_length(r->'monthly') from (select public.dashboard_summary('2026-09-30','2026-09-01',null,null,false,'2026-09-15') r) q;
+commit;
 
 \echo ===== 5) período longo: máximo de 24 meses
 begin; set local role authenticated; set local request.jwt.claim.sub='11111111-1111-1111-1111-111111111111';

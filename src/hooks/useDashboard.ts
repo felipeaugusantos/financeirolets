@@ -143,6 +143,7 @@ export function useDashboard(filters?: DashboardFilters) {
       const today = ymd(now);
       const rangeStart = periodFrom || ymd(new Date(now.getFullYear(), now.getMonth(), 1));
       const rangeEnd = periodTo || ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+      if (rangeEnd < rangeStart) throw new Error('Período inválido: a data inicial deve ser anterior à final.');
 
       // Tudo é calculado no banco (dashboard_summary), com as mesmas regras de lib/finance.ts.
       const { data: s, error } = await callRpc<DashboardSummary>('dashboard_summary', {
