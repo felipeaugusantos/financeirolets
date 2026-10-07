@@ -45,6 +45,32 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.4',
+    date: '2026-10-07',
+    summary: 'Dashboard mais rápido e confiável, nova tela de pré-lançamento do cartão e salvamento seguro de lançamentos.',
+    items: [
+      { area: 'Relatórios', kind: 'melhoria', title: 'Dashboard mais rápido e confiável',
+        detail: 'Os números do Dashboard agora vêm calculados de uma vez e batem com os relatórios. Se algo falhar, o sistema avisa em vez de mostrar zeros.',
+        tech: 'Função dashboard_summary (SQL 11a–11g) substitui as consultas paginadas do hook useDashboard; erro PGRST202 orienta aplicar a migração 20261008120000.' },
+      { area: 'Relatórios', kind: 'novidade', title: 'Dashboard com filtros na URL e detalhe dos cartões',
+        detail: 'Período, unidade e frente ficam no endereço da página (dá para compartilhar o link). Clicar num cartão abre os lançamentos que o compõem.',
+        tech: 'useSearchParams em Dashboard.tsx; drill-down para /lancamentos com filtro regime=caixa|dashboard.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'Resultado, variação colorida e botão Atualizar',
+        detail: 'Novo cartão Resultado com margem %, variações verdes/vermelhas, eixo do gráfico compacto e horário da última atualização com botão Atualizar.' },
+      { area: 'Conciliação Bancária', kind: 'novidade', title: 'Nova tela de pré-lançamento do cartão',
+        detail: 'Confira as linhas do cartão antes de lançar, com cabeçalho e rodapé fixos e a lista rolando no meio. Botão Lançar cria os lançamentos conciliados.',
+        tech: 'Funções create_transaction_from_entries / create_transaction_from_card_entry (SQL 07/08).' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Marcar e desmarcar todas ao lançar linhas do extrato',
+        detail: 'Na janela Lançar linhas do extrato há caixa no cabeçalho e botões Marcar todas / Desmarcar todas (linhas com possível duplicidade ficam de fora).' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Desvincular só exclui o que o extrato criou',
+        detail: 'Ao desvincular e excluir, apenas lançamentos criados a partir do extrato são removidos; lançamentos que já existiam são preservados, e meses fechados são respeitados.',
+        tech: 'Função unlink_statement_entries (SQL 10).' },
+      { area: 'Lançamentos', kind: 'correcao', title: 'Salvar e excluir lançamentos sem deixar pela metade',
+        detail: 'Criar, editar e excluir lançamentos (com rateio e parcelas) agora acontece tudo ou nada, evitando lançamentos incompletos.',
+        tech: 'Funções create_transactions_with_allocations, update_transaction_with_allocations, delete_transaction_with_children (SQL 09).' },
+    ],
+  },
+  {
     version: '1.2.3',
     date: '2026-10-07',
     summary: 'Ajustes na conciliação bancária: desvincular exclui o lançamento, busca por valor e revisão editável.',
