@@ -4,37 +4,10 @@ import { act } from 'react';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-type Row = Record<string, unknown>;
-interface Result { data: Row[] | null; error: { message: string } | null }
+const h = vi.hoisted(() => ({ rpc: vi.fn() }));
+vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc: h.rpc } }));
 
-const h = vi.hoisted(() => ({
-  /** Resposta por consulta: decide pelo nome da tabela e pelos métodos encadeados. */
-  respond: null as null | ((table: string, calls: string[], range: [number, number] | null) => Promise<Result> | Result),
-}));
-
-vi.mock('@/integrations/supabase/client', () => {
-  const chain = (table: string) => {
-    const calls: string[] = [];
-    let range: [number, number] | null = null;
-    const proxy: unknown = new Proxy({}, {
-      get: (_t, prop: string) => {
-        if (prop === 'then') {
-          return (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
-            Promise.resolve(h.respond!(table, calls, range)).then(resolve, reject);
-        }
-        return (...args: unknown[]) => {
-          calls.push(prop);
-          if (prop === 'range') range = [args[0] as number, args[1] as number];
-          return proxy;
-        };
-      },
-    });
-    return proxy;
-  };
-  return { supabase: { from: (t: string) => chain(t) } };
-});
-
-import { useDashboard, type DashboardFilters } from '@/hooks/useDashboard';
+import { useDashboard, dashboardRpcError, type DashboardFilters } from '@/hooks/useDashboard';
 
 type Api = ReturnType<typeof useDashboard>;
 let api: Api;
@@ -53,39 +26,21 @@ async function waitFor(check: () => void, timeoutMs = 3000) {
   }
 }
 
-const ok = (data: Row[]): Result => ({ data, error: null });
-// Sem .range() o servidor devolve no máximo 1.000 linhas (limite padrão do Supabase), como em produção.
-const page = (rows: Row[], range: [number, number] | null) => (range ? rows.slice(range[0], range[1] + 1) : rows.slice(0, 1000));
+/** Resposta de dashboard_summary, no formato que o PostgREST devolve (numeric como string ou número). */
+const summary = (over: Record<string, unknown> = {}) => ({
+  movimentacaoCalculada: '600.00', saldoInicialTotal: '5000.00', saldoInicialConfigurado: true,
+  receitas: '1000.00', despesas: '400.00', receitasProvisionadas: '0', despesasProvisionadas: '200.00',
+  prevReceitas: '700.00', prevDespesas: '0',
+  semCategoria: 1, semCategoriaReceita: 0, semCategoriaDespesa: 1, semUnidade: 2,
+  monthly: [{ month: '2026-09', receitas: '1000.00', despesas: '400.00', receitasProv: '0', despesasProv: '200.00' }],
+  categoryData: [{ name: 'Aluguel', value: '400.00' }],
+  receitaCategoryData: [{ name: 'Vendas', value: 1000 }],
+  unitRanking: [{ unitId: 'u1', unitName: 'Café', despesas: '200.00', receitas: '1000.00' }],
+  overdueBills: [{ id: 't5', description: 'Antiga', net_amount: '50.00', due_date: '2026-06-01', type: 'despesa', partner_name: null }],
+  dueTodayBills: [{ id: 't9', description: 'Hoje', net_amount: '10.00', due_date: '2026-09-15', type: 'receita', partner_name: 'Cliente' }],
+  ...over,
+});
 
-// --- dados de teste (hoje = 15/09/2026) -----------------------------------------------------------
-const t1 = { id: 't1', type: 'receita', net_amount: 1000, status: 'recebido', payment_date: '2026-09-10', competence_date: '2026-09-10', due_date: null, category_id: 'c1', unit_id: 'u1', front_id: null, affects_dre: true, affects_cashflow: true };
-// despesa rateada 50/50 entre as unidades (sem unit_id no lançamento)
-const t2 = { id: 't2', type: 'despesa', net_amount: 400, status: 'pago', payment_date: '2026-09-11', competence_date: '2026-09-11', due_date: null, category_id: 'c2', unit_id: null, front_id: null, affects_dre: true, affects_cashflow: true };
-// transferência interna: não afeta o caixa
-const t3 = { id: 't3', type: 'despesa', net_amount: 300, status: 'pago', payment_date: '2026-09-12', competence_date: '2026-09-12', due_date: null, category_id: 'c2', unit_id: 'u1', front_id: null, affects_dre: false, affects_cashflow: false };
-// pendente vencida (dentro do período)
-const t4 = { id: 't4', type: 'despesa', net_amount: 200, status: 'pendente', payment_date: null, competence_date: '2026-09-20', due_date: '2026-09-05', category_id: 'c2', unit_id: 'u2', front_id: null, affects_dre: true, affects_cashflow: true };
-// pendente vencida há meses (fora do período do painel)
-const t5 = { id: 't5', type: 'despesa', net_amount: 50, status: 'pendente', payment_date: null, competence_date: '2026-06-01', due_date: '2026-06-01', category_id: null, unit_id: 'u1', front_id: null, affects_dre: true, affects_cashflow: true };
-const allocs = [
-  { id: 'a1', transaction_id: 't2', unit_id: 'u1', front_id: null, allocation_type: 'percentual', percentage: 50, amount: null },
-  { id: 'a2', transaction_id: 't2', unit_id: 'u2', front_id: null, allocation_type: 'percentual', percentage: 50, amount: null },
-];
-
-function normal(table: string, calls: string[], range: [number, number] | null): Result {
-  if (table === 'transactions') {
-    if (calls.includes('or')) return ok(page([t1, t2, t3, t4], range));            // período
-    if (calls.includes('lte')) return ok([{ ...t4, partner: null }, { ...t5, partner: null }]); // alertas
-    return ok(page([t1, t2], range));                                                // saldo (só afeta caixa)
-  }
-  if (table === 'transaction_allocations') return ok(page(allocs, range));
-  if (table === 'accounts') return ok([{ id: 'acc', initial_balance: 5000, initial_balance_date: '2026-08-31' }]);
-  if (table === 'categories') return ok([{ id: 'c1', name: 'Vendas' }, { id: 'c2', name: 'Aluguel' }]);
-  if (table === 'units') return ok([{ id: 'u1', name: 'Café' }, { id: 'u2', name: 'Boulevard' }]);
-  return ok([]);
-}
-
-// O estado do hook muda depois do act em refetchs; é ruído, não falha.
 beforeAll(() => {
   const original = console.error;
   console.error = (...args: unknown[]) => {
@@ -97,45 +52,57 @@ beforeAll(() => {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-09-15T12:00:00'));
-  h.respond = normal;
+  h.rpc.mockReset();
+  h.rpc.mockResolvedValue({ data: summary(), error: null });
   const host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
 });
 afterEach(() => { root?.unmount(); root = null; document.body.innerHTML = ''; vi.useRealTimers(); });
 
-describe('useDashboard', () => {
-  it('KPIs, saldo, ranking com rateio e contas em atraso batem com as regras', async () => {
+describe('useDashboard (resumo calculado no banco)', () => {
+  it('converte a resposta em KPIs, saldo, variação, meses e avisos', async () => {
     await render();
     await waitFor(() => expect(api.loading).toBe(false));
     expect(api.error).toBeNull();
     expect(api.receitasMes).toBe(1000);
-    expect(api.despesasMes).toBe(400);                 // a transferência (não afeta caixa) fica de fora
-    expect(api.saldoTotal).toBe(5000 + 1000 - 400);    // saldo inicial + movimento posterior à data-base
-    // "Contas em Atraso" = a lista do aviso (inclui a vencida há meses, fora do período)
-    expect(api.contasAtrasadas).toBe(2);
-    expect(api.overdueBills.map(b => b.id)).toEqual(['t4', 't5']);
-    // ranking: despesa rateada 50/50, transferência ignorada, pendente fora (sem "incluir provisionados")
-    const byUnit = Object.fromEntries(api.unitRanking.map(u => [u.unitName, u]));
-    expect(byUnit['Café']).toMatchObject({ despesas: 200, receitas: 1000 });
-    expect(byUnit['Boulevard']).toMatchObject({ despesas: 200 });
-    expect(byUnit['Sem unidade']).toBeUndefined();
+    expect(api.despesasMes).toBe(400);
+    expect(api.saldoTotal).toBe(5600);                 // movimento + saldo inicial
+    expect(api.saldoInicialConfigurado).toBe(true);
+    expect(api.margemContribuicao).toBe(600);          // sem provisionados: 1000 - 400
+    expect(api.variacaoReceita).toBeCloseTo(((1000 - 700) / 700) * 100);
+    expect(api.variacaoDespesa).toBeNull();            // período anterior sem despesa
+    expect(api.monthlyData).toEqual([{ label: 'Set/26', receitas: 1000, despesas: 400, receitasProv: 0, despesasProv: 200 }]);
+    expect(api.categoryData).toEqual([{ name: 'Aluguel', value: 400 }]);
+    expect(api.unitRanking[0]).toEqual({ unitId: 'u1', unitName: 'Café', despesas: 200, receitas: 1000 });
+    expect(api.semCategoria).toBe(1);
+    expect(api.semUnidade).toBe(2);
+    expect(api.contasAtrasadas).toBe(1);               // = tamanho da lista do aviso
+    expect(api.overdueBills[0]).toMatchObject({ id: 't5', net_amount: 50, partner_name: undefined });
+    expect(api.vencendoHoje).toBe(1);
+    expect(api.dueTodayBills[0].partner_name).toBe('Cliente');
   });
 
-  it('lê todas as páginas: mais de 1.000 linhas não são truncadas', async () => {
-    const many = Array.from({ length: 2300 }, (_, i) => ({ ...t1, id: `m${i}`, net_amount: 1 }));
-    h.respond = (table, calls, range) =>
-      table === 'transactions' && calls.includes('or') ? ok(page(many, range)) : normal(table, calls, range);
-    await render();
+  it('com "incluir provisionados" a margem soma os provisionados', async () => {
+    await render({ includeProvisioned: true });
     await waitFor(() => expect(api.loading).toBe(false));
-    expect(api.receitasMes).toBe(2300);
+    expect(api.margemContribuicao).toBe(1000 - (400 + 200));
   });
 
-  it('consulta com erro mostra o aviso em vez de zeros silenciosos', async () => {
-    h.respond = (table, calls, range) =>
-      table === 'transactions' && calls.includes('or')
-        ? { data: null, error: { message: 'timeout na consulta' } }
-        : normal(table, calls, range);
+  it('envia ao banco o período, os filtros e o "hoje" local', async () => {
+    await render({ unitId: 'u1', frontId: 'f1', includeProvisioned: true, period: { from: '2026-08-01', to: '2026-09-30' } });
+    await waitFor(() => expect(api.loading).toBe(false));
+    expect(h.rpc).toHaveBeenCalledWith('dashboard_summary', {
+      p_from: '2026-08-01', p_to: '2026-09-30', p_unit: 'u1', p_front: 'f1', p_include_provisioned: true, p_today: '2026-09-15',
+    });
+    h.rpc.mockClear();
+    await render();                                    // sem filtros: mês atual, nulos
+    await waitFor(() => expect(h.rpc).toHaveBeenCalled());
+    expect(h.rpc.mock.calls[0][1]).toMatchObject({ p_from: '2026-09-01', p_to: '2026-09-30', p_unit: null, p_front: null, p_include_provisioned: false });
+  });
+
+  it('erro do banco mostra o aviso em vez de zeros silenciosos', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'timeout na consulta' } });
     await render();
     await waitFor(() => expect(api.loading).toBe(false));
     expect(api.error).toContain('timeout na consulta');
@@ -144,36 +111,31 @@ describe('useDashboard', () => {
   it('falha ao recarregar mantém os números anteriores e avisa; tentar de novo recupera', async () => {
     await render();
     await waitFor(() => expect(api.loading).toBe(false));
-    expect(api.receitasMes).toBe(1000);
-
-    h.respond = (table, calls, range) =>
-      table === 'accounts' ? { data: null, error: { message: 'sem conexão' } } : normal(table, calls, range);
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'sem conexão' } });
     await act(async () => { api.reload(); });
     await waitFor(() => expect(api.error).toContain('sem conexão'));
     expect(api.receitasMes).toBe(1000);                // não virou zero
     expect(api.refreshing).toBe(false);
-
-    h.respond = normal;
+    h.rpc.mockResolvedValue({ data: summary(), error: null });
     await act(async () => { api.reload(); });
     await waitFor(() => expect(api.error).toBeNull());
-    expect(api.receitasMes).toBe(1000);
+  });
+
+  it('função ausente no banco orienta a aplicar a migração', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } });
+    await render();
+    await waitFor(() => expect(api.loading).toBe(false));
+    expect(api.error).toMatch(/20261008120000/);
+    expect(dashboardRpcError({ message: 'invalid_period: x' })).toMatch(/Período inválido/);
   });
 
   it('resposta lenta de um filtro anterior não sobrescreve a do filtro atual', async () => {
     let release!: () => void;
     const gate = new Promise<void>(r => { release = r; });
-    let periodCalls = 0;
-    h.respond = async (table, calls, range) => {
-      if (table === 'transactions' && calls.includes('or')) {
-        periodCalls++;
-        if (periodCalls === 1) {                       // 1ª busca (sem filtro): lenta, receita 1.000
-          await gate;
-          return ok(page([t1], range));
-        }
-        return ok(page([{ ...t1, id: 'fast', net_amount: 7, unit_id: 'u2' }], range)); // 2ª (unidade u2): rápida
-      }
-      return normal(table, calls, range);
-    };
+    h.rpc.mockReset();
+    h.rpc
+      .mockImplementationOnce(async () => { await gate; return { data: summary({ receitas: '1000.00' }), error: null }; })
+      .mockImplementation(async () => ({ data: summary({ receitas: '7.00' }), error: null }));
     await render();
     await render({ unitId: 'u2' });
     await waitFor(() => expect(api.receitasMes).toBe(7));

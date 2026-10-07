@@ -15,3 +15,14 @@ psql -h /tmp/pgtest -p 5544 -d t -q -f scripts/testes-sql/09-salvar-e-excluir-la
 
 Cada bloco imprime o que era esperado no título (`===== N) ... (esperado: ...)`) e o resultado
 logo abaixo; erros `ERROR:` nos casos de falha são o comportamento esperado.
+
+## Dashboard (SQL 11)
+
+- `11-dashboard-resumo.test.sql`: cenário conferido à mão (visão geral, filtro de unidade, provisionados, erros).
+- `dashboard-paridade.ts`: **paridade com a lógica do app em dados aleatórios** (lançamentos, rateios, contas,
+  filtros, períodos). Compara a função `dashboard_summary` com um oráculo em TypeScript que usa
+  `src/lib/finance.ts`. Esperado: `0 divergência(s)`.
+
+```bash
+bun run scripts/testes-sql/dashboard-paridade.ts /tmp/pgtest 5544 t 25   # host do socket, porta, banco, rodadas
+```
