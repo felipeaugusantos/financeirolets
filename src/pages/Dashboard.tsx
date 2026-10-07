@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon, AlignLeft, Layers, LayoutGrid } from 'lucide-react';
+import { Loader2, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon, AlignLeft, Layers, LayoutGrid } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -300,7 +300,7 @@ export default function Dashboard() {
     period: { from: period.from, to: period.to },
   };
 
-  const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking } = useDashboard(dashFilters);
+  const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking, error, refreshing, reload } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
   const activeUnits = (units)?.filter((u) => u.active) ?? [];
@@ -357,11 +357,18 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={refreshing}>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Visão geral financeira do grupo</p>
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            Visão geral financeira do grupo
+            {refreshing && (
+              <span className="inline-flex items-center gap-1 text-xs" role="status">
+                <Loader2 className="h-3 w-3 animate-spin" /> Atualizando…
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={periodPreset} onValueChange={(v) => setPeriodPreset(v as PeriodPreset)}>
@@ -458,8 +465,21 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {error && (
+        <Alert variant="destructive" role="alert">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span>
+              Não foi possível carregar todos os números ({error}). Os valores abaixo podem estar
+              desatualizados ou incompletos.
+            </span>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={reload}>Tentar novamente</Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+      <div className={cn('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 transition-opacity', refreshing && 'opacity-60')}>
         {cards.map((card) => (
           <Card key={card.title} className="shadow-card rounded-2xl border-border min-w-0">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
