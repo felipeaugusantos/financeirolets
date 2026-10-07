@@ -101,6 +101,11 @@ export default function AutoPostDialog({
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  /** Linhas que "Marcar todas" seleciona: as com possível duplicidade ficam de fora e só entram marcadas à mão. */
+  const selectable = useMemo(() => items.filter(v => !duplicateIds.has(v.entry.id)), [items, duplicateIds]);
+  const allSelected = selectable.length > 0 && selectable.every(v => checked.has(v.entry.id));
+  const selectAll = () => setChecked(new Set(selectable.map(v => v.entry.id)));
+  const clearAll = () => setChecked(new Set());
   const patch = (id: string, p: Partial<RowEdit>) =>
     setEdits(prev => ({ ...prev, [id]: { ...prev[id], ...p } }));
 
@@ -147,7 +152,13 @@ export default function AutoPostDialog({
           <table className="w-full text-xs">
             <thead className="sticky top-0 z-10 bg-muted">
               <tr className="text-left">
-                <th className="p-2 w-8"></th>
+                <th className="p-2 w-8">
+                  <Checkbox
+                    aria-label="Marcar ou desmarcar todas"
+                    checked={allSelected ? true : checked.size > 0 ? 'indeterminate' : false}
+                    onCheckedChange={() => (allSelected ? clearAll() : selectAll())}
+                  />
+                </th>
                 <th className="p-2">Data</th>
                 <th className="p-2">Descrição</th>
                 <th className="p-2 text-right">Valor</th>
@@ -214,10 +225,19 @@ export default function AutoPostDialog({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <span className="text-xs text-muted-foreground">
-            {selection.length} de {items.length} linha(s) — total {brl(total)}
-            {missingCat > 0 && <span className="text-destructive"> · {missingCat} sem categoria</span>}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 rounded-xl text-xs" disabled={busy || selectable.length === 0} onClick={selectAll}
+              title={dupCount > 0 ? 'Linhas com possível duplicidade não entram: marque-as uma a uma, se for o caso.' : undefined}>
+              Marcar todas{dupCount > 0 ? ` (exceto ${dupCount} duplicidade(s))` : ''}
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 rounded-xl text-xs" disabled={busy || checked.size === 0} onClick={clearAll}>
+              Desmarcar todas
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {selection.length} de {items.length} linha(s) — total {brl(total)}
+              {missingCat > 0 && <span className="text-destructive"> · {missingCat} sem categoria</span>}
+            </span>
+          </div>
           <div className="flex gap-2">
             <Button variant="ghost" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button
