@@ -25,7 +25,10 @@ import InternalTransfersPanel from '@/components/ofx/InternalTransfersPanel';
 import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
 import ClosingPanel from '@/components/ofx/ClosingPanel';
 import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog';
-import AutoPostDialog from '@/components/ofx/AutoPostDialog';
+import AutoPostDialog, { type AutoPostItem } from '@/components/ofx/AutoPostDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { reconciledPercent, matchesEntrySearch } from '@/lib/entrySearch';
+import { Progress } from '@/components/ui/progress';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
 import { suggestPaymentMethod } from '@/lib/paymentMethod';
@@ -66,11 +69,21 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const reprocessRef = useRef<HTMLInputElement>(null);
 
+  const { user } = useAuth();
+  const filterKey = `ofx-conciliacao-filtros:${user?.id ?? 'anon'}`;
+  const saved = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem(filterKey) || '{}') as Record<string, string>; }
+    catch { return {} as Record<string, string>; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [accounts, setAccounts] = useState<Tables<'accounts'>[]>([]);
-  const [accountId, setAccountId] = useState<string>('');
-  const [from, setFrom] = useState(firstDayOfMonth());
-  const [to, setTo] = useState(todayLocalISO());
-  const [statusFilter, setStatusFilter] = useState<'pendente' | 'vinculado' | 'ignorado' | 'todos'>('pendente');
+  const [accountId, setAccountId] = useState<string>(saved.accountId || '');
+  const [from, setFrom] = useState(saved.from || firstDayOfMonth());
+  const [to, setTo] = useState(saved.to || todayLocalISO());
+  const [statusFilter, setStatusFilter] = useState<'pendente' | 'vinculado' | 'ignorado' | 'todos'>(
+    (saved.statusFilter as 'pendente') || 'pendente');
+  const [search, setSearch] = useState(saved.search || '');
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
   const [createFor, setCreateFor] = useState<EnrichedEntry | null>(null);
   const [createForm, setCreateForm] = useState<Partial<TransactionPatch>>({});
@@ -78,7 +91,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const [ignoreReason, setIgnoreReason] = useState('');
   const [showDetails, setShowDetails] = useState(false);
-  const [view, setView] = useState<'paineis' | 'lista'>('paineis');
+  const [view, setView] = useState<'paineis' | 'lista'>((saved.view as 'lista') || 'paineis');
   const [existingDescriptions, setExistingDescriptions] = useState<Map<string, string[]>>(new Map());
   /** Conciliação (vínculo) que o usuário pediu para excluir; null = nenhum diálogo. */
   const [deleteTarget, setDeleteTarget] = useState<StatementEntry | null>(null);
@@ -95,9 +108,21 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   const {
     enriched, entries, candidates, rules, loading, importing, batchRunning, lastImport, stats,
-    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, unlinkAndDeleteEntry, ignoreEntry, createFromEntry,
     linkMany, ignoreMany, createMany, createGrouped, autoLinkByDescription, unlinkMany, duplicateGroups,
   } = useOfxImport(accountId || null, from, to);
+
+  // Guarda os filtros para reabrir a tela do mesmo jeito.
+  useEffect(() => {
+    try {
+      localStorage.setItem(filterKey, JSON.stringify({ accountId, from, to, statusFilter, view, search }));
+    } catch { /* armazenamento indisponível */ }
+  }, [filterKey, accountId, from, to, statusFilter, view, search]);
+
+  // Seleção não sobrevive a troca de conta, período, status ou visão (evita somas "invisíveis").
+  useEffect(() => { setSelected(new Set()); }, [accountId, from, to, statusFilter, view]);
+
+  const progress = useMemo(() => reconciledPercent(entries), [entries]);
 
 
   useEffect(() => {
@@ -243,12 +268,26 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     await runAutoLinkByDescription();
   };
 
-  /** Exclui a conciliação de uma linha: o vínculo é desfeito, o lançamento fica. */
+  /** Desvincular: linhas com lançamento pedem confirmação; ignoradas apenas reabrem. */
+  const requestUnlink = (e: StatementEntry) => {
+    if (e.transaction_id) setDeleteTarget(e);
+    else unlinkEntry(e.id);
+  };
+
+  /** Só desfaz o vínculo; o lançamento fica. */
   const confirmDeleteLink = async () => {
     if (!deleteTarget) return;
     await unlinkEntry(deleteTarget.id);
     setDeleteTarget(null);
-    toast({ title: 'Conciliação excluída', description: 'A linha voltou para pendente. O lançamento não foi apagado.' });
+    toast({ title: 'Conciliação desfeita', description: 'A linha voltou para pendente. O lançamento não foi apagado.' });
+  };
+
+  /** Desfaz o vínculo e exclui o lançamento (padrão). */
+  const confirmUnlinkAndDelete = async () => {
+    if (!deleteTarget?.transaction_id) return;
+    const ok = await unlinkAndDeleteEntry(deleteTarget.id, deleteTarget.transaction_id);
+    setDeleteTarget(null);
+    if (ok) toast({ title: 'Lançamento excluído', description: 'A linha voltou para pendente.' });
   };
 
   /** Exclui todas as conciliações (linhas vinculadas) do período exibido. */
@@ -263,8 +302,14 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
 
   const visible = useMemo(
-    () => enriched.filter(e => statusFilter === 'todos' || e.entry.status === statusFilter),
-    [enriched, statusFilter]
+    () => enriched.filter(e =>
+      (statusFilter === 'todos' || e.entry.status === statusFilter)
+      && (view !== 'lista' || matchesEntrySearch(search, e.entry.memo, Number(e.entry.amount)))),
+    [enriched, statusFilter, search, view]
+  );
+  const listEntries = useMemo(
+    () => (search.trim() ? entries.filter(e => matchesEntrySearch(search, e.memo, Number(e.amount))) : entries),
+    [entries, search]
   );
 
   // Só linhas pendentes entram em ação de lote.
@@ -312,24 +357,31 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       v.entry.status === 'pendente'
       && !!v.ruleCategoryId
       && !descAutoIds.has(v.entry.id)
-      && !duplicateIds.has(v.entry.id)
     ),
-    [enriched, descAutoIds, duplicateIds]
+    [enriched, descAutoIds]
   );
+  /** Com seleção na tabela, o diálogo traz exatamente as linhas marcadas. */
+  const autoPostItems = selectedItems.length > 0 ? selectedItems : autoPostable;
+  /** Linhas com possível duplicidade: aparecem no diálogo, mas desmarcadas e com aviso. */
+  const autoPostWarnIds = useMemo(() => {
+    const s = new Set(duplicateIds);
+    descAutoIds.forEach(id => s.add(id));
+    return s;
+  }, [duplicateIds, descAutoIds]);
 
   /** Cria e concilia, de uma vez, as linhas revisadas no diálogo automático. */
-  const confirmAutoPost = async (items: EnrichedEntry[]) => {
+  const confirmAutoPost = async (items: AutoPostItem[]) => {
     setAutoPostOpen(false);
-    const res = await createMany(items.map(v => ({
+    const res = await createMany(items.map(({ item: v, categoryId, unitId, frontId, paymentMethod, useRuleAllocations }) => ({
       entry: v.entry as StatementEntry,
       patch: {
         description: v.entry.memo || 'Lançamento do extrato',
-        category_id: v.ruleCategoryId,
-        unit_id: v.ruleAllocations?.length ? null : v.ruleUnitId,
-        front_id: v.ruleAllocations?.length ? null : v.ruleFrontId,
+        category_id: categoryId,
+        unit_id: useRuleAllocations ? null : unitId,
+        front_id: useRuleAllocations ? null : frontId,
         partner_id: v.rulePartnerId,
-        payment_method: suggestPaymentMethod(v.entry.memo),
-        allocations: v.ruleAllocations ?? undefined,
+        payment_method: paymentMethod as TransactionPatch['payment_method'],
+        allocations: useRuleAllocations ? (v.ruleAllocations ?? undefined) : undefined,
       },
     })));
     clearSelection();
@@ -624,11 +676,12 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
             <Button
               variant="secondary"
               className="gap-2 rounded-xl"
-              disabled={!accountId || loading || batchRunning || autoPostable.length === 0}
+              disabled={!accountId || loading || batchRunning || autoPostItems.length === 0}
               onClick={() => setAutoPostOpen(true)}
-              title="Cria e concilia de uma vez todas as linhas pendentes que as regras já classificaram"
+              title="Cria e concilia as linhas selecionadas (ou, sem seleção, as que as regras já classificaram)"
             >
-              <PlusCircle className="h-4 w-4" /> Lançar pelas regras ({autoPostable.length})
+              <PlusCircle className="h-4 w-4" />
+              {selectedItems.length > 0 ? 'Lançar selecionadas' : 'Lançar pelas regras'} ({autoPostItems.length})
             </Button>
             )}
 
@@ -643,7 +696,24 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                 {s}
               </Button>
             ))}
+            {view === 'lista' && (
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por descrição ou valor"
+                className="h-8 w-56 rounded-xl text-xs"
+              />
+            )}
           </div>
+          {accountId && progress.total > 0 && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span><strong className="text-foreground">{progress.pct}% conciliado</strong> no período</span>
+                <span>{progress.done} de {progress.total} linha(s) decididas</span>
+              </div>
+              <Progress value={progress.pct} className="h-2" />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -737,7 +807,12 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
           candidates={candidates}
           busy={batchRunning}
           onLink={(entryId, txId, note) => linkEntry(entryId, txId, note)}
-          onUnlink={(entryId) => unlinkEntry(entryId)}
+          onUnlink={(entryId) => {
+            const e = entries.find(x => x.id === entryId);
+            if (e) requestUnlink(e as StatementEntry);
+          }}
+          search={search}
+          onSearchChange={setSearch}
           onIgnore={(ids, reason) => ignoreMany(ids, reason)}
           onCreate={(id) => {
             const item = enriched.find(v => v.entry.id === id);
@@ -785,7 +860,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
       {accountId && view === 'lista' && (
         <OfxPeriodReport
-          entries={entries}
+          entries={listEntries}
           accountName={account?.name ?? 'Conta'}
           from={from}
           to={to}
@@ -797,7 +872,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
           busy={batchRunning}
           onView={(e) => navigate(`/lancamentos?q=${encodeURIComponent(e.memo || '')}`)}
-          onUnlink={(e) => unlinkEntry(e.id)}
+          onUnlink={(e) => requestUnlink(e)}
           onDeleteLink={(e) => setDeleteTarget(e)}
           onDeleteAllLinks={() => setDeleteAllOpen(true)}
           onToggle={toggle}
@@ -990,7 +1065,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                       {e.ignore_reason ? `Justificativa: ${e.ignore_reason}` : (e.match_note || '—')}
                       {e.decided_at && ` · ${new Date(e.decided_at).toLocaleString('pt-BR')}`}
                     </p>
-                    <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-8" onClick={() => unlinkEntry(e.id)}>
+                    <Button size="sm" variant="ghost" className="gap-1.5 rounded-xl h-8" onClick={() => requestUnlink(e as StatementEntry)}>
                       <Link2Off className="h-3.5 w-3.5" /> Reabrir
                     </Button>
                   </div>
@@ -1006,21 +1081,25 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
       <Dialog open={!!deleteTarget} onOpenChange={o => !o && setDeleteTarget(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Excluir conciliação</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-heading">Desvincular conciliação</DialogTitle></DialogHeader>
           {deleteTarget && (
             <div className="space-y-2 text-xs">
               <p className="text-muted-foreground">
                 {br(deleteTarget.posted_at)} · {brl(Number(deleteTarget.amount))} · {deleteTarget.memo}
               </p>
               <p>
-                O vínculo com o lançamento será desfeito e a linha voltará para <strong>pendente</strong>.
-                O lançamento em si <strong>não</strong> é excluído.
+                A linha voltará para <strong>pendente</strong>. Por padrão o lançamento ligado a ela
+                também é <strong>excluído</strong> (com rateio e anexos). Em mês fechado a exclusão é recusada
+                e nada é apagado.
               </p>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button variant="destructive" disabled={batchRunning} onClick={confirmDeleteLink}>Excluir conciliação</Button>
+            <Button variant="outline" disabled={batchRunning} onClick={confirmDeleteLink}>Só desvincular</Button>
+            <Button variant="destructive" disabled={batchRunning} onClick={confirmUnlinkAndDelete}>
+              Desvincular e excluir lançamento
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1103,8 +1182,8 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       <AutoPostDialog
         open={autoPostOpen}
         onOpenChange={setAutoPostOpen}
-        items={autoPostable}
-        duplicateIds={duplicateIds}
+        items={autoPostItems}
+        duplicateIds={autoPostWarnIds}
         options={options}
         busy={batchRunning}
         onConfirm={confirmAutoPost}

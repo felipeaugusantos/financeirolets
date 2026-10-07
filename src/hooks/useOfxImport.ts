@@ -428,6 +428,35 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     return true;
   }, [updateEntry, decisionStamp, load, toast]);
 
+  /**
+   * Desvincula a linha e exclui o lançamento ligado a ela (com rateio e anexos).
+   * Se a exclusão for recusada (mês fechado, permissão), a linha volta a ficar vinculada.
+   */
+  const unlinkAndDeleteEntry = useCallback(async (entryId: string, transactionId: string) => {
+    const err = await updateEntry(entryId, {
+      transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
+    });
+    if (err) { toast({ title: 'Erro ao desvincular', description: err, variant: 'destructive' }); return false; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let { error } = await (supabase as any).rpc('delete_transaction_with_children', { p_id: transactionId });
+    if (error?.code === 'PGRST202') {
+      const res = await supabase.from('transactions').delete().eq('id', transactionId).select('id');
+      error = res.error ?? (res.data?.length ? null : { message: 'Sem permissão para excluir este lançamento.' });
+    }
+    if (error) {
+      await updateEntry(entryId, { transaction_id: transactionId, status: 'vinculado', ...decisionStamp() });
+      toast({
+        title: 'Lançamento não excluído',
+        description: `${error.message} A conciliação foi mantida.`,
+        variant: 'destructive',
+      });
+      await load();
+      return false;
+    }
+    await load();
+    return true;
+  }, [updateEntry, decisionStamp, load, toast]);
+
   const ignoreEntry = useCallback(async (entryId: string, note: string) => {
     const err = await updateEntry(entryId, {
       status: 'ignorado', match_note: note, ignore_reason: note, ...decisionStamp(),
@@ -699,7 +728,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
   return {
     enriched, duplicateGroups, entries, candidates, rules, loading, importing, batchRunning, lastImport, stats,
-    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, unlinkAndDeleteEntry, ignoreEntry, createFromEntry,
     linkMany, ignoreMany, createMany, createGrouped, autoLinkByDescription, unlinkMany,
     reload: load, reloadRules: loadRules,
   };

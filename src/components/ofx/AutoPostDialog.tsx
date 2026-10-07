@@ -20,41 +20,78 @@ export function isSafeRule(v: EnrichedEntry): boolean {
   return SAFE_RULE.test(txt);
 }
 
+/** Linha revisada, com os campos possivelmente editados pelo usuário. */
+export interface AutoPostItem {
+  item: EnrichedEntry;
+  categoryId: string | null;
+  unitId: string | null;
+  frontId: string | null;
+  paymentMethod: string | null;
+  /** true = mantém o rateio da regra (unidade não foi trocada manualmente). */
+  useRuleAllocations: boolean;
+}
+
+interface RowEdit { categoryId: string | null; unitId: string | null; frontId: string | null; paymentMethod: string | null; unitTouched: boolean }
+
 export interface AutoPostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Linhas pendentes que uma regra classificou (categoria definida). */
+  /** Linhas a revisar (selecionadas, ou as classificadas por regra). */
   items: EnrichedEntry[];
-  /** Linhas cuja descrição já existe em algum lançamento do período. */
+  /** Linhas com possível duplicidade: aparecem desmarcadas e com aviso. */
   duplicateIds: Set<string>;
   options: OptionList;
   busy?: boolean;
-  onConfirm: (items: EnrichedEntry[]) => void | Promise<void>;
+  onConfirm: (items: AutoPostItem[]) => void | Promise<void>;
+}
+
+const NONE = '';
+
+function Sel({ value, onChange, list, placeholder }: {
+  value: string | null; onChange: (v: string | null) => void;
+  list: { id: string; name: string }[]; placeholder: string;
+}) {
+  return (
+    <select
+      value={value ?? NONE}
+      onChange={e => onChange(e.target.value || null)}
+      className="w-full min-w-[120px] rounded-md border bg-background px-1.5 py-1 text-xs"
+    >
+      <option value={NONE}>{placeholder}</option>
+      {list.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+    </select>
+  );
 }
 
 /**
- * Revisão final antes de lançar automaticamente todas as linhas do extrato que
- * as regras de conciliação já classificaram. Nada é criado sem esta conferência.
+ * Revisão final antes de lançar as linhas do extrato. Categoria, unidade, frente e
+ * forma de pagamento podem ser ajustadas linha a linha. Nada é criado sem esta conferência.
  */
 export default function AutoPostDialog({
   open, onOpenChange, items, duplicateIds, options, busy, onConfirm,
 }: AutoPostDialogProps) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [edits, setEdits] = useState<Record<string, RowEdit>>({});
 
-  const eligible = useMemo(
-    () => items.filter(v => !duplicateIds.has(v.entry.id)),
-    [items, duplicateIds],
-  );
-  const skipped = useMemo(
-    () => items.filter(v => duplicateIds.has(v.entry.id)),
-    [items, duplicateIds],
-  );
-
-  // "Automatizar mantendo um olhar": só as regras de baixo risco vêm marcadas;
-  // as demais aparecem desmarcadas para o usuário conferir antes.
+  // Ao abrir: regras de baixo risco vêm marcadas; duplicidades e demais, desmarcadas.
   useEffect(() => {
-    if (open) setChecked(new Set(eligible.filter(isSafeRule).map(v => v.entry.id)));
-  }, [open, eligible]);
+    if (!open) return;
+    setChecked(new Set(items.filter(v => isSafeRule(v) && !duplicateIds.has(v.entry.id)).map(v => v.entry.id)));
+    const e: Record<string, RowEdit> = {};
+    for (const v of items) {
+      e[v.entry.id] = {
+        categoryId: v.ruleCategoryId,
+        unitId: v.ruleUnitId,
+        frontId: v.ruleFrontId,
+        paymentMethod: suggestPaymentMethod(v.entry.memo),
+        unitTouched: false,
+      };
+    }
+    setEdits(e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const dupCount = useMemo(() => items.filter(v => duplicateIds.has(v.entry.id)).length, [items, duplicateIds]);
 
   const name = (list: { id: string; name: string }[], id: string | null) =>
     (id && list.find(o => o.id === id)?.name) || '—';
@@ -64,34 +101,51 @@ export default function AutoPostDialog({
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  const patch = (id: string, p: Partial<RowEdit>) =>
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], ...p } }));
 
-  const selection = eligible.filter(v => checked.has(v.entry.id));
+  const selection = items.filter(v => checked.has(v.entry.id));
+  const missingCat = selection.filter(v => !edits[v.entry.id]?.categoryId).length;
   const total = selection.reduce((s, v) => s + Number(v.entry.amount), 0);
+  const pmList = Object.entries(PAYMENT_METHOD_LABELS).map(([id, n]) => ({ id, name: n }));
+
+  const confirm = () => onConfirm(selection.map(v => {
+    const e = edits[v.entry.id];
+    const keepAlloc = !e.unitTouched && (v.ruleAllocations?.length ?? 0) > 0;
+    return {
+      item: v,
+      categoryId: e.categoryId,
+      unitId: e.unitId,
+      frontId: e.frontId,
+      paymentMethod: e.paymentMethod,
+      useRuleAllocations: keepAlloc,
+    };
+  }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-[95vw] xl:max-w-7xl">
         <DialogHeader>
-          <DialogTitle>Lançar automaticamente pelas regras</DialogTitle>
+          <DialogTitle>Lançar linhas do extrato</DialogTitle>
           <DialogDescription>
-            Cada linha vira um lançamento com a categoria, unidade, frente, rateio e
-            forma de pagamento sugeridos pela regra, e já fica conciliada.
+            Cada linha marcada vira um lançamento já conciliado. Ajuste categoria, unidade,
+            frente e forma de pagamento antes de confirmar.
           </DialogDescription>
         </DialogHeader>
 
-        {skipped.length > 0 && (
+        {dupCount > 0 && (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              {skipped.length} linha(s) fora da lista: já existe lançamento com a
-              mesma descrição no período. Confira manualmente se for necessário.
+              {dupCount} linha(s) com possível lançamento já existente estão desmarcadas e
+              sinalizadas. Confira antes de marcar.
             </AlertDescription>
           </Alert>
         )}
 
-        <div className="max-h-[52vh] overflow-auto rounded-xl border">
+        <div className="max-h-[60vh] overflow-auto rounded-xl border">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-muted/60">
+            <thead className="sticky top-0 z-10 bg-muted">
               <tr className="text-left">
                 <th className="p-2 w-8"></th>
                 <th className="p-2">Data</th>
@@ -105,41 +159,54 @@ export default function AutoPostDialog({
               </tr>
             </thead>
             <tbody>
-              {eligible.map(v => {
-                const pm = suggestPaymentMethod(v.entry.memo);
+              {items.map(v => {
+                const e = edits[v.entry.id];
+                if (!e) return null;
                 const alloc = v.ruleAllocations ?? [];
+                const dup = duplicateIds.has(v.entry.id);
                 return (
-                  <tr key={v.entry.id} className="border-t align-top">
+                  <tr key={v.entry.id} className={`border-t align-top ${dup ? 'bg-amber-500/5' : ''}`}>
                     <td className="p-2">
-                      <Checkbox
-                        checked={checked.has(v.entry.id)}
-                        onCheckedChange={() => toggle(v.entry.id)}
-                      />
+                      <Checkbox checked={checked.has(v.entry.id)} onCheckedChange={() => toggle(v.entry.id)} />
                     </td>
                     <td className="p-2 whitespace-nowrap">{br(v.entry.posted_at)}</td>
-                    <td className="p-2 max-w-[240px] truncate" title={v.entry.memo ?? ''}>
+                    <td className="p-2 min-w-[220px] whitespace-normal break-words">
                       {v.entry.memo}
+                      {dup && <Badge variant="outline" className="ml-1 rounded-lg text-[10px]">possível duplicidade</Badge>}
                     </td>
                     <td className={`p-2 text-right whitespace-nowrap ${v.entry.amount < 0 ? 'text-destructive' : ''}`}>
                       {brl(v.entry.amount)}
                     </td>
-                    <td className="p-2 max-w-[140px] truncate" title={v.ruleLabel ?? ''}>
-                      <Badge variant="outline" className="rounded-lg">{v.ruleLabel}</Badge>
+                    <td className="p-2 min-w-[120px] whitespace-normal break-words">
+                      {v.ruleLabel ? <span className="font-medium">{v.ruleLabel}</span> : <span className="text-muted-foreground">sem regra</span>}
                     </td>
-                    <td className="p-2">{name(options.categories, v.ruleCategoryId)}</td>
                     <td className="p-2">
-                      {alloc.length > 0
-                        ? alloc.map(a => `${name(options.units, a.unit_id)} ${a.value}%`).join(' · ')
-                        : name(options.units, v.ruleUnitId)}
+                      <Sel value={e.categoryId} onChange={x => patch(v.entry.id, { categoryId: x })}
+                        list={options.categories} placeholder="Escolha…" />
                     </td>
-                    <td className="p-2">{name(options.fronts, v.ruleFrontId)}</td>
-                    <td className="p-2">{pm ? PAYMENT_METHOD_LABELS[pm] : '—'}</td>
+                    <td className="p-2">
+                      <Sel value={e.unitId} onChange={x => patch(v.entry.id, { unitId: x, unitTouched: true })}
+                        list={options.units} placeholder={alloc.length && !e.unitTouched ? 'Rateio da regra' : '—'} />
+                      {alloc.length > 0 && !e.unitTouched && (
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          {alloc.map(a => `${name(options.units, a.unit_id)} ${a.value}%`).join(' · ')}
+                        </p>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <Sel value={e.frontId} onChange={x => patch(v.entry.id, { frontId: x })}
+                        list={options.fronts} placeholder="—" />
+                    </td>
+                    <td className="p-2">
+                      <Sel value={e.paymentMethod} onChange={x => patch(v.entry.id, { paymentMethod: x })}
+                        list={pmList} placeholder="—" />
+                    </td>
                   </tr>
                 );
               })}
-              {eligible.length === 0 && (
+              {items.length === 0 && (
                 <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">
-                  Nenhuma linha pendente classificada por regra neste período.
+                  Nenhuma linha para lançar.
                 </td></tr>
               )}
             </tbody>
@@ -148,16 +215,15 @@ export default function AutoPostDialog({
 
         <DialogFooter className="flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <span className="text-xs text-muted-foreground">
-            {selection.length} de {eligible.length} linha(s) — total {brl(total)}
+            {selection.length} de {items.length} linha(s) — total {brl(total)}
+            {missingCat > 0 && <span className="text-destructive"> · {missingCat} sem categoria</span>}
           </span>
           <div className="flex gap-2">
-            <Button variant="ghost" className="rounded-xl" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
+            <Button variant="ghost" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button
               className="gap-2 rounded-xl"
-              disabled={selection.length === 0 || busy}
-              onClick={() => onConfirm(selection)}
+              disabled={selection.length === 0 || missingCat > 0 || busy}
+              onClick={confirm}
             >
               <Zap className="h-4 w-4" />
               {busy ? 'Lançando...' : `Lançar ${selection.length} linha(s)`}
