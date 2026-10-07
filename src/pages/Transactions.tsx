@@ -13,6 +13,7 @@ import TransactionList from '@/components/transactions/TransactionList';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { useDeleteHistory, DeletedCapture } from '@/hooks/useDeleteHistory';
+import { filtersFromUrl } from '@/lib/transactionUrl';
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -20,8 +21,8 @@ function formatCurrency(v: number) {
 
 export default function Transactions() {
   const [searchParams] = useSearchParams();
-  const [filters, setFilters] = useState<TFilters>({});
-  // Permite abrir a tela já filtrada a partir da Conferência de lançamentos.
+  // Permite abrir a tela já filtrada: Conferência de lançamentos (q) e cartões do Dashboard (tipo, período, regime).
+  const [filters, setFilters] = useState<TFilters>(() => filtersFromUrl(searchParams));
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cardSaleOpen, setCardSaleOpen] = useState(false);
@@ -207,6 +208,20 @@ export default function Transactions() {
             className="pl-10 bg-card border-border rounded-xl"
           />
         </div>
+        {filters.regime && (
+          <Alert>
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span>
+                {filters.regime === 'caixa'
+                  ? 'Mostrando os pagos e recebidos que compõem o cartão do Dashboard (período pela data de pagamento).'
+                  : 'Mostrando os pagos (pela data de pagamento) e os provisionados (pela competência) que compõem o cartão do Dashboard.'}
+              </span>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setFilters(({ regime: _regime, ...rest }) => rest)}>
+                Remover esta visão
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         <TransactionFilters filters={filters} onChange={setFilters} />
       </div>
 

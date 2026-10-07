@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon, AlignLeft, Layers, LayoutGrid } from 'lucide-react';
+import { RefreshCw, Loader2, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Clock, CalendarClock, BarChart3, Info, Building2, CalendarIcon, AlignLeft, Layers, LayoutGrid } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -18,7 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { parseView, serializeView, variationTone, compactBRL, drilldownUrl, type DashboardView, type PeriodPreset } from '@/lib/dashboardView';
 import type { Tables } from '@/integrations/supabase/types';
 
 const fmt = (v: number) =>
@@ -211,8 +212,6 @@ function CategoryChart({
   return <CategoryBars data={data} emptyLabel={emptyLabel} accent={accent} />;
 }
 
-type PeriodPreset = 'current_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'ytd' | 'last_year' | 'custom';
-
 function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: string }): { from: string; to: string; label: string; isMonth: boolean } {
   const now = new Date();
   const y = now.getFullYear();
@@ -261,7 +260,7 @@ function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: strin
 const PIE_COLORS = [
   'hsl(340, 82%, 52%)',
   'hsl(184, 100%, 39%)',
-  'hsl(40, 70%, 50%)',
+  'hsl(40, 75%, 38%)',
   'hsl(122, 52%, 33%)',
   'hsl(0, 69%, 50%)',
   'hsl(260, 60%, 55%)',
@@ -277,12 +276,18 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const [unitId, setUnitId] = useState<string>('');
-  const [frontId, setFrontId] = useState<string>('');
-  const [includeProvisioned, setIncludeProvisioned] = useState(false);
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('current_month');
-  const [customFrom, setCustomFrom] = useState<string | undefined>();
-  const [customTo, setCustomTo] = useState<string | undefined>();
+  // Filtros na URL: o link da tela reproduz a mesma visão e sobrevive ao recarregar.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = useMemo(() => parseView(searchParams), [searchParams]);
+  const updateView = (patch: Partial<DashboardView>) =>
+    setSearchParams(serializeView({ ...view, ...patch }), { replace: true });
+  const { unitId, frontId, includeProvisioned, preset: periodPreset, from: customFrom, to: customTo } = view;
+  const setUnitId = (v: string) => updateView({ unitId: v });
+  const setFrontId = (v: string) => updateView({ frontId: v });
+  const setIncludeProvisioned = (v: boolean) => updateView({ includeProvisioned: v });
+  const setPeriodPreset = (v: PeriodPreset) => updateView({ preset: v });
+  const setCustomFrom = (v: string | undefined) => updateView({ from: v });
+  const setCustomTo = (v: string | undefined) => updateView({ to: v });
   const [chartMode, setChartMode] = useState<ChartMode>('bars');
 
   const { data: units } = useSupabaseCrud<Tables<'units'>>('units');
@@ -300,7 +305,7 @@ export default function Dashboard() {
     period: { from: period.from, to: period.to },
   };
 
-  const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking, error, refreshing, reload } = useDashboard(dashFilters);
+  const { saldoTotal, saldoInicialConfigurado, receitasMes, despesasMes, receitasProvisionadas, despesasProvisionadas, contasAtrasadas, vencendoHoje, overdueBills, dueTodayBills, monthlyData, categoryData, receitaCategoryData, loading, semCategoria, semUnidade, margemContribuicao, variacaoReceita, variacaoDespesa, unitRanking, error, refreshing, updatedAt, reload } = useDashboard(dashFilters);
   const navigate = useNavigate();
 
   const activeUnits = (units)?.filter((u) => u.active) ?? [];
@@ -312,14 +317,23 @@ export default function Dashboard() {
   const despesasTotal = despesasMes + (includeProvisioned ? despesasProvisionadas : 0);
   const periodSuffix = period.isMonth ? 'mês' : 'período';
   const variationLabel = period.isMonth ? 'vs mês anterior' : 'vs período anterior';
+  const toneClass = { good: 'text-success', bad: 'text-destructive', neutral: 'text-muted-foreground' } as const;
+  const variationSub = (kind: 'receita' | 'despesa', v: number | null) =>
+    v !== null ? <span className={toneClass[variationTone(kind, v)]}>{fmtPct(v)} {variationLabel}</span> : '';
   const receitasSub = includeProvisioned && receitasProvisionadas > 0
     ? `Realizado ${fmt(receitasMes)} • Prov. ${fmt(receitasProvisionadas)}`
-    : (variacaoReceita !== null ? fmtPct(variacaoReceita) + ' ' + variationLabel : '');
+    : variationSub('receita', variacaoReceita);
   const despesasSub = includeProvisioned && despesasProvisionadas > 0
     ? `Realizado ${fmt(despesasMes)} • Prov. ${fmt(despesasProvisionadas)}`
-    : (variacaoDespesa !== null ? fmtPct(variacaoDespesa) + ' ' + variationLabel : '');
+    : variationSub('despesa', variacaoDespesa);
 
-  const cards = [
+  // Detalhar um cartão só é possível sem filtro de unidade/frente: a lista de lançamentos não divide rateios.
+  const canDrill = !dashFilters.unitId && !dashFilters.frontId;
+  const drill = (kind: 'receita' | 'despesa') =>
+    canDrill ? drilldownUrl({ kind, from: period.from, to: period.to, includeProvisioned }) : undefined;
+  const margemPct = receitasTotal > 0 ? `${((margemContribuicao / receitasTotal) * 100).toFixed(1)}% da receita` : '';
+
+  const cards: { title: string; value: string; icon: typeof DollarSign; color: string; sub: React.ReactNode; href?: string }[] = [
     {
       title: saldoInicialConfigurado ? 'Saldo Total' : 'Movimentação calculada',
       value: fmt(saldoTotal),
@@ -327,10 +341,10 @@ export default function Dashboard() {
       color: 'text-secondary',
       sub: saldoInicialConfigurado ? '' : 'Saldo inicial não configurado — não é o saldo bancário',
     },
-    { title: `Receitas do ${periodSuffix}`, value: fmt(receitasTotal), icon: TrendingUp, color: 'text-success', sub: receitasSub },
-    { title: `Despesas do ${periodSuffix}`, value: fmt(despesasTotal), icon: TrendingDown, color: 'text-destructive', sub: despesasSub },
-    { title: 'Margem', value: fmt(margemContribuicao), icon: BarChart3, color: margemContribuicao >= 0 ? 'text-success' : 'text-destructive', sub: '' },
-    { title: 'Contas em Atraso', value: String(contasAtrasadas), icon: AlertTriangle, color: contasAtrasadas > 0 ? 'text-warning' : 'text-muted-foreground', sub: '' },
+    { title: `Receitas do ${periodSuffix}`, value: fmt(receitasTotal), icon: TrendingUp, color: 'text-success', sub: receitasSub, href: drill('receita') },
+    { title: `Despesas do ${periodSuffix}`, value: fmt(despesasTotal), icon: TrendingDown, color: 'text-destructive', sub: despesasSub, href: drill('despesa') },
+    { title: 'Resultado', value: fmt(margemContribuicao), icon: BarChart3, color: margemContribuicao >= 0 ? 'text-success' : 'text-destructive', sub: margemPct },
+    { title: 'Contas em Atraso', value: String(contasAtrasadas), icon: AlertTriangle, color: contasAtrasadas > 0 ? 'text-warning' : 'text-muted-foreground', sub: '', href: contasAtrasadas > 0 ? '/contas' : undefined },
   ];
 
   if (loading) {
@@ -363,11 +377,22 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold text-card-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             Visão geral financeira do grupo
-            {refreshing && (
+            {refreshing ? (
               <span className="inline-flex items-center gap-1 text-xs" role="status">
                 <Loader2 className="h-3 w-3 animate-spin" /> Atualizando…
               </span>
+            ) : updatedAt && (
+              <span className="text-xs">· atualizado às {format(new Date(updatedAt), 'HH:mm')}</span>
             )}
+            <button
+              type="button"
+              onClick={reload}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+              aria-label="Atualizar números"
+            >
+              <RefreshCw className="h-3 w-3" /> Atualizar
+            </button>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -451,14 +476,7 @@ export default function Dashboard() {
             variant="ghost"
             size="sm"
             className="h-9 text-xs text-muted-foreground"
-            onClick={() => {
-              setPeriodPreset('current_month');
-              setCustomFrom(undefined);
-              setCustomTo(undefined);
-              setUnitId('all');
-              setFrontId('all');
-              setIncludeProvisioned(false);
-            }}
+            onClick={() => setSearchParams({}, { replace: true })}
           >
             Limpar filtros
           </Button>
@@ -481,7 +499,15 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className={cn('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 transition-opacity', refreshing && 'opacity-60')}>
         {cards.map((card) => (
-          <Card key={card.title} className="shadow-card rounded-2xl border-border min-w-0">
+          <Card
+            key={card.title}
+            className={cn('shadow-card rounded-2xl border-border min-w-0', card.href && 'cursor-pointer transition-shadow hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring')}
+            {...(card.href ? {
+              role: 'link', tabIndex: 0, title: 'Ver os lançamentos',
+              onClick: () => navigate(card.href!),
+              onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') navigate(card.href!); },
+            } : {})}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
               <CardTitle className="text-xs font-medium text-muted-foreground truncate">{card.title}</CardTitle>
               <card.icon className={`h-4 w-4 shrink-0 ${card.color}`} />
@@ -594,7 +620,7 @@ export default function Dashboard() {
                 <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis tick={{ fontSize: 11 }} width={72} tickFormatter={(v) => compactBRL(Number(v))} />
                   <ChartTooltip content={<ChartTooltipContent formatter={(value) => fmt(Number(value))} />} />
                   <Bar dataKey="receitas" stackId="r" fill="var(--color-receitas)" radius={includeProvisioned ? [0,0,0,0] : [4,4,0,0]} />
                   {includeProvisioned && (

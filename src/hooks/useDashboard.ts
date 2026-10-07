@@ -49,6 +49,8 @@ export interface DashboardData {
   error: string | null;
   /** Recarregando depois de mudar filtro (os números anteriores continuam na tela). */
   refreshing: boolean;
+  /** Quando os números atuais foram carregados (epoch ms), ou null enquanto não há dados. */
+  updatedAt: number | null;
 }
 
 export interface DashboardFilters {
@@ -119,6 +121,7 @@ export function useDashboard(filters?: DashboardFilters) {
     unitRanking: [],
     error: null,
     refreshing: false,
+    updatedAt: null,
   });
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -208,7 +211,7 @@ export function useDashboard(filters?: DashboardFilters) {
         unitRanking: s.unitRanking.map((u) => ({
           unitId: u.unitId, unitName: u.unitName, despesas: Number(u.despesas), receitas: Number(u.receitas),
         })),
-        error: null, refreshing: false,
+        error: null, refreshing: false, updatedAt: Date.now(),
       });
     } catch (err) {
       if (isCancelled()) return;
