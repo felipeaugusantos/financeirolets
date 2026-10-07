@@ -45,6 +45,23 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.3',
+    date: '2026-10-07',
+    summary: 'Ajustes na conciliação bancária: desvincular exclui o lançamento, busca por valor e revisão editável.',
+    items: [
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Desvincular exclui o lançamento',
+        detail: 'Ao desvincular, o lançamento ligado é excluído (ou você escolhe só desvincular). Em mês fechado nada é apagado.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Filtros lembrados',
+        detail: 'Conta, período, status, visão e busca voltam como estavam ao reabrir a tela.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Lançar automaticamente revisado',
+        detail: 'Traz as linhas selecionadas, mostra possíveis duplicidades desmarcadas, colunas editáveis e texto completo.' },
+      { area: 'Conciliação Bancária', kind: 'correcao', title: 'Total da seleção corrigido',
+        detail: 'O total ao lado de Criar lançamento soma só as linhas do extrato marcadas e zera ao trocar de conta ou período.' },
+      { area: 'Conciliação Bancária', kind: 'novidade', title: 'Percentual conciliado e busca por valor',
+        detail: 'Barra de % conciliado e busca no extrato por descrição ou valor.' },
+    ],
+  },
+  {
     version: '1.2.2',
     date: '2026-09-24',
     summary: 'Divisão padrão por categoria, 50 regras de conciliação e fluxo de caixa por unidade.',

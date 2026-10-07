@@ -421,26 +421,69 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     return true;
   }, [updateEntry, decisionStamp, load, toast]);
 
+  const unlinkEntry = useCallback(async (entryId: string) => {
+    const err = await updateEntry(entryId, {
+      transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
+    });
+    if (err) { toast({ title: 'Erro ao desvincular', description: err, variant: 'destructive' }); return false; }
+    await load();
+    return true;
+  }, [updateEntry, decisionStamp, load, toast]);
+
   /**
-   * Desvincula linhas do extrato (ou reabre ignoradas) e exclui, NA MESMA transação, o lançamento
-   * que foi criado a partir delas (função unlink_statement_entries). Lançamento que já existia
-   * antes da conciliação nunca é excluído; mês fechado recusa tudo.
+   * Desvincula a linha e exclui o lançamento ligado a ela (com rateio e anexos).
+   *
+   * - Lançamento CRIADO a partir da linha: tudo numa única transação do banco
+   *   (unlink_statement_entries). Se outra linha do extrato/cartão ainda estiver ligada a ele
+   *   (agrupamento), ele é mantido; mês fechado recusa e nada muda.
+   * - Lançamento que já existia (escolha explícita do usuário de excluí-lo): desvincula e exclui;
+   *   se a exclusão for recusada, a linha volta a ficar vinculada com a nota original.
    */
-  const unlinkEntries = useCallback(async (entryIds: string[]): Promise<UnlinkSummary | null> => {
-    const { data, error } = await callRpc<UnlinkSummary>('unlink_statement_entries', { p_entry_ids: entryIds });
-    if (error || !data) {
-      toast({ title: 'Erro ao desvincular', description: error ? unlinkErrorText(error) : 'Falha ao desvincular', variant: 'destructive' });
-      return null;
+  const unlinkAndDeleteEntry = useCallback(async (
+    entryId: string,
+    transactionId: string,
+    opts: { createdFromExtract: boolean; matchNote: string | null },
+  ) => {
+    if (opts.createdFromExtract) {
+      const { data, error } = await callRpc<UnlinkSummary>('unlink_statement_entries', { p_entry_ids: [entryId] });
+      if (error || !data) {
+        toast({
+          title: 'Lançamento não excluído',
+          description: `${error ? unlinkErrorText(error) : 'Falha ao desvincular.'} A conciliação foi mantida.`,
+          variant: 'destructive',
+        });
+        return false;
+      }
+      await load();
+      toast({ title: 'Conciliação desfeita', description: unlinkSummaryText(data) });
+      return true;
+    }
+
+    const err = await updateEntry(entryId, {
+      transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
+    });
+    if (err) { toast({ title: 'Erro ao desvincular', description: err, variant: 'destructive' }); return false; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let { error } = await (supabase as any).rpc('delete_transaction_with_children', { p_id: transactionId });
+    if (error?.code === 'PGRST202') {
+      const res = await supabase.from('transactions').delete().eq('id', transactionId).select('id');
+      error = res.error ?? (res.data?.length ? null : { message: 'Sem permissão para excluir este lançamento.' });
+    }
+    if (error) {
+      await updateEntry(entryId, {
+        transaction_id: transactionId, status: 'vinculado', match_note: opts.matchNote, ...decisionStamp(),
+      });
+      toast({
+        title: 'Lançamento não excluído',
+        description: `${error.message} A conciliação foi mantida.`,
+        variant: 'destructive',
+      });
+      await load();
+      return false;
     }
     await load();
-    return data;
-  }, [load, toast]);
-
-  const unlinkEntry = useCallback(async (entryId: string) => {
-    const res = await unlinkEntries([entryId]);
-    if (res) toast({ title: 'Conciliação desfeita', description: unlinkSummaryText(res) });
-    return res;
-  }, [unlinkEntries, toast]);
+    return true;
+  }, [updateEntry, decisionStamp, load, toast]);
 
   const ignoreEntry = useCallback(async (entryId: string, note: string) => {
     const err = await updateEntry(entryId, {
@@ -673,18 +716,14 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   }, [createLinked, load, toast, categorySplitFor]);
 
   /**
-   * Exclui a conciliação de várias linhas de uma vez (tudo ou nada): o vínculo é desfeito, a linha
-   * volta para pendente e o lançamento criado a partir dela é excluído (ver unlinkEntries).
+   * Exclui a conciliação de várias linhas: o vínculo é desfeito e a linha volta
+   * para pendente. O lançamento em si não é alterado nem apagado.
    */
-  const unlinkMany = useCallback(async (entryIds: string[]) => {
-    if (entryIds.length === 0) return { ok: 0, failed: 0 };
-    setBatchRunning(true);
-    const res = await unlinkEntries(entryIds);
-    setBatchRunning(false);
-    if (!res) return { ok: 0, failed: entryIds.length };
-    toast({ title: `Conciliações excluídas: ${res.unlinked} linha(s)`, description: unlinkSummaryText(res) });
-    return { ok: res.unlinked, failed: 0 };
-  }, [unlinkEntries, toast]);
+  const unlinkMany = useCallback((entryIds: string[]) =>
+    runBatch('Conciliações excluídas', entryIds.map(id => () => updateEntry(id, {
+      transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
+    })))
+  , [runBatch, updateEntry, decisionStamp]);
 
   /**
    * Vincula automaticamente as linhas cujo memo é idêntico à descrição de um
@@ -717,7 +756,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
   return {
     enriched, duplicateGroups, entries, candidates, rules, loading, importing, batchRunning, lastImport, stats,
-    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, ignoreEntry, createFromEntry,
+    importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, unlinkAndDeleteEntry, ignoreEntry, createFromEntry,
     linkMany, ignoreMany, createMany, createGrouped, autoLinkByDescription, unlinkMany,
     reload: load, reloadRules: loadRules,
   };

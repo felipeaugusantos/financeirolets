@@ -13,13 +13,6 @@ interface EntryLike { status: string; match_note: string | null }
 export const createdFromStatement = (e: EntryLike): boolean =>
   e.status === 'vinculado' && !!e.match_note?.startsWith(CREATED_NOTE_PREFIX);
 
-/** Quantas das linhas teriam o lançamento excluído e quantas só perderiam o vínculo. */
-export function unlinkImpact(entries: EntryLike[]): { createdLinks: number; existingLinks: number } {
-  const linked = entries.filter(e => e.status === 'vinculado');
-  const createdLinks = linked.filter(createdFromStatement).length;
-  return { createdLinks, existingLinks: linked.length - createdLinks };
-}
-
 /** Texto do aviso depois de desvincular. */
 export function unlinkSummaryText(s: UnlinkSummary): string {
   const parts = [`${s.unlinked} linha(s) voltaram para pendente`];

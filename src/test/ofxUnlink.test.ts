@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createdFromStatement, unlinkImpact, unlinkSummaryText, unlinkErrorText } from '@/lib/ofxUnlink';
+import { createdFromStatement, unlinkSummaryText, unlinkErrorText } from '@/lib/ofxUnlink';
 
 const e = (status: string, match_note: string | null) => ({ status, match_note });
 
@@ -15,16 +15,6 @@ describe('desvincular conciliação e excluir o lançamento criado', () => {
     // linha ignorada ou pendente não tem lançamento
     expect(createdFromStatement(e('ignorado', 'Criado a partir do extrato'))).toBe(false);
     expect(createdFromStatement(e('pendente', null))).toBe(false);
-  });
-
-  it('conta o impacto de desvincular um conjunto de linhas', () => {
-    expect(unlinkImpact([
-      e('vinculado', 'Criado a partir do extrato'),
-      e('vinculado', 'Criado a partir do extrato (lote)'),
-      e('vinculado', 'Vinculado na conciliação em painéis'),
-      e('ignorado', 'Transferência própria'),
-      e('pendente', null),
-    ])).toEqual({ createdLinks: 2, existingLinks: 1 });
   });
 
   it('descreve o resultado em português', () => {
