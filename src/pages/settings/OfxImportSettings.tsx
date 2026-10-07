@@ -860,7 +860,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
       {accountId && view === 'lista' && (
         <OfxPeriodReport
-          entries={entries}
+          entries={listEntries}
           accountName={account?.name ?? 'Conta'}
           from={from}
           to={to}
