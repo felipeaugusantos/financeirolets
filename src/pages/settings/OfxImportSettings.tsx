@@ -302,8 +302,14 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
 
   const visible = useMemo(
-    () => enriched.filter(e => statusFilter === 'todos' || e.entry.status === statusFilter),
-    [enriched, statusFilter]
+    () => enriched.filter(e =>
+      (statusFilter === 'todos' || e.entry.status === statusFilter)
+      && (view !== 'lista' || matchesEntrySearch(search, e.entry.memo, Number(e.entry.amount)))),
+    [enriched, statusFilter, search, view]
+  );
+  const listEntries = useMemo(
+    () => (search.trim() ? entries.filter(e => matchesEntrySearch(search, e.memo, Number(e.amount))) : entries),
+    [entries, search]
   );
 
   // Só linhas pendentes entram em ação de lote.
@@ -690,7 +696,24 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                 {s}
               </Button>
             ))}
+            {view === 'lista' && (
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por descrição ou valor"
+                className="h-8 w-56 rounded-xl text-xs"
+              />
+            )}
           </div>
+          {accountId && progress.total > 0 && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span><strong className="text-foreground">{progress.pct}% conciliado</strong> no período</span>
+                <span>{progress.done} de {progress.total} linha(s) decididas</span>
+              </div>
+              <Progress value={progress.pct} className="h-2" />
+            </div>
+          )}
         </CardContent>
       </Card>
 
