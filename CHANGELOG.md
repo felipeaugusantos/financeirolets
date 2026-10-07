@@ -3,6 +3,13 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.3 — 07/10/2026
+- Desvincular conciliação exclui o lançamento (opção de só desvincular).
+- Filtros da conciliação lembrados; seleção limpa ao trocar conta/período.
+- Lançar automaticamente: seleção respeitada, colunas editáveis, texto completo.
+- Total do Criar lançamento corrigido; % conciliado; busca por valor.
+- Regra Kaique → Pro Labore Sócios.
+
 ## 1.2.2 — 24/09/2026
 - Divisão padrão por categoria (`category_split_rules`) e botão "Nova regra simples".
 - 50 regras de conciliação (37 atualizadas + 13 novas).
