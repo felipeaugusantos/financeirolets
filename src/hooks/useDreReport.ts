@@ -81,6 +81,7 @@ function computeLineValues(
   const lineValues = new Map<string, number>();
   let unallocTotal = 0;
   let unallocCount = 0;
+  const unallocItems: OutOfDreItem[] = [];
   // Lançamentos que não pertencem a nenhuma linha do DRE (sem categoria ou
   // categoria sem dre_line_id). Antes eram descartados em silêncio.
   let outOfDreTotal = 0;
@@ -141,10 +142,16 @@ function computeLineValues(
     if (unitFilter !== NO_UNIT_KEY && splits.every((s) => s.unitKey === NO_UNIT_KEY)) {
       unallocTotal += totalVal;
       unallocCount++;
+      unallocItems.push({
+        id: tx.id, description: tx.description || '—',
+        date: tx.competence_date ?? tx.payment_date ?? null,
+        category_id: tx.category_id, value: tx.type === 'despesa' ? -Math.abs(totalVal) : totalVal,
+        is_reversal: !!tx.is_reversal,
+      });
     }
   });
 
-  return { lineValues, unallocTotal, unallocCount, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
+  return { lineValues, unallocTotal, unallocCount, unallocItems, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
 }
 
 function buildSubtotals(allLines: DreLineRow[], lineValues: Map<string, number>) {
@@ -271,6 +278,7 @@ export function useDreReport() {
   const [lines, setLines] = useState<DreLineResult[]>([]);
   const [unallocatedTotal, setUnallocatedTotal] = useState(0);
   const [unallocatedCount, setUnallocatedCount] = useState(0);
+  const [unallocatedItems, setUnallocatedItems] = useState<OutOfDreItem[]>([]);
   const [outOfDreTotal, setOutOfDreTotal] = useState(0);
   const [outOfDreCount, setOutOfDreCount] = useState(0);
   const [outOfDreItems, setOutOfDreItems] = useState<OutOfDreItem[]>([]);
@@ -355,6 +363,7 @@ export function useDreReport() {
       setLines(result);
       setUnallocatedTotal(current.unallocTotal);
       setUnallocatedCount(current.unallocCount);
+      setUnallocatedItems(current.unallocItems);
       setOutOfDreTotal(current.outOfDreTotal);
       setOutOfDreCount(current.outOfDreCount);
       setOutOfDreItems(current.outOfDreItems);
@@ -367,5 +376,5 @@ export function useDreReport() {
     }
   }, [toast]);
 
-  return { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
+  return { lines, loading, generate, unallocatedTotal, unallocatedCount, unallocatedItems, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
 }

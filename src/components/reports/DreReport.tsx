@@ -24,7 +24,7 @@ const fmtPct = (v: number) =>
   `${(v >= 0 ? '+' : '')}${v.toFixed(1)}%`;
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
-  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems } = useDreReport();
+  const { lines, loading, generate, unallocatedTotal, unallocatedCount, unallocatedItems, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems } = useDreReport();
   const [drill, setDrill] = useState<DreLineResult | null>(null);
   const drillItems = (() => {
     if (!drill) return [];
@@ -48,12 +48,12 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   }, [drill]);
   const [outCatNames, setOutCatNames] = useState<Record<string, string>>({});
   useEffect(() => {
-    const ids = [...new Set(outOfDreItems.map(i => i.category_id).filter(Boolean) as string[])];
+    const ids = [...new Set([...outOfDreItems, ...unallocatedItems].map(i => i.category_id).filter(Boolean) as string[])];
     if (ids.length === 0) return;
     supabase.from('categories').select('id, name').in('id', ids).then(({ data }) => {
-      setOutCatNames(Object.fromEntries((data ?? []).map(c => [c.id, c.name])));
+      setOutCatNames(prev => ({ ...prev, ...Object.fromEntries((data ?? []).map(c => [c.id, c.name])) }));
     });
-  }, [outOfDreItems]);
+  }, [outOfDreItems, unallocatedItems]);
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
@@ -336,6 +336,27 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
           <span className="text-amber-800 dark:text-amber-300">
             <strong>{unallocatedCount} lançamento(s)</strong> sem unidade atribuída ({fmt(Math.abs(unallocatedTotal))}) não estão incluídos neste relatório filtrado. Atribua uma unidade ou configure rateio nesses lançamentos para incluí-los.
+            <span className="mt-2 block overflow-auto">
+              <table className="w-full text-xs text-foreground">
+                <thead><tr className="text-left text-muted-foreground">
+                  <th className="py-1 pr-2">Data</th><th className="py-1 pr-2">Descrição</th>
+                  <th className="py-1 pr-2">Categoria</th><th className="py-1 text-right">Valor</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {unallocatedItems.map(it => (
+                    <tr key={it.id} className="border-t border-amber-200 dark:border-amber-900">
+                      <td className="py-1 pr-2 whitespace-nowrap">{it.date ? it.date.split('-').reverse().join('/') : '—'}</td>
+                      <td className="py-1 pr-2">{it.description}</td>
+                      <td className="py-1 pr-2">{it.category_id ? (outCatNames[it.category_id] ?? '—') : 'Sem categoria'}</td>
+                      <td className="py-1 text-right whitespace-nowrap">{fmt(it.value)}</td>
+                      <td className="py-1 pl-2">
+                        <a className="underline" href={`/lancamentos?q=${encodeURIComponent(it.description)}`}>Abrir</a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </span>
           </span>
         </div>
       )}
