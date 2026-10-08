@@ -121,6 +121,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  /**
+   * Lançamentos rateados que têm parte na unidade filtrada (via transaction_allocations).
+   * Sem isso, um lançamento rateado só aparecia na unidade principal dele.
+   */
+  const [allocIds, setAllocIds] = useState<{ unit: string; ids: string[] } | null>(null);
+  useEffect(() => {
+    const u = filters.unit_id;
+    if (!u || u === '__null__') { setAllocIds(null); return; }
+    let cancelled = false;
+    supabase.from('transaction_allocations').select('transaction_id').eq('unit_id', u).then(({ data }) => {
+      if (!cancelled) setAllocIds({ unit: u, ids: [...new Set((data ?? []).map(r => r.transaction_id))] });
+    });
+    return () => { cancelled = true; };
+  }, [filters.unit_id]);
+  const allocReady = !filters.unit_id || filters.unit_id === '__null__' || allocIds?.unit === filters.unit_id;
+
   /** Aplica exatamente os mesmos filtros na listagem e na agregação de totais. */
   const applyFilters = useCallback(<Q,>(q: Q): Q => {
     // O tipo recursivo do builder estoura o compilador; trabalhamos no subconjunto acima.
@@ -129,7 +145,13 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (filters.status) query = query.eq('status', filters.status as Enums['transaction_status']);
     if (filters.category_id) query = filters.category_id === '__null__' ? query.is('category_id', null) : query.eq('category_id', filters.category_id);
     if (filters.account_id) query = filters.account_id === '__null__' ? query.is('account_id', null) : query.eq('account_id', filters.account_id);
-    if (filters.unit_id) query = filters.unit_id === '__null__' ? query.is('unit_id', null) : query.eq('unit_id', filters.unit_id);
+    if (filters.unit_id === '__null__') query = query.is('unit_id', null);
+    else if (filters.unit_id) {
+      const ids = allocIds?.unit === filters.unit_id ? allocIds.ids : [];
+      query = ids.length
+        ? query.or(`unit_id.eq.${filters.unit_id},id.in.(${ids.join(',')})`)
+        : query.eq('unit_id', filters.unit_id);
+    }
     if (filters.front_id) query = filters.front_id === '__null__' ? query.is('front_id', null) : query.eq('front_id', filters.front_id);
     if (filters.partner_id) query = filters.partner_id === '__null__' ? query.is('partner_id', null) : query.eq('partner_id', filters.partner_id);
     if (filters.payment_method) query = filters.payment_method === '__null__' ? query.is('payment_method', null) : query.eq('payment_method', filters.payment_method as Enums['payment_method']);
@@ -162,9 +184,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
 
     return query as unknown as Q;
-  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.regime, filters.search]);
+  }, [filters.type, filters.status, filters.category_id, filters.account_id, filters.unit_id, filters.front_id, filters.partner_id, filters.payment_method, filters.dateFrom, filters.dateTo, filters.regime, filters.search, allocIds]);
 
   const fetchData = useCallback(async () => {
+    if (!allocReady) return;
     setLoading(true);
 
     // 1) Lista exibida — limitada a uma página do backend.
@@ -220,7 +243,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setTotals(aggregated ?? sumTotals(typed));
     }
     setLoading(false);
-  }, [applyFilters, toast]);
+  }, [applyFilters, toast, allocReady]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
