@@ -74,7 +74,7 @@ describe('Dashboard (tela)', () => {
   });
 
   it('cartão de receitas abre os lançamentos do mesmo período, tipo e regime', async () => {
-    await mount('/');
+    await mount('/?regime=caixa');
     await act(async () => { (card(/Receitas do mês/)!).click(); });
     const where = document.querySelector('[data-testid="where"]')!.textContent!;
     expect(where).toMatch(/^\/lancamentos\?/);
@@ -94,6 +94,11 @@ describe('Dashboard (tela)', () => {
     const btn = Array.from(document.querySelectorAll('button')).find(b => /Atualizar/.test(b.textContent ?? ''))!;
     await act(async () => { btn.click(); });
     expect(h.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('padrão é competência e o cartão não vira link', async () => {
+    await mount('/');
+    expect(card(/Receitas do mês/)!.getAttribute('role')).toBeNull();
   });
 
   it('período na URL é aplicado ao título dos gráficos', async () => {
