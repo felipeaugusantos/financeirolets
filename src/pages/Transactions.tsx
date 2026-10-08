@@ -305,6 +305,7 @@ export default function Transactions() {
           notes: editingTx.notes || undefined,
           affects_dre: editingTx.affects_dre,
           affects_cashflow: editingTx.affects_cashflow,
+          is_reversal: editingTx.is_reversal,
         } : undefined}
       />
 
