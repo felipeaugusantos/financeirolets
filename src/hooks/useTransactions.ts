@@ -25,6 +25,8 @@ export interface TransactionRow {
   net_amount: number;
   /** Valor cheio quando a lista mostra só a parte da unidade filtrada (rateio). */
   full_net_amount?: number;
+  /** Divisão do rateio por unidade (valor de cada parte), quando houver. */
+  split?: { unit: string; value: number }[];
   competence_date: string;
   due_date: string | null;
   payment_date: string | null;
@@ -255,6 +257,26 @@ export function useTransactions(filters: TransactionFilters = {}) {
     } else {
       const typed = ((listRes.data ?? []) as unknown as TransactionRow[]).map(unitShare);
       setData(typed);
+      // Divisão do rateio por unidade, mostrada embaixo de cada lançamento rateado.
+      const ids = typed.map(t => t.id);
+      if (ids.length) {
+        const chunks: string[][] = [];
+        for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
+        Promise.all(chunks.map(c => supabase.from('transaction_allocations')
+          .select('transaction_id, allocation_type, percentage, amount, unit:units(name)').in('transaction_id', c)))
+          .then(results => {
+            const byTx = new Map<string, { unit: string; value: number }[]>();
+            const totalOf = new Map(typed.map(t => [t.id, t.full_net_amount ?? Number(t.net_amount) ?? 0]));
+            for (const r of results) for (const a of (r.data ?? []) as unknown as { transaction_id: string; allocation_type: string; percentage: number | null; amount: number | null; unit: { name: string } | null }[]) {
+              const total = totalOf.get(a.transaction_id) ?? 0;
+              const v = a.allocation_type === 'percentual' && a.percentage != null ? total * Number(a.percentage) / 100 : Number(a.amount ?? 0);
+              const list = byTx.get(a.transaction_id) ?? [];
+              list.push({ unit: (a.unit?.name ?? 'Sem unidade').replace(/^Let's\s+/i, ''), value: Math.round(v * 100) / 100 });
+              byTx.set(a.transaction_id, list);
+            }
+            if (byTx.size) setData(cur => cur.map(t => byTx.has(t.id) ? { ...t, split: byTx.get(t.id) } : t));
+          });
+      }
       const complete = typed.length < PAGE_SIZE;
       setListComplete(complete);
       setTotals(aggregated ?? sumTotals(typed));
