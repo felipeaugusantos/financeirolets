@@ -101,6 +101,13 @@ describe('useDashboard (resumo calculado no banco)', () => {
     expect(h.rpc.mock.calls[0][1]).toMatchObject({ p_from: '2026-09-01', p_to: '2026-09-30', p_unit: null, p_front: null, p_include_provisioned: false });
   });
 
+  it('regime competência chama o resumo por competência', async () => {
+    await render({ regime: 'competencia', includeProvisioned: true });
+    await waitFor(() => expect(api.loading).toBe(false));
+    expect(h.rpc.mock.calls[0][0]).toBe('dashboard_summary_comp');
+    expect(api.margemContribuicao).toBe(600);          // provisionados ignorados
+  });
+
   it('erro do banco mostra o aviso em vez de zeros silenciosos', async () => {
     h.rpc.mockResolvedValue({ data: null, error: { message: 'timeout na consulta' } });
     await render();

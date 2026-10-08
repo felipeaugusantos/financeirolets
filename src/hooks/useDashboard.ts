@@ -57,6 +57,8 @@ export interface DashboardFilters {
   unitId?: string;
   frontId?: string;
   includeProvisioned?: boolean;
+  /** 'competencia' = mesma regra do DRE (mês de competência, pago ou não). Padrão: caixa. */
+  regime?: 'caixa' | 'competencia';
   period?: { from: string; to: string };
 }
 
@@ -134,7 +136,7 @@ export function useDashboard(filters?: DashboardFilters) {
     fetchData(() => cancelled);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters?.unitId, filters?.frontId, filters?.includeProvisioned, periodFrom, periodTo, reloadKey]);
+  }, [filters?.unitId, filters?.frontId, filters?.includeProvisioned, filters?.regime, periodFrom, periodTo, reloadKey]);
 
   const unitFilter = filters?.unitId;
   const frontFilter = filters?.frontId;
@@ -149,18 +151,23 @@ export function useDashboard(filters?: DashboardFilters) {
       if (rangeEnd < rangeStart) throw new Error('Período inválido: a data inicial deve ser anterior à final.');
 
       // Tudo é calculado no banco (dashboard_summary), com as mesmas regras de lib/finance.ts.
-      const { data: s, error } = await callRpc<DashboardSummary>('dashboard_summary', {
-        p_from: rangeStart,
-        p_to: rangeEnd,
-        p_unit: unitFilter ?? null,
-        p_front: frontFilter ?? null,
-        p_include_provisioned: !!filters?.includeProvisioned,
-        p_today: today,
-      });
+      const comp = filters?.regime === 'competencia';
+      const { data: s, error } = comp
+        ? await callRpc<DashboardSummary>('dashboard_summary_comp', {
+            p_from: rangeStart, p_to: rangeEnd, p_unit: unitFilter ?? null, p_front: frontFilter ?? null, p_today: today,
+          })
+        : await callRpc<DashboardSummary>('dashboard_summary', {
+            p_from: rangeStart,
+            p_to: rangeEnd,
+            p_unit: unitFilter ?? null,
+            p_front: frontFilter ?? null,
+            p_include_provisioned: !!filters?.includeProvisioned,
+            p_today: today,
+          });
       if (error || !s) throw new Error(error ? dashboardRpcError(error) : 'Resposta vazia do servidor.');
       if (isCancelled()) return;
 
-      const incluirProv = !!filters?.includeProvisioned;
+      const incluirProv = !comp && !!filters?.includeProvisioned;
       const receitasMes = Number(s.receitas);
       const despesasMes = Number(s.despesas);
       const receitasProvisionadas = Number(s.receitasProvisionadas);

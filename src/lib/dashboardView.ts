@@ -12,9 +12,11 @@ export interface DashboardView {
   unitId: string;
   frontId: string;
   includeProvisioned: boolean;
+  /** Padrão competência (igual ao DRE); caixa = pela data de pagamento. */
+  regime: 'competencia' | 'caixa';
 }
 
-export const DEFAULT_VIEW: DashboardView = { preset: 'current_month', unitId: '', frontId: '', includeProvisioned: false };
+export const DEFAULT_VIEW: DashboardView = { preset: 'current_month', unitId: '', frontId: '', includeProvisioned: false, regime: 'competencia' };
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,6 +36,7 @@ export function parseView(sp: URLSearchParams): DashboardView {
     unitId: unit && UUID.test(unit) ? unit : '',
     frontId: front && UUID.test(front) ? front : '',
     includeProvisioned: sp.get('prov') === '1',
+    regime: sp.get('regime') === 'caixa' ? 'caixa' : 'competencia',
   };
 }
 
@@ -48,6 +51,7 @@ export function serializeView(v: DashboardView): URLSearchParams {
   if (v.unitId && v.unitId !== 'all') sp.set('unidade', v.unitId);
   if (v.frontId && v.frontId !== 'all') sp.set('frente', v.frontId);
   if (v.includeProvisioned) sp.set('prov', '1');
+  if (v.regime === 'caixa') sp.set('regime', 'caixa');
   return sp;
 }
 

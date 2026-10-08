@@ -281,9 +281,11 @@ export default function Dashboard() {
   const view = useMemo(() => parseView(searchParams), [searchParams]);
   const updateView = (patch: Partial<DashboardView>) =>
     setSearchParams(serializeView({ ...view, ...patch }), { replace: true });
-  const { unitId, frontId, includeProvisioned, preset: periodPreset, from: customFrom, to: customTo } = view;
+  const { unitId, frontId, regime, preset: periodPreset, from: customFrom, to: customTo } = view;
   const setUnitId = (v: string) => updateView({ unitId: v });
   const setFrontId = (v: string) => updateView({ frontId: v });
+  // Provisionados só fazem sentido no regime de caixa (competência já inclui pagos e não pagos).
+  const includeProvisioned = regime === 'caixa' && view.includeProvisioned;
   const setIncludeProvisioned = (v: boolean) => updateView({ includeProvisioned: v });
   const setPeriodPreset = (v: PeriodPreset) => updateView({ preset: v });
   const setCustomFrom = (v: string | undefined) => updateView({ from: v });
@@ -302,6 +304,7 @@ export default function Dashboard() {
     unitId: unitId && unitId !== 'all' ? unitId : undefined,
     frontId: frontId && frontId !== 'all' ? frontId : undefined,
     includeProvisioned,
+    regime,
     period: { from: period.from, to: period.to },
   };
 
@@ -328,7 +331,7 @@ export default function Dashboard() {
     : variationSub('despesa', variacaoDespesa);
 
   // Detalhar um cartão só é possível sem filtro de unidade/frente: a lista de lançamentos não divide rateios.
-  const canDrill = !dashFilters.unitId && !dashFilters.frontId;
+  const canDrill = regime === 'caixa' && !dashFilters.unitId && !dashFilters.frontId;
   const drill = (kind: 'receita' | 'despesa') =>
     canDrill ? drilldownUrl({ kind, from: period.from, to: period.to, includeProvisioned }) : undefined;
   const margemPct = receitasTotal > 0 ? `${((margemContribuicao / receitasTotal) * 100).toFixed(1)}% da receita` : '';
@@ -458,6 +461,16 @@ export default function Dashboard() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={regime} onValueChange={(v) => updateView({ regime: v as 'competencia' | 'caixa' })}>
+            <SelectTrigger className="w-[190px] rounded-xl h-9" aria-label="Regime">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="competencia">Por competência (DRE)</SelectItem>
+              <SelectItem value="caixa">Por caixa (pagamento)</SelectItem>
+            </SelectContent>
+          </Select>
+          {regime === 'caixa' && (
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -472,6 +485,7 @@ export default function Dashboard() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          )}
           <Button
             variant="ghost"
             size="sm"
