@@ -588,7 +588,13 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   const confirmCreate = async () => {
     if (!createFor) return;
-    const ok = await createFromEntry(createFor.entry as StatementEntry, { ...createForm, useRuleAllocations: false } as TransactionPatch);
+    // Mantém o rateio da regra, a menos que o usuário tenha escolhido uma unidade na tela.
+    const keepRuleSplit = !createForm.unit_id && (createFor.ruleAllocations?.length ?? 0) > 0;
+    const ok = await createFromEntry(createFor.entry as StatementEntry, {
+      ...createForm,
+      useRuleAllocations: keepRuleSplit,
+      allocations: keepRuleSplit ? createFor.ruleAllocations : undefined,
+    } as TransactionPatch);
     if (ok) setCreateFor(null);
   };
 
@@ -1240,6 +1246,13 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
               {createFor.ruleLabel && (
                 <p className="text-xs text-muted-foreground">
                   Campos pré-preenchidos pela regra de conciliação "<strong>{createFor.ruleLabel}</strong>". Revise e salve.
+                </p>
+              )}
+              {(createFor.ruleAllocations?.length ?? 0) > 0 && (
+                <p className="text-xs rounded-lg border border-border bg-muted/50 p-2">
+                  {createForm.unit_id
+                    ? 'Unidade escolhida: o rateio da regra não será aplicado.'
+                    : `Será aplicado o rateio da regra entre ${createFor.ruleAllocations!.map(a => `${options.units.find(u => u.id === a.unit_id)?.name ?? '—'} ${a.value ?? ''}%`).join(', ')}. Escolha uma unidade só se quiser lançar tudo nela.`}
                 </p>
               )}
               <div className="space-y-1.5">
