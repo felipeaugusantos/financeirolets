@@ -22,7 +22,15 @@ const fmtPct = (v: number) =>
   `${(v >= 0 ? '+' : '')}${v.toFixed(1)}%`;
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
-  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount } = useDreReport();
+  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems } = useDreReport();
+  const [outCatNames, setOutCatNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = [...new Set(outOfDreItems.map(i => i.category_id).filter(Boolean) as string[])];
+    if (ids.length === 0) return;
+    supabase.from('categories').select('id, name').in('id', ids).then(({ data }) => {
+      setOutCatNames(Object.fromEntries((data ?? []).map(c => [c.id, c.name])));
+    });
+  }, [outOfDreItems]);
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<DreFilters>({
@@ -314,6 +322,27 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
           <span className="text-destructive">
             <strong>{outOfDreCount} lançamento(s)</strong> fora do DRE ({fmt(Math.abs(outOfDreTotal))} de impacto líquido) porque estão sem categoria ou em categoria sem linha de DRE. Eles existem no caixa, mas não aparecem em nenhuma linha abaixo. Vincule as categorias em Configurações → Categorias.
+            <span className="mt-2 block overflow-auto">
+              <table className="w-full text-xs text-foreground">
+                <thead><tr className="text-left text-muted-foreground">
+                  <th className="py-1 pr-2">Data</th><th className="py-1 pr-2">Descrição</th>
+                  <th className="py-1 pr-2">Categoria</th><th className="py-1 text-right">Valor</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {outOfDreItems.map(it => (
+                    <tr key={it.id} className="border-t border-destructive/20">
+                      <td className="py-1 pr-2 whitespace-nowrap">{it.date ? it.date.split('-').reverse().join('/') : '—'}</td>
+                      <td className="py-1 pr-2">{it.description}</td>
+                      <td className="py-1 pr-2">{it.category_id ? (outCatNames[it.category_id] ?? 'Categoria sem linha de DRE') : 'Sem categoria'}</td>
+                      <td className="py-1 text-right whitespace-nowrap">{fmt(it.value)}</td>
+                      <td className="py-1 pl-2">
+                        <a className="underline" href={`/lancamentos?q=${encodeURIComponent(it.description)}`}>Abrir</a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </span>
           </span>
         </div>
       )}
