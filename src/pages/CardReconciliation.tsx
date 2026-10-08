@@ -31,6 +31,7 @@ interface CardEntry {
   account_id: string;
   card_last4: string | null;
   posted_at: string;
+  launch_date: string | null;
   description: string;
   amount: number;
   status: string;
@@ -220,6 +221,8 @@ export default function CardReconciliation() {
   const included = drafts.filter(d => d.include);
   const readyToLaunch = included.filter(d => d.unit_id && d.category_id);
 
+  /** Data do pagamento da fatura: vira competência e pagamento dos lançamentos criados. */
+  const [launchDate, setLaunchDate] = useState(todayLocalISO());
   const closeImport = () => { setPendingImport(null); setEdits({}); setProgress(null); };
 
   /**
@@ -235,6 +238,7 @@ export default function CardReconciliation() {
         account_id: accountId,
         card_last4: d.row.card,
         posted_at: d.row.posted_at,
+        launch_date: launchDate || null,
         description: d.row.description,
         amount: d.row.amount,
         row_hash: d.hash,
@@ -440,7 +444,8 @@ export default function CardReconciliation() {
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
                     <th className="py-2 px-2 w-8"> </th>
-                    <th className="py-2 px-2 font-medium">Data</th>
+                    <th className="py-2 px-2 font-medium">Compra</th>
+                    <th className="py-2 px-2 font-medium">Lançamento</th>
                     <th className="py-2 px-2 font-medium">Descrição</th>
                     <th className="py-2 px-2 font-medium text-right">Valor</th>
                     <th className="py-2 px-2 font-medium">Unidade</th>
@@ -469,6 +474,16 @@ export default function CardReconciliation() {
                           />
                         </td>
                         <td className="py-1.5 px-2 whitespace-nowrap">{br(e.posted_at)}</td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="date"
+                            disabled={done}
+                            value={e.launch_date ?? ''}
+                            onChange={ev => patchEntry(e.id, { launch_date: ev.target.value || null })}
+                            title="Data do lançamento no sistema (pagamento da fatura). Vazio = data da compra."
+                            className="h-8 rounded-md border border-input bg-background px-1.5 text-xs disabled:opacity-50"
+                          />
+                        </td>
                         <td className="py-1.5 px-2">
                           <span className="block truncate max-w-[240px]">{e.description}</span>
                           {e.card_last4 && <span className="text-[10px] text-muted-foreground">{cardText(e.card_last4)}</span>}
@@ -539,6 +554,12 @@ export default function CardReconciliation() {
               {pendingImport?.fileName} — nada foi gravado ainda. Confira, ajuste unidade e categoria e clique em Lançar.
             </DialogDescription>
           </DialogHeader>
+          <label className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-medium">Data do lançamento (pagamento da fatura):</span>
+            <input type="date" value={launchDate} onChange={ev => setLaunchDate(ev.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+            <span className="text-muted-foreground">usada como competência e pagamento; a data da compra fica guardada.</span>
+          </label>
 
             {preview && (
               <>
