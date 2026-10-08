@@ -1219,6 +1219,17 @@ export type Database = {
         }
         Returns: Json
       }
+      dash_categories_comp: {
+        Args: {
+          p_from: string
+          p_front: string
+          p_prov: boolean
+          p_to: string
+          p_type: string
+          p_unit: string
+        }
+        Returns: Json
+      }
       dash_filtered_value: {
         Args: {
           p_front: string
@@ -1240,7 +1251,21 @@ export type Database = {
         }
         Returns: Json
       }
+      dash_kpis_comp: {
+        Args: {
+          p_from: string
+          p_front: string
+          p_prov: boolean
+          p_to: string
+          p_unit: string
+        }
+        Returns: Json
+      }
       dash_monthly: {
+        Args: { p_from: string; p_front: string; p_to: string; p_unit: string }
+        Returns: Json
+      }
+      dash_monthly_comp: {
         Args: { p_from: string; p_front: string; p_to: string; p_unit: string }
         Returns: Json
       }
@@ -1254,7 +1279,34 @@ export type Database = {
         }
         Returns: Json
       }
+      dash_ranking_comp: {
+        Args: {
+          p_from: string
+          p_front: string
+          p_prov: boolean
+          p_to: string
+          p_unit: string
+        }
+        Returns: Json
+      }
       dash_rows: {
+        Args: { p_from: string; p_front: string; p_to: string; p_unit: string }
+        Returns: {
+          category_id: string
+          competence_date: string
+          id: string
+          payment_date: string
+          pip: boolean
+          pipv: boolean
+          total: number
+          type: Database["public"]["Enums"]["transaction_type"]
+          unit_id: string
+          val: number
+          vip: boolean
+          vipv: boolean
+        }[]
+      }
+      dash_rows_comp: {
         Args: { p_from: string; p_front: string; p_to: string; p_unit: string }
         Returns: {
           category_id: string
@@ -1283,6 +1335,16 @@ export type Database = {
           p_from: string
           p_front?: string
           p_include_provisioned?: boolean
+          p_to: string
+          p_today?: string
+          p_unit?: string
+        }
+        Returns: Json
+      }
+      dashboard_summary_comp: {
+        Args: {
+          p_from: string
+          p_front?: string
           p_to: string
           p_today?: string
           p_unit?: string
