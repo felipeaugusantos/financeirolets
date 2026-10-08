@@ -46,6 +46,7 @@ export interface TransactionRow {
   recurrence_parent_id?: string | null;
   affects_dre?: boolean;
   affects_cashflow?: boolean;
+  is_reversal?: boolean;
   card_sale_group_id?: string | null;
   // joined
   category?: { name: string; type: string } | null;
@@ -107,6 +108,7 @@ export interface TransactionInput {
   recurrence_end_date?: string;
   affects_dre?: boolean;
   affects_cashflow?: boolean;
+  is_reversal?: boolean;
   card_sale_group_id?: string | null;
 }
 
@@ -245,6 +247,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       created_by: user.id,
       affects_dre: input.affects_dre ?? true,
       affects_cashflow: input.affects_cashflow ?? true,
+      is_reversal: input.is_reversal ?? false,
       card_sale_group_id: input.card_sale_group_id ?? null,
       // Recorrência só é aplicada à 1ª linha (matriz). Veja loop abaixo.
     };
@@ -363,6 +366,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (input.recurrence_end_date !== undefined) updateData.recurrence_end_date = input.recurrence_end_date || null;
     if (input.affects_dre !== undefined) updateData.affects_dre = input.affects_dre;
     if (input.affects_cashflow !== undefined) updateData.affects_cashflow = input.affects_cashflow;
+    if (input.is_reversal !== undefined) updateData.is_reversal = input.is_reversal;
 
     // Campos, rateio e reajuste do rateio em R$ (quando o valor muda sem rateio novo) numa só transação.
     const allocations = input.allocations === undefined

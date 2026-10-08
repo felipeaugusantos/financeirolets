@@ -107,6 +107,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
   const [allocOpen, setAllocOpen] = useState(false);
   const [affectsDre, setAffectsDre] = useState(true);
   const [affectsCashflow, setAffectsCashflow] = useState(true);
+  const [isReversal, setIsReversal] = useState(false);
 
   const isEditing = !!initialData?.id;
 
@@ -133,6 +134,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       setNotes(initialData.notes || '');
       setAffectsDre(initialData.affects_dre ?? true);
       setAffectsCashflow(initialData.affects_cashflow ?? true);
+      setIsReversal(initialData.is_reversal ?? false);
       // Load existing allocations for editing
       if (initialData.id) {
         supabase.from('transaction_allocations')
@@ -184,6 +186,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     setFiles([]);
     setAllocOpen(false);
     setAffectsDre(true);
+    setIsReversal(false);
     setAffectsCashflow(true);
   };
 
@@ -275,6 +278,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
       recurrence_end_date: isRecurring && !isInstallment && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : undefined,
       affects_dre: affectsDre,
       affects_cashflow: affectsCashflow,
+      is_reversal: isReversal,
     };
     const ok = await onSave(input);
     setSaving(false);
@@ -374,6 +378,16 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
                 {!affectsDre && affectsCashflow && 'Ex.: transferência, empréstimo, recebimento líquido de cartão. Movimenta o saldo, não entra no resultado.'}
                 {!affectsDre && !affectsCashflow && '⚠️ Esse lançamento não aparece em lugar nenhum. Tem certeza?'}
               </p>
+              <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+                <Label htmlFor="is-reversal" className="text-xs cursor-pointer">↩️ É estorno</Label>
+                <Switch id="is-reversal" checked={isReversal} onCheckedChange={setIsReversal} />
+              </div>
+              {isReversal && (
+                <p className="text-xs px-2 text-muted-foreground">
+                  Estorno: use a mesma categoria do lançamento original. O valor entra negativo nessa linha do DRE,
+                  abatendo o que foi lançado, e no caixa entra no sentido contrário.
+                </p>
+              )}
             </div>
 
             {/* Dates */}

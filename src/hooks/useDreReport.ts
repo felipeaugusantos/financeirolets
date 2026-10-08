@@ -26,6 +26,7 @@ interface DreTxRow {
   description?: string | null;
   competence_date?: string | null;
   payment_date?: string | null;
+  is_reversal?: boolean | null;
 }
 
 export interface OutOfDreItem {
@@ -34,6 +35,7 @@ export interface OutOfDreItem {
   date: string | null;
   category_id: string | null;
   value: number;
+  is_reversal?: boolean;
 }
 
 export interface DreLineResult {
@@ -90,7 +92,7 @@ function computeLineValues(
     list.push({
       id: tx.id, description: tx.description || '—',
       date: tx.competence_date ?? tx.payment_date ?? null,
-      category_id: tx.category_id, value: v,
+      category_id: tx.category_id, value: v, is_reversal: !!tx.is_reversal,
     });
     lineItems.set(lineId, list);
   };
@@ -195,7 +197,7 @@ async function fetchPeriodValues(
   const dateField = dateFieldForRegime(filters.regime);
   let txQuery = supabase
     .from('transactions')
-    .select('id, net_amount, category_id, status, unit_id, type, description, competence_date, payment_date')
+    .select('id, net_amount, category_id, status, unit_id, type, description, competence_date, payment_date, is_reversal')
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo)
     .limit(10000);

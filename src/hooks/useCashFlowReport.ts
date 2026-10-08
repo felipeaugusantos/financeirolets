@@ -40,7 +40,7 @@ export function useCashFlowReport() {
     try {
       let query = supabase
         .from('transactions')
-        .select('id, type, net_amount, payment_date, status, unit_id, category_id, account_id')
+        .select('id, type, net_amount, payment_date, status, unit_id, category_id, account_id, is_reversal')
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo)
         .limit(10000);

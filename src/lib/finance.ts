@@ -40,9 +40,11 @@ export function affectsCashflow(tx: { affects_cashflow?: boolean | null }): bool
 }
 
 /** Valor de referência do lançamento (líquido). */
-export function txValue(tx: { net_amount?: number | string | null }): number {
+export function txValue(tx: { net_amount?: number | string | null; is_reversal?: boolean | null }): number {
   const v = Number(tx.net_amount);
-  return Number.isFinite(v) ? v : 0;
+  if (!Number.isFinite(v)) return 0;
+  // Estorno: abate a mesma categoria (entra negativo no DRE e inverte o sentido no caixa).
+  return tx.is_reversal ? -v : v;
 }
 
 /** Sinal contábil pela natureza do lançamento: receita entra (+), despesa sai (-). */

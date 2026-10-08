@@ -384,6 +384,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                     {showCode && <TableHead className="w-16">#</TableHead>}
                     <TableHead>Linha</TableHead>
                     <TableHead className="text-right w-36">Realizado</TableHead>
+                    <TableHead className="w-8"><span className="sr-only">Lançamentos</span></TableHead>
                     {showAV && <TableHead className="text-right w-20">AV %</TableHead>}
                     {showBudgetCol && <TableHead className="text-right w-32">Orçado</TableHead>}
                     {showBudgetCol && <TableHead className="text-right w-24">Var %</TableHead>}
@@ -428,20 +429,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                           style={{ paddingLeft: `${(line.depth * 1.5) + 1}rem` }}
                           className={cn(line.is_subtotal ? 'font-semibold' : 'text-sm')}
                         >
-                          <span className="inline-flex items-center gap-1.5">
-                            {line.name}
-                            {line.value !== 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setDrill(line)}
-                                className="text-muted-foreground hover:text-primary"
-                                title="Ver lançamentos desta linha"
-                                aria-label={`Ver lançamentos de ${line.name}`}
-                              >
-                                <ListIcon className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </span>
+                          {line.name}
                         </TableCell>
                         <TableCell className={cn(
                           'text-right tabular-nums',
@@ -450,6 +438,28 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                           line.is_subtotal && 'font-semibold'
                         )}>
                           {fmt(line.value)}
+                          {(() => {
+                            const rev = (lineItems.get(line.id) ?? []).filter(i => i.is_reversal);
+                            if (rev.length === 0) return null;
+                            return (
+                              <span className="block text-[10px] font-normal text-muted-foreground">
+                                inclui estorno {fmt(rev.reduce((t, i) => t + i.value, 0))}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="w-8 px-1 text-center">
+                          {line.value !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setDrill(line)}
+                              className="text-muted-foreground hover:text-primary"
+                              title="Ver lançamentos desta linha"
+                              aria-label={`Ver lançamentos de ${line.name}`}
+                            >
+                              <ListIcon className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </TableCell>
                         {showAV && (
                           <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
@@ -501,7 +511,10 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 {drillItems.map(it => (
                   <tr key={it.id} className="border-t">
                     <td className="p-2 whitespace-nowrap">{it.date ? it.date.split('-').reverse().join('/') : '—'}</td>
-                    <td className="p-2">{it.description}</td>
+                    <td className="p-2">
+                      {it.description}
+                      {it.is_reversal && <span className="ml-1 rounded bg-muted px-1 text-[10px] font-medium">estorno</span>}
+                    </td>
                     <td className="p-2">{it.category_id ? (outCatNames[it.category_id] ?? '…') : '—'}</td>
                     <td className="p-2 text-right whitespace-nowrap tabular-nums">{fmt(it.value)}</td>
                     <td className="p-2">

@@ -316,6 +316,7 @@ export type Database = {
           front_id: string | null
           id: string
           imported_by: string | null
+          launch_date: string | null
           note: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           posted_at: string
@@ -338,6 +339,7 @@ export type Database = {
           front_id?: string | null
           id?: string
           imported_by?: string | null
+          launch_date?: string | null
           note?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           posted_at: string
@@ -360,6 +362,7 @@ export type Database = {
           front_id?: string | null
           id?: string
           imported_by?: string | null
+          launch_date?: string | null
           note?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           posted_at?: string
@@ -964,6 +967,7 @@ export type Database = {
           installment_number: number | null
           installment_total: number | null
           is_recurring: boolean
+          is_reversal: boolean
           last_recurrence_generated_at: string | null
           net_amount: number
           notes: string | null
@@ -999,6 +1003,7 @@ export type Database = {
           installment_number?: number | null
           installment_total?: number | null
           is_recurring?: boolean
+          is_reversal?: boolean
           last_recurrence_generated_at?: string | null
           net_amount?: number
           notes?: string | null
@@ -1034,6 +1039,7 @@ export type Database = {
           installment_number?: number | null
           installment_total?: number | null
           is_recurring?: boolean
+          is_reversal?: boolean
           last_recurrence_generated_at?: string | null
           net_amount?: number
           notes?: string | null
