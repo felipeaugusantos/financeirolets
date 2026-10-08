@@ -3,6 +3,12 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.5 — 08/10/2026
+- Dashboard por competência (padrão) ou caixa.
+- DRE: lançamentos por linha, listas de fora do DRE e sem unidade; linha 1.1.10.
+- Marcador de estorno; cartão com data do lançamento e competência.
+- Rateio das regras respeitado em "Criar lançamento".
+
 ## 1.2.4 — 07/10/2026
 - Dashboard calculado no banco (`dashboard_summary`), erros visíveis, filtros na URL, detalhe dos cartões, Resultado e botão Atualizar.
 - Nova tela de pré-lançamento do cartão (cabeçalho/rodapé fixos) e Marcar/Desmarcar todas ao lançar linhas do extrato.
