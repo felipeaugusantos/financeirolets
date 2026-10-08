@@ -72,7 +72,7 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
     (async () => {
       setLoading(true);
       const start = monthStart(fromM), end = monthEnd(toM);
-      const cols = 'id, type, status, net_amount, unit_id, category_id, payment_date, due_date';
+      const cols = 'id, type, status, net_amount, unit_id, category_id, payment_date, due_date, is_reversal';
       const [realized, projected] = await Promise.all([
         fetchAll<Tx>((a, b) => supabase.from('transactions').select(cols)
           .in('status', ['pago', 'recebido']).eq('affects_cashflow', true)

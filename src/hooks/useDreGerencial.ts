@@ -133,7 +133,7 @@ async function fetchLineValues(
   const dateField = dateFieldForRegime(filters.regime);
   let q = supabase
     .from('transactions')
-    .select('id, net_amount, category_id, status, unit_id, front_id, type')
+    .select('id, net_amount, category_id, status, unit_id, front_id, type, is_reversal')
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo)
     .limit(10000);

@@ -113,7 +113,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       const dateField = dateFieldForRegime(filters.regime);
       let txQuery = supabase
         .from('transactions')
-        .select('id, net_amount, category_id, type, status, unit_id')
+        .select('id, net_amount, category_id, type, status, unit_id, is_reversal')
         .gte(dateField, filters.dateFrom)
         .lte(dateField, filters.dateTo)
         .limit(10000);

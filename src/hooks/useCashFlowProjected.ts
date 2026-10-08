@@ -42,7 +42,7 @@ export function useCashFlowProjected() {
       // Realizado: paid by payment_date
       let realizedQ = supabase
         .from('transactions')
-        .select('id, type, net_amount, payment_date, unit_id, category_id')
+        .select('id, type, net_amount, payment_date, unit_id, category_id, is_reversal')
         .gte('payment_date', filters.dateFrom)
         .lte('payment_date', filters.dateTo)
         .limit(10000);
@@ -51,7 +51,7 @@ export function useCashFlowProjected() {
       // Projetado: pending/scheduled by due_date
       let projectedQ = supabase
         .from('transactions')
-        .select('id, type, net_amount, due_date, unit_id, category_id')
+        .select('id, type, net_amount, due_date, unit_id, category_id, is_reversal')
         .gte('due_date', filters.dateFrom)
         .lte('due_date', filters.dateTo)
         .limit(10000);

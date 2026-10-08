@@ -195,7 +195,7 @@ async function fetchPeriodValues(
   const dateField = dateFieldForRegime(filters.regime);
   let txQuery = supabase
     .from('transactions')
-    .select('id, net_amount, category_id, status, unit_id, type, description, competence_date, payment_date')
+    .select('id, net_amount, category_id, status, unit_id, type, description, competence_date, payment_date, is_reversal')
     .gte(dateField, dateFrom)
     .lte(dateField, dateTo)
     .limit(10000);
