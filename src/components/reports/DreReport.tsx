@@ -151,6 +151,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
         subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo} | Regime: ${filters.regime === 'competencia' ? 'Competência' : 'Caixa'}`,
         filename: `DRE_${filters.dateFrom}_${filters.dateTo}.pdf`,
         element: reportRef.current,
+        // Com colunas extras (orçado/ano anterior) o PDF sai em paisagem.
+        captureWidth: filters.includeBudget || filters.includePrevious ? 1300 : 1000,
       });
     } finally {
       setExporting(false);
