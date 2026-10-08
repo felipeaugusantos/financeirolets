@@ -384,6 +384,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                     {showCode && <TableHead className="w-16">#</TableHead>}
                     <TableHead>Linha</TableHead>
                     <TableHead className="text-right w-36">Realizado</TableHead>
+                    <TableHead className="w-8"><span className="sr-only">Lançamentos</span></TableHead>
                     {showAV && <TableHead className="text-right w-20">AV %</TableHead>}
                     {showBudgetCol && <TableHead className="text-right w-32">Orçado</TableHead>}
                     {showBudgetCol && <TableHead className="text-right w-24">Var %</TableHead>}

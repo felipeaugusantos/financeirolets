@@ -70,3 +70,11 @@ describe('regras financeiras comuns', () => {
     expect(a).toBe(b);
   });
 });
+
+import { txValue as txValueRev } from '@/lib/finance';
+describe('estorno', () => {
+  it('salário 1.000 com estorno de 200 resulta em 800 na linha', () => {
+    const total = txValueRev({ net_amount: 1000 }) + txValueRev({ net_amount: 200, is_reversal: true });
+    expect(total).toBe(800);
+  });
+});
