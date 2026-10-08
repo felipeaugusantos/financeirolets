@@ -285,10 +285,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
       percentage: a.percentage ?? null,
       amount: a.amount != null ? Math.round((a.amount / count) * 100) / 100 : null,
     }));
-    const { data: insertedIds, error } = await callRpc<string[]>('create_transactions_with_allocations', {
+    let { data: insertedIds, error } = await callRpc<string[]>('create_transactions_with_allocations', {
       p_rows: rows,
       p_allocations: allocations,
     });
+    if (error?.code === 'PGRST202') {
+      // Banco sem a função atômica: grava pelo caminho direto.
+      const ins = await supabase.from('transactions').insert(rows as never).select('id');
+      error = ins.error;
+      insertedIds = (ins.data ?? []).map(r => r.id);
+      if (!error && allocations.length > 0 && insertedIds.length > 0) {
+        const allocRes = await supabase.from('transaction_allocations').insert(
+          insertedIds.flatMap(tid => allocations.map(a => ({ ...a, transaction_id: tid }))) as never,
+        );
+        if (allocRes.error) toast({ title: 'Rateio não salvo', description: allocRes.error.message, variant: 'destructive' });
+      }
+    }
     if (error || !insertedIds || insertedIds.length === 0) {
       toast({
         title: 'Erro ao criar lançamento',
@@ -362,11 +374,24 @@ export function useTransactions(filters: TransactionFilters = {}) {
           percentage: a.percentage ?? null,
           amount: a.amount ?? null,
         }));
-    const { error } = await callRpc('update_transaction_with_allocations', {
+    let { error } = await callRpc('update_transaction_with_allocations', {
       p_id: id,
       p_patch: updateData,
       ...(allocations !== undefined ? { p_allocations: allocations } : {}),
     });
+    if (error?.code === 'PGRST202') {
+      // Banco sem a função atômica: atualiza pelo caminho direto.
+      const upd = await supabase.from('transactions').update(updateData as never).eq('id', id).select('id');
+      error = upd.error ?? (upd.data?.length ? null : { message: 'transaction_not_found' });
+      if (!error && allocations !== undefined) {
+        await supabase.from('transaction_allocations').delete().eq('transaction_id', id);
+        if (allocations.length > 0) {
+          const r = await supabase.from('transaction_allocations')
+            .insert(allocations.map(a => ({ ...a, transaction_id: id })) as never);
+          if (r.error) error = r.error;
+        }
+      }
+    }
     if (error) {
       toast({ title: 'Erro ao atualizar', description: transactionRpcError('update_transaction_with_allocations', error), variant: 'destructive' });
       return false;
@@ -384,10 +409,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
     // Lançamento, rateio e anexos saem numa única transação; em mês fechado o banco recusa
     // tudo e nada é perdido. A função devolve o que removeu, para o desfazer.
-    const { data: removed, error } = await callRpc<{
+    let { data: removed, error } = await callRpc<{
       row: DeletedCapture['row'];
       allocations: DeletedCapture['allocations'];
     }>('delete_transaction_with_children', { p_id: id });
+    if (error?.code === 'PGRST202') {
+      // Banco sem a função atômica: guarda o registro e exclui pelo caminho direto.
+      const [{ data: row }, { data: allocs }] = await Promise.all([
+        supabase.from('transactions').select('*').eq('id', id).maybeSingle(),
+        supabase.from('transaction_allocations').select('*').eq('transaction_id', id),
+      ]);
+      const del = await supabase.from('transactions').delete().eq('id', id).select('id');
+      error = del.error ?? (del.data?.length ? null : { message: 'transaction_not_found' });
+      removed = error || !row ? null : { row: row as DeletedCapture['row'], allocations: (allocs ?? []) as DeletedCapture['allocations'] };
+    }
     if (error || !removed) {
       toast({
         title: 'Erro ao excluir',
