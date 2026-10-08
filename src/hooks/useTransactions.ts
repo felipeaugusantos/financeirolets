@@ -23,6 +23,8 @@ export interface TransactionRow {
   amount: number;
   tax_amount: number;
   net_amount: number;
+  /** Valor cheio quando a lista mostra só a parte da unidade filtrada (rateio). */
+  full_net_amount?: number;
   competence_date: string;
   due_date: string | null;
   payment_date: string | null;
@@ -258,7 +260,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setTotals(aggregated ?? sumTotals(typed));
     }
     setLoading(false);
-  }, [applyFilters, toast, allocReady]);
+  }, [applyFilters, toast, allocReady, unitShare]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -168,6 +168,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
                 <div className="text-right flex flex-col items-end gap-1">
                   <span className={`text-sm font-semibold ${tx.type === 'receita' ? 'text-[hsl(var(--success))]' : 'text-destructive'}`}>
                     {tx.type === 'receita' ? '+' : '-'} {formatCurrency(Number(tx.net_amount))}
+                    {tx.full_net_amount != null && <span className="block text-[10px] font-normal text-muted-foreground">rateio · total {formatCurrency(tx.full_net_amount)}</span>}
                   </span>
                   <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[tx.status] || ''}`}>
                     {STATUS_LABELS[tx.status]}
@@ -219,6 +220,7 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
               <TableCell className="text-xs text-muted-foreground">{tx.category?.name || '—'}</TableCell>
               <TableCell className={`text-sm font-semibold text-right ${tx.type === 'receita' ? 'text-[hsl(var(--success))]' : 'text-destructive'}`}>
                 {tx.type === 'receita' ? '+' : '-'} {formatCurrency(Number(tx.net_amount))}
+                    {tx.full_net_amount != null && <span className="block text-[10px] font-normal text-muted-foreground">rateio · total {formatCurrency(tx.full_net_amount)}</span>}
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={`text-[10px] ${STATUS_COLORS[tx.status] || ''}`}>
