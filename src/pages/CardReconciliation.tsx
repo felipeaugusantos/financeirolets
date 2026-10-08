@@ -17,7 +17,7 @@ import {
   type AmountSign, type CardSheetInput,
 } from '@/lib/cardSheet';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
-import { errorMessage } from '@/lib/utils';
+import { errorMessage, todayLocalISO } from '@/lib/utils';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
