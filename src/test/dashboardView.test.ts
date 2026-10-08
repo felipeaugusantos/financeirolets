@@ -10,7 +10,7 @@ describe('filtros do Dashboard na URL', () => {
   });
 
   it('ida e volta com período personalizado, unidade, frente e provisionados', () => {
-    const v = { preset: 'custom' as const, from: '2026-08-01', to: '2026-09-30', unitId: U, frontId: U.replace('1111', '9999'), includeProvisioned: true };
+    const v = { preset: 'custom' as const, from: '2026-08-01', to: '2026-09-30', unitId: U, frontId: U.replace('1111', '9999'), includeProvisioned: true, regime: 'caixa' as const };
     const back = parseView(serializeView(v));
     expect(back).toEqual(v);
   });
