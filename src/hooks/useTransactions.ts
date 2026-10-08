@@ -23,6 +23,8 @@ export interface TransactionRow {
   amount: number;
   tax_amount: number;
   net_amount: number;
+  /** Valor cheio quando a lista mostra só a parte da unidade filtrada (rateio). */
+  full_net_amount?: number;
   competence_date: string;
   due_date: string | null;
   payment_date: string | null;
@@ -125,16 +127,31 @@ export function useTransactions(filters: TransactionFilters = {}) {
    * Lançamentos rateados que têm parte na unidade filtrada (via transaction_allocations).
    * Sem isso, um lançamento rateado só aparecia na unidade principal dele.
    */
-  const [allocIds, setAllocIds] = useState<{ unit: string; ids: string[] } | null>(null);
+  const [allocIds, setAllocIds] = useState<{ unit: string; ids: string[]; parts: Map<string, { t: string; p: number | null; a: number | null }[]> } | null>(null);
   useEffect(() => {
     const u = filters.unit_id;
     if (!u || u === '__null__') { setAllocIds(null); return; }
     let cancelled = false;
-    supabase.from('transaction_allocations').select('transaction_id').eq('unit_id', u).then(({ data }) => {
-      if (!cancelled) setAllocIds({ unit: u, ids: [...new Set((data ?? []).map(r => r.transaction_id))] });
+    supabase.from('transaction_allocations').select('transaction_id, allocation_type, percentage, amount').eq('unit_id', u).then(({ data }) => {
+      if (cancelled) return;
+      const parts = new Map<string, { t: string; p: number | null; a: number | null }[]>();
+      for (const r of data ?? []) {
+        const list = parts.get(r.transaction_id) ?? [];
+        list.push({ t: r.allocation_type, p: r.percentage == null ? null : Number(r.percentage), a: r.amount == null ? null : Number(r.amount) });
+        parts.set(r.transaction_id, list);
+      }
+      setAllocIds({ unit: u, ids: [...parts.keys()], parts });
     });
     return () => { cancelled = true; };
   }, [filters.unit_id]);
+  /** Com filtro de unidade, um lançamento rateado vale só a parte da unidade. */
+  const unitShare = useCallback(<R extends { id?: string; net_amount: number | string | null }>(r: R): R => {
+    const parts = allocIds && filters.unit_id === allocIds.unit && r.id ? allocIds.parts.get(r.id) : undefined;
+    if (!parts) return r;
+    const total = Number(r.net_amount) || 0;
+    const share = parts.reduce((s, x) => s + (x.t === 'percentual' && x.p != null ? total * x.p / 100 : (x.a ?? 0)), 0);
+    return { ...r, net_amount: Math.round(share * 100) / 100, full_net_amount: total };
+  }, [allocIds, filters.unit_id]);
   const allocReady = !filters.unit_id || filters.unit_id === '__null__' || allocIds?.unit === filters.unit_id;
 
   /** Aplica exatamente os mesmos filtros na listagem e na agregação de totais. */
@@ -219,7 +236,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
         .order('id', { ascending: false })
         .range(fromIdx, toIdx);
       if (error) throw error;
-      return (rows ?? []) as TotalsRow[];
+      return ((rows ?? []) as TotalsRow[]).map(unitShare);
     });
 
     const [listRes, aggregated] = await Promise.all([
@@ -236,14 +253,14 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setTotals(EMPTY_TOTALS);
       setListComplete(true);
     } else {
-      const typed = (listRes.data ?? []) as unknown as TransactionRow[];
+      const typed = ((listRes.data ?? []) as unknown as TransactionRow[]).map(unitShare);
       setData(typed);
       const complete = typed.length < PAGE_SIZE;
       setListComplete(complete);
       setTotals(aggregated ?? sumTotals(typed));
     }
     setLoading(false);
-  }, [applyFilters, toast, allocReady]);
+  }, [applyFilters, toast, allocReady, unitShare]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
