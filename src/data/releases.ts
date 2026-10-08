@@ -45,6 +45,20 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.5',
+    date: '2026-10-08',
+    summary: 'Dashboard por competência, mais detalhes no DRE, estorno marcado, datas do cartão e rateio das regras corrigido.',
+    items: [
+      { area: 'Relatórios', kind: 'novidade', title: 'Dashboard por competência', detail: 'O Dashboard abre pelo mês de competência, igual ao DRE. Dá para trocar para "por caixa" quando quiser ver o que foi pago.', tech: 'dashboard_summary_comp + dash_*_comp; regime na URL (padrão competência).' },
+      { area: 'Relatórios', kind: 'novidade', title: 'Ver os lançamentos de cada linha do DRE', detail: 'Cada linha com valor tem um ícone que abre os lançamentos que formam aquele número.', tech: 'lineItems em useDreReport.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'Lançamentos fora do DRE e sem unidade aparecem listados', detail: 'Os avisos do DRE agora mostram quais lançamentos estão sem linha de DRE ou sem unidade, com link para abrir cada um.', tech: 'outOfDreItems / unallocItems.' },
+      { area: 'Relatórios', kind: 'novidade', title: 'Nova linha "Venda Produtos para Lojas Próprias"', detail: 'Linha 1.1.10 criada no DRE. Ligue a categoria em Configurações → Categorias.' },
+      { area: 'Lançamentos', kind: 'novidade', title: 'Marcador "É estorno"', detail: 'Um estorno (por exemplo, de salário) abate o valor da mesma linha no DRE e aparece identificado como estorno.', tech: 'transactions.is_reversal; txValue nega o valor.' },
+      { area: 'Conciliação Bancária', kind: 'novidade', title: 'Cartão: data do lançamento e competência', detail: 'Na importação do cartão você informa a data do lançamento (pagamento da fatura) e o mês de competência em que o valor vale no DRE. A data da compra fica guardada.', tech: 'card_statement_entries.launch_date / competence_date; RPC create_transaction_from_card_entry.' },
+      { area: 'Conciliação Bancária', kind: 'correcao', title: 'Rateio das regras respeitado ao criar lançamento', detail: 'Ao criar um lançamento a partir do extrato, o rateio entre unidades definido na regra é aplicado e mostrado na tela. Se escolher uma unidade, tudo vai para ela.', tech: 'confirmCreate mantém ruleAllocations quando unit_id vazio.' },
+    ],
+  },
+  {
     version: '1.2.4',
     date: '2026-10-07',
     summary: 'Dashboard mais rápido e confiável, nova tela de pré-lançamento do cartão e salvamento seguro de lançamentos.',
