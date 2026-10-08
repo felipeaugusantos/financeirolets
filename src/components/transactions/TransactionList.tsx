@@ -161,6 +161,11 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
                     <span>{format(parseDateUTC(tx.competence_date), 'dd/MM/yy')}</span>
                     {tx.category && <span>• {tx.category.name}</span>}
                   </div>
+                  {tx.split && tx.split.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {tx.split.map(p => `${p.unit} ${formatCurrency(p.value)}`).join(' · ')}
+                    </p>
+                  )}
                   {tx.installment_total && (
                     <span className="text-[10px] text-muted-foreground">{tx.installment_number}/{tx.installment_total}</span>
                   )}
@@ -216,6 +221,11 @@ export default function TransactionList({ data, loading, onEdit, onDelete, onMar
                   )}
                   <VisibilityBadges tx={tx} />
                 </div>
+                  {tx.split && tx.split.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {tx.split.map(p => `${p.unit} ${formatCurrency(p.value)}`).join(' · ')}
+                    </p>
+                  )}
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">{tx.category?.name || '—'}</TableCell>
               <TableCell className={`text-sm font-semibold text-right ${tx.type === 'receita' ? 'text-[hsl(var(--success))]' : 'text-destructive'}`}>
