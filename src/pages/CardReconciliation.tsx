@@ -25,7 +25,7 @@ const NONE = '__none__';
 const SELECT_CLASS = 'h-8 w-full min-w-[9rem] rounded-md border border-input bg-background px-2 text-xs disabled:opacity-50';
 /** Final de 4 dígitos aparece como •••• 1234; rótulo de bloco ("VISA INFINITY") aparece como está. */
 /** "2026-09" -> "2026-09-30" (último dia do mês); vazio -> null. */
-export function monthToDate(month: string): string | null {
+function monthToDate(month: string): string | null {
   if (!/^\d{4}-\d{2}$/.test(month)) return null;
   const [y, m] = month.split('-').map(Number);
   const last = new Date(y, m, 0).getDate();
