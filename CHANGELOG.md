@@ -3,6 +3,10 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.6 — 08/10/2026
+- Lançamentos: filtro por unidade mostra só a parte do rateio (lista e totais).
+- Divisão por unidade exibida embaixo de cada lançamento rateado.
+
 ## 1.2.5 — 08/10/2026
 - Dashboard por competência (padrão) ou caixa.
 - DRE: lançamentos por linha, listas de fora do DRE e sem unidade; linha 1.1.10.

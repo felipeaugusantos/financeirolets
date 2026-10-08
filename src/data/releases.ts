@@ -45,6 +45,15 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.6',
+    date: '2026-10-08',
+    summary: 'Lista de Lançamentos mostra o rateio por unidade.',
+    items: [
+      { area: 'Lançamentos', kind: 'correcao', title: 'Filtro por unidade mostra só a parte do rateio', detail: 'Ao filtrar por uma unidade, o lançamento rateado aparece com a parte dessa unidade (ex.: R$ 2.640,32 de um total de R$ 5.280,65), e os totais do topo somam só essa parte.', tech: 'useTransactions: allocIds por unidade + unitShare na lista e em sumAllPages.' },
+      { area: 'Lançamentos', kind: 'melhoria', title: 'Divisão por unidade embaixo de cada rateio', detail: 'Todo lançamento rateado mostra embaixo a divisão, como "Café R$ 2.640,32 · Boulevard R$ 2.640,32", mesmo sem filtro.', tech: 'TransactionRow.split carregado de transaction_allocations em lotes de 150.' },
+    ],
+  },
+  {
     version: '1.2.5',
     date: '2026-10-08',
     summary: 'Dashboard por competência, mais detalhes no DRE, estorno marcado, datas do cartão e rateio das regras corrigido.',
