@@ -84,6 +84,16 @@ function computeLineValues(
   let outOfDreTotal = 0;
   let outOfDreCount = 0;
   const outOfDreItems: OutOfDreItem[] = [];
+  const lineItems = new Map<string, OutOfDreItem[]>();
+  const pushItem = (lineId: string, tx: DreTxRow, v: number) => {
+    const list = lineItems.get(lineId) || [];
+    list.push({
+      id: tx.id, description: tx.description || '—',
+      date: tx.competence_date ?? tx.payment_date ?? null,
+      category_id: tx.category_id, value: v,
+    });
+    lineItems.set(lineId, list);
+  };
 
   transactions.forEach((tx) => {
     const totalVal = txValue(tx);
@@ -109,7 +119,10 @@ function computeLineValues(
     }
     // Regra única de rateio/unidade compartilhada com Dashboard, DRE Comparativo e Fluxo de Caixa.
     const splits = splitByUnit(tx, allocMap);
-    const add = (v: number) => lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + v);
+    const add = (v: number) => {
+      lineValues.set(dreLineId, (lineValues.get(dreLineId) || 0) + v);
+      pushItem(dreLineId, tx, v);
+    };
 
     if (!unitFilter) {
       add(totalVal);
@@ -129,7 +142,7 @@ function computeLineValues(
     }
   });
 
-  return { lineValues, unallocTotal, unallocCount, outOfDreTotal, outOfDreCount, outOfDreItems };
+  return { lineValues, unallocTotal, unallocCount, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
 }
 
 function buildSubtotals(allLines: DreLineRow[], lineValues: Map<string, number>) {
@@ -259,6 +272,7 @@ export function useDreReport() {
   const [outOfDreTotal, setOutOfDreTotal] = useState(0);
   const [outOfDreCount, setOutOfDreCount] = useState(0);
   const [outOfDreItems, setOutOfDreItems] = useState<OutOfDreItem[]>([]);
+  const [lineItems, setLineItems] = useState<Map<string, OutOfDreItem[]>>(new Map());
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -342,6 +356,7 @@ export function useDreReport() {
       setOutOfDreTotal(current.outOfDreTotal);
       setOutOfDreCount(current.outOfDreCount);
       setOutOfDreItems(current.outOfDreItems);
+      setLineItems(current.lineItems);
     } catch (err: unknown) {
       toast({ title: 'Erro ao gerar DRE', description: errorMessage(err), variant: 'destructive' });
       setLines([]);
@@ -350,5 +365,5 @@ export function useDreReport() {
     }
   }, [toast]);
 
-  return { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems };
+  return { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
 }

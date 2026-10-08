@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useDreReport, DreFilters } from '@/hooks/useDreReport';
+import { useDreReport, DreFilters, type DreLineResult } from '@/hooks/useDreReport';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { List as ListIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,28 @@ const fmtPct = (v: number) =>
   `${(v >= 0 ? '+' : '')}${v.toFixed(1)}%`;
 
 export default function DreReport({ onBack }: { onBack: () => void }) {
-  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems } = useDreReport();
+  const { lines, loading, generate, unallocatedTotal, unallocatedCount, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems } = useDreReport();
+  const [drill, setDrill] = useState<DreLineResult | null>(null);
+  const drillItems = (() => {
+    if (!drill) return [];
+    const ids = new Set<string>([drill.id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      lines.forEach(l => { if (l.parent_id && ids.has(l.parent_id) && !ids.has(l.id)) { ids.add(l.id); grew = true; } });
+    }
+    return [...ids].flatMap(id => lineItems.get(id) ?? [])
+      .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+  })();
+  useEffect(() => {
+    const ids = [...new Set(drillItems.map(i => i.category_id).filter(Boolean) as string[])]
+      .filter(id => !outCatNames[id]);
+    if (ids.length === 0) return;
+    supabase.from('categories').select('id, name').in('id', ids).then(({ data }) => {
+      setOutCatNames(prev => ({ ...prev, ...Object.fromEntries((data ?? []).map(c => [c.id, c.name])) }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drill]);
   const [outCatNames, setOutCatNames] = useState<Record<string, string>>({});
   useEffect(() => {
     const ids = [...new Set(outOfDreItems.map(i => i.category_id).filter(Boolean) as string[])];
@@ -405,7 +428,20 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                           style={{ paddingLeft: `${(line.depth * 1.5) + 1}rem` }}
                           className={cn(line.is_subtotal ? 'font-semibold' : 'text-sm')}
                         >
-                          {line.name}
+                          <span className="inline-flex items-center gap-1.5">
+                            {line.name}
+                            {line.value !== 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setDrill(line)}
+                                className="text-muted-foreground hover:text-primary"
+                                title="Ver lançamentos desta linha"
+                                aria-label={`Ver lançamentos de ${line.name}`}
+                              >
+                                <ListIcon className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </span>
                         </TableCell>
                         <TableCell className={cn(
                           'text-right tabular-nums',
@@ -449,6 +485,41 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!drill} onOpenChange={o => !o && setDrill(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-heading">{drill?.code ? `${drill.code} - ` : ''}{drill?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-muted text-left">
+                <tr><th className="p-2">Data</th><th className="p-2">Descrição</th><th className="p-2">Categoria</th>
+                  <th className="p-2 text-right">Valor</th><th></th></tr>
+              </thead>
+              <tbody>
+                {drillItems.map(it => (
+                  <tr key={it.id} className="border-t">
+                    <td className="p-2 whitespace-nowrap">{it.date ? it.date.split('-').reverse().join('/') : '—'}</td>
+                    <td className="p-2">{it.description}</td>
+                    <td className="p-2">{it.category_id ? (outCatNames[it.category_id] ?? '…') : '—'}</td>
+                    <td className="p-2 text-right whitespace-nowrap tabular-nums">{fmt(it.value)}</td>
+                    <td className="p-2">
+                      <a className="underline" href={`/lancamentos?q=${encodeURIComponent(it.description)}`}>Abrir</a>
+                    </td>
+                  </tr>
+                ))}
+                {drillItems.length === 0 && (
+                  <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">Linha calculada sem lançamentos diretos.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {drillItems.length} lançamento(s) · total {fmt(drillItems.reduce((s, i) => s + i.value, 0))}
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
