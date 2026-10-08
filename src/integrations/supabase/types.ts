@@ -309,6 +309,7 @@ export type Database = {
           amount: number
           card_last4: string | null
           category_id: string | null
+          competence_date: string | null
           created_at: string
           decided_at: string | null
           decided_by: string | null
@@ -332,6 +333,7 @@ export type Database = {
           amount: number
           card_last4?: string | null
           category_id?: string | null
+          competence_date?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -355,6 +357,7 @@ export type Database = {
           amount?: number
           card_last4?: string | null
           category_id?: string | null
+          competence_date?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null

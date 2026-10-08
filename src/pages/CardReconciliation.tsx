@@ -24,6 +24,13 @@ const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('
 const NONE = '__none__';
 const SELECT_CLASS = 'h-8 w-full min-w-[9rem] rounded-md border border-input bg-background px-2 text-xs disabled:opacity-50';
 /** Final de 4 dígitos aparece como •••• 1234; rótulo de bloco ("VISA INFINITY") aparece como está. */
+/** "2026-09" -> "2026-09-30" (último dia do mês); vazio -> null. */
+function monthToDate(month: string): string | null {
+  if (!/^\d{4}-\d{2}$/.test(month)) return null;
+  const [y, m] = month.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${month}-${String(last).padStart(2, '0')}`;
+}
 const cardText = (c: string) => (/^\d{4}$/.test(c) ? `•••• ${c}` : c);
 
 interface CardEntry {
@@ -32,6 +39,7 @@ interface CardEntry {
   card_last4: string | null;
   posted_at: string;
   launch_date: string | null;
+  competence_date: string | null;
   description: string;
   amount: number;
   status: string;
@@ -223,6 +231,8 @@ export default function CardReconciliation() {
 
   /** Data do pagamento da fatura: vira competência e pagamento dos lançamentos criados. */
   const [launchDate, setLaunchDate] = useState(todayLocalISO());
+  /** Competência (AAAA-MM): mês em que vale no DRE. Vazio = usa a data do lançamento. */
+  const [competenceMonth, setCompetenceMonth] = useState('');
   const closeImport = () => { setPendingImport(null); setEdits({}); setProgress(null); };
 
   /**
@@ -239,6 +249,7 @@ export default function CardReconciliation() {
         card_last4: d.row.card,
         posted_at: d.row.posted_at,
         launch_date: launchDate || null,
+        competence_date: monthToDate(competenceMonth),
         description: d.row.description,
         amount: d.row.amount,
         row_hash: d.hash,
@@ -446,6 +457,7 @@ export default function CardReconciliation() {
                     <th className="py-2 px-2 w-8"> </th>
                     <th className="py-2 px-2 font-medium">Compra</th>
                     <th className="py-2 px-2 font-medium">Lançamento</th>
+                    <th className="py-2 px-2 font-medium">Competência</th>
                     <th className="py-2 px-2 font-medium">Descrição</th>
                     <th className="py-2 px-2 font-medium text-right">Valor</th>
                     <th className="py-2 px-2 font-medium">Unidade</th>
@@ -481,6 +493,16 @@ export default function CardReconciliation() {
                             value={e.launch_date ?? ''}
                             onChange={ev => patchEntry(e.id, { launch_date: ev.target.value || null })}
                             title="Data do lançamento no sistema (pagamento da fatura). Vazio = data da compra."
+                            className="h-8 rounded-md border border-input bg-background px-1.5 text-xs disabled:opacity-50"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="month"
+                            disabled={done}
+                            value={e.competence_date ? e.competence_date.slice(0, 7) : ''}
+                            onChange={ev => patchEntry(e.id, { competence_date: monthToDate(ev.target.value) })}
+                            title="Mês em que o valor entra no DRE. Vazio = mês da data do lançamento."
                             className="h-8 rounded-md border border-input bg-background px-1.5 text-xs disabled:opacity-50"
                           />
                         </td>
@@ -558,7 +580,13 @@ export default function CardReconciliation() {
             <span className="font-medium">Data do lançamento (pagamento da fatura):</span>
             <input type="date" value={launchDate} onChange={ev => setLaunchDate(ev.target.value)}
               className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
-            <span className="text-muted-foreground">usada como competência e pagamento; a data da compra fica guardada.</span>
+            <span className="text-muted-foreground">usada como vencimento e pagamento; a data da compra fica guardada.</span>
+          </label>
+          <label className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-medium">Competência (mês em que vale no DRE):</span>
+            <input type="month" value={competenceMonth} onChange={ev => setCompetenceMonth(ev.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+            <span className="text-muted-foreground">vazio = mês da data do lançamento.</span>
           </label>
 
             {preview && (
