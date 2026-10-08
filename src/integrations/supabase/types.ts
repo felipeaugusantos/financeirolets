@@ -1191,6 +1191,95 @@ export type Database = {
         }
         Returns: string
       }
+      dash_alerts: {
+        Args: { p_front: string; p_today: string; p_unit: string }
+        Returns: Json
+      }
+      dash_balance: {
+        Args: { p_front: string; p_today: string; p_unit: string }
+        Returns: Json
+      }
+      dash_categories: {
+        Args: {
+          p_from: string
+          p_front: string
+          p_prov: boolean
+          p_to: string
+          p_type: string
+          p_unit: string
+        }
+        Returns: Json
+      }
+      dash_filtered_value: {
+        Args: {
+          p_front: string
+          p_total: number
+          p_tx: string
+          p_tx_front: string
+          p_tx_unit: string
+          p_unit: string
+        }
+        Returns: number
+      }
+      dash_kpis: {
+        Args: {
+          p_from: string
+          p_front: string
+          p_prov: boolean
+          p_to: string
+          p_unit: string
+        }
+        Returns: Json
+      }
+      dash_monthly: {
+        Args: { p_from: string; p_front: string; p_to: string; p_unit: string }
+        Returns: Json
+      }
+      dash_ranking: {
+        Args: {
+          p_from: string
+          p_front: string
+          p_prov: boolean
+          p_to: string
+          p_unit: string
+        }
+        Returns: Json
+      }
+      dash_rows: {
+        Args: { p_from: string; p_front: string; p_to: string; p_unit: string }
+        Returns: {
+          category_id: string
+          competence_date: string
+          id: string
+          payment_date: string
+          pip: boolean
+          pipv: boolean
+          total: number
+          type: Database["public"]["Enums"]["transaction_type"]
+          unit_id: string
+          val: number
+          vip: boolean
+          vipv: boolean
+        }[]
+      }
+      dash_split_by_unit: {
+        Args: { p_total: number; p_tx: string; p_tx_unit: string }
+        Returns: {
+          unit_id: string
+          value: number
+        }[]
+      }
+      dashboard_summary: {
+        Args: {
+          p_from: string
+          p_front?: string
+          p_include_provisioned?: boolean
+          p_to: string
+          p_today?: string
+          p_unit?: string
+        }
+        Returns: Json
+      }
       generate_recurring_transactions: { Args: never; Returns: number }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
@@ -1214,6 +1303,10 @@ export type Database = {
           _record_id: string
         }
         Returns: string
+      }
+      unlink_statement_entries: {
+        Args: { p_entry_ids: string[] }
+        Returns: Json
       }
     }
     Enums: {
