@@ -1,3 +1,4 @@
+import { fetchAllocationsFor } from '@/lib/fetchAllocations';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -127,10 +128,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       let allocMap = new Map<string, AllocationRow[]>();
 
       if (txIds.length > 0) {
-        const { data: allocs } = await supabase
-          .from('transaction_allocations')
-          .select('transaction_id, unit_id, allocation_type, percentage, amount')
-          .in('transaction_id', txIds);
+        const allocs = await fetchAllocationsFor<AllocationRow>(txIds, 'transaction_id, unit_id, allocation_type, percentage, amount');
         allocMap = buildAllocationMap(allocs);
       }
 

@@ -1,3 +1,4 @@
+import { fetchAllocationsFor } from '@/lib/fetchAllocations';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -224,10 +225,7 @@ async function fetchPeriodValues(
   const txIds = (transactions ?? []).map((t) => t.id);
   let allocMap = new Map<string, AllocationRow[]>();
   if (txIds.length > 0) {
-    const { data: allocs } = await supabase
-      .from('transaction_allocations')
-      .select('transaction_id, unit_id, allocation_type, percentage, amount')
-      .in('transaction_id', txIds);
+    const allocs = await fetchAllocationsFor<AllocationRow>(txIds, 'transaction_id, unit_id, allocation_type, percentage, amount');
     allocMap = buildAllocationMap(allocs);
   }
 
