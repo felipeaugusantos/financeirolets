@@ -1,3 +1,4 @@
+import { resolveDreTotals } from '@/lib/dreTotals';
 import { fetchAllocationsFor } from '@/lib/fetchAllocations';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
