@@ -116,6 +116,9 @@ export interface TransactionInput {
   card_sale_group_id?: string | null;
 }
 
+/** Teto de ids no filtro "id.in" (vão na URL; acima disso o backend recusa). */
+const MAX_OR_IDS = 150;
+
 export function useTransactions(filters: TransactionFilters = {}) {
   const [data, setData] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,18 +137,26 @@ export function useTransactions(filters: TransactionFilters = {}) {
     const u = filters.unit_id;
     if (!u || u === '__null__') { setAllocIds(null); return; }
     let cancelled = false;
-    supabase.from('transaction_allocations').select('transaction_id, allocation_type, percentage, amount').eq('unit_id', u).then(({ data }) => {
+    supabase.from('transaction_allocations').select('transaction_id, allocation_type, percentage, amount, tx:transactions!inner(unit_id, competence_date, payment_date)').eq('unit_id', u).then(({ data }) => {
       if (cancelled) return;
       const parts = new Map<string, { t: string; p: number | null; a: number | null }[]>();
-      for (const r of data ?? []) {
+      // Só entram no filtro "id.in" os rateados cuja unidade principal é OUTRA e que caem no período:
+      // a lista de ids vai na URL e, sem esse recorte, cresce sem limite até o backend recusar.
+      const from = filters.dateFrom, to = filters.dateTo;
+      const inRange = (d?: string | null) => !!d && (!from || d >= from) && (!to || d <= to);
+      const extra = new Set<string>();
+      type Row = { transaction_id: string; allocation_type: string; percentage: number | null; amount: number | null; tx: { unit_id: string | null; competence_date: string; payment_date: string | null } | null };
+      for (const r of (data ?? []) as unknown as Row[]) {
+        if (r.tx && r.tx.unit_id !== u && (inRange(r.tx.competence_date) || inRange(r.tx.payment_date))) extra.add(r.transaction_id);
         const list = parts.get(r.transaction_id) ?? [];
         list.push({ t: r.allocation_type, p: r.percentage == null ? null : Number(r.percentage), a: r.amount == null ? null : Number(r.amount) });
         parts.set(r.transaction_id, list);
       }
-      setAllocIds({ unit: u, ids: [...parts.keys()], parts });
+      setAllocIds({ unit: u, ids: [...extra].slice(0, MAX_OR_IDS), parts });
+      if (extra.size > MAX_OR_IDS) console.warn('[useTransactions] rateios demais no período; refine o filtro de datas', extra.size);
     });
     return () => { cancelled = true; };
-  }, [filters.unit_id]);
+  }, [filters.unit_id, filters.dateFrom, filters.dateTo]);
   /** Com filtro de unidade, um lançamento rateado vale só a parte da unidade. */
   const unitShare = useCallback(<R extends { id?: string; net_amount: number | string | null }>(r: R): R => {
     const parts = allocIds && filters.unit_id === allocIds.unit && r.id ? allocIds.parts.get(r.id) : undefined;
