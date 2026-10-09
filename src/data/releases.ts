@@ -45,6 +45,15 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.8',
+    date: '2026-10-09',
+    summary: 'Totais do DRE seguem a configuração das linhas.',
+    items: [
+      { area: 'Relatórios', kind: 'melhoria', title: 'Totais do DRE pela configuração das linhas', detail: 'Resultado Bruto, Superávit e Fluxo de Caixa Retido agora seguem a fórmula de cada linha, a mesma no DRE, no DRE Comparativo e no DRE Gerencial. Os valores não mudam: julho continua R$ 33.277,29.', tech: 'src/lib/dreTotals.ts (fórmula > filhos > regra antiga > valor×sinal); fórmulas 1+2, 3+4, 5+5.1+6+7 em dre_lines; suíte T1–T20.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'Aviso de fórmula em círculo', detail: 'Se uma linha do DRE passar a somar a si mesma, o sistema avisa e zera a linha, em vez de travar.' },
+    ],
+  },
+  {
     version: '1.2.7',
     date: '2026-10-09',
     summary: 'DRE respeita os rateios entre unidades em todos os meses.',
