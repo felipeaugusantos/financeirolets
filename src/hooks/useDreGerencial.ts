@@ -239,7 +239,11 @@ export function useDreGerencial() {
       allLines.forEach((l) => getDepth(l.id));
 
       const current = await fetchLineValues(filters.dateFrom, filters.dateTo, filters, catToDre, fallbackByType);
-      const currentTotals = resolveValues(allLines, current.lineValues);
+      const resolved = resolveDreTotals(allLines, current.lineValues);
+      const currentTotals = resolved.values;
+      if (resolved.circular.length) {
+        toast({ title: 'Fórmula circular no DRE', description: `Linhas ${resolved.circular.join(', ')} se referem umas às outras e foram zeradas. Ajuste em Configurações → DRE.`, variant: 'destructive' });
+      }
 
       let previousTotals: Map<string, number> | null = null;
       if (filters.comparison !== 'none') {
