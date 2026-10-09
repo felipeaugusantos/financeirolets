@@ -181,55 +181,17 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
       };
       dreLines.forEach((l) => getDepth(l.id));
 
-      // 8. Compute values per column with subtotals
-      const computedValues = new Map<string, Map<string, number>>();
-
-      const getLineValue = (line: Tables<'dre_lines'>, colId: string): number => {
-        const key = `${line.id}__${colId}`;
-        if (computedValues.has(line.id) && computedValues.get(line.id)!.has(colId)) {
-          return computedValues.get(line.id)!.get(colId)!;
-        }
-
-        let val: number;
-        if (!line.is_subtotal) {
-          const raw = lineValues.get(line.id)?.get(colId) || 0;
-          val = raw * (line.sign ?? 1);
-        } else {
-          const children = dreLines.filter((c) => c.parent_id === line.id);
-          if (children.length > 0) {
-            val = children.reduce((sum: number, child) => sum + getLineValue(child, colId), 0);
-          } else {
-            const code = line.code;
-            if (code === '3') {
-              const g1 = dreLines.find((l) => l.code === '1');
-              const g2 = dreLines.find((l) => l.code === '2');
-              val = (g1 ? getLineValue(g1, colId) : 0) + (g2 ? getLineValue(g2, colId) : 0);
-            } else if (code === '5') {
-              const g3 = dreLines.find((l) => l.code === '3');
-              const g4 = dreLines.find((l) => l.code === '4');
-              val = (g3 ? getLineValue(g3, colId) : 0) + (g4 ? getLineValue(g4, colId) : 0);
-            } else if (code === '8') {
-              const g5 = dreLines.find((l) => l.code === '5');
-              // Pró-labore fica após o resultado líquido, mas entra no caixa retido.
-              const g51 = dreLines.find((l) => l.code === '5.1');
-              const g6 = dreLines.find((l) => l.code === '6');
-              const g7 = dreLines.find((l) => l.code === '7');
-              val = (g5 ? getLineValue(g5, colId) : 0) + (g51 ? getLineValue(g51, colId) : 0)
-                + (g6 ? getLineValue(g6, colId) : 0) + (g7 ? getLineValue(g7, colId) : 0);
-            } else {
-              val = 0;
-            }
-          }
-        }
-
-        if (!computedValues.has(line.id)) computedValues.set(line.id, new Map());
-        computedValues.get(line.id)!.set(colId, val);
-        return val;
-      };
+      // 8. Totais por coluna pelo motor único (fórmula > filhos > regra antiga > valor × sinal)
+      const totalsByCol = new Map<string, Map<string, number>>();
+      cols.forEach((col) => {
+        const raw = new Map<string, number>();
+        lineValues.forEach((byCol, lineId) => raw.set(lineId, byCol.get(col.id) || 0));
+        totalsByCol.set(col.id, resolveDreTotals(dreLines, raw).values);
+      });
 
       const result: DreLineComparative[] = dreLines.map((l) => {
         const values: Record<string, number> = {};
-        cols.forEach(col => { values[col.id] = getLineValue(l, col.id); });
+        cols.forEach(col => { values[col.id] = totalsByCol.get(col.id)?.get(l.id) ?? 0; });
         return {
           id: l.id, code: l.code, name: l.name, sort_order: l.sort_order,
           is_subtotal: l.is_subtotal, sign: l.sign, parent_id: l.parent_id,
