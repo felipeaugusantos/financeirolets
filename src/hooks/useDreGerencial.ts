@@ -1,3 +1,4 @@
+import { resolveDreTotals } from '@/lib/dreTotals';
 import { fetchAllocationsFor } from '@/lib/fetchAllocations';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,49 +78,9 @@ function previousWindow(from: string, to: string) {
   return { from: toLocalISODate(prevFrom), to: toLocalISODate(prevTo) };
 }
 
-/**
- * Resolve o valor de cada linha respeitando:
- *  - `formula` (ex.: "C1+C2") quando existir;
- *  - soma dos filhos, para subtotais;
- *  - valor lançado × sinal, para linhas analíticas.
- */
+/** Totais pelo motor único (fórmula > filhos > regra antiga > valor × sinal). */
 export function resolveValues(allLines: Tables<'dre_lines'>[], lineValues: Map<string, number>) {
-  const byCode = new Map<string, Tables<'dre_lines'>>();
-  allLines.forEach((l) => { if (l.code) byCode.set(l.code, l); });
-  const computed = new Map<string, number>();
-  const visiting = new Set<string>();
-
-  const get = (line: Tables<'dre_lines'>): number => {
-    if (computed.has(line.id)) return computed.get(line.id)!;
-    if (visiting.has(line.id)) return 0; // proteção contra fórmula circular
-    visiting.add(line.id);
-
-    let val = 0;
-    if (line.formula) {
-      // Tokens no formato "C1+C2-C3"
-      const terms: string[] = String(line.formula).match(/[+-]?[^+-]+/g) ?? [];
-      val = terms.reduce<number>((sum, raw) => {
-        const t = raw.trim();
-        const negative = t.startsWith('-');
-        const code = t.replace(/^[+-]/, '').trim();
-        const ref = byCode.get(code);
-        if (!ref) return sum;
-        return sum + (negative ? -get(ref) : get(ref));
-      }, 0);
-    } else if (line.is_subtotal) {
-      const children = allLines.filter((c) => c.parent_id === line.id);
-      val = children.reduce((s: number, c) => s + get(c), 0);
-    } else {
-      val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
-    }
-
-    visiting.delete(line.id);
-    computed.set(line.id, val);
-    return val;
-  };
-
-  allLines.forEach((l) => get(l));
-  return computed;
+  return resolveDreTotals(allLines, lineValues).values;
 }
 
 async function fetchLineValues(
