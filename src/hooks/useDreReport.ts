@@ -1,3 +1,4 @@
+import { resolveDreTotals } from '@/lib/dreTotals';
 import { fetchAllocationsFor } from '@/lib/fetchAllocations';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -155,45 +156,9 @@ export function computeLineValues(
   return { lineValues, unallocTotal, unallocCount, unallocItems, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
 }
 
+/** Totais pelo motor único (fórmula > filhos > regra antiga > valor × sinal). */
 export function buildSubtotals(allLines: DreLineRow[], lineValues: Map<string, number>) {
-  const computed = new Map<string, number>();
-  const get = (line: DreLineRow): number => {
-    if (computed.has(line.id)) return computed.get(line.id)!;
-    let val: number;
-    if (!line.is_subtotal) {
-      val = (lineValues.get(line.id) || 0) * (line.sign ?? 1);
-    } else {
-      const children = allLines.filter((c) => c.parent_id === line.id);
-      if (children.length > 0) {
-        val = children.reduce((s: number, c) => s + get(c), 0);
-      } else {
-        const code = line.code;
-        if (code === '3') {
-          const g1 = allLines.find((l) => l.code === '1');
-          const g2 = allLines.find((l) => l.code === '2');
-          val = (g1 ? get(g1) : 0) + (g2 ? get(g2) : 0);
-        } else if (code === '5') {
-          const g3 = allLines.find((l) => l.code === '3');
-          const g4 = allLines.find((l) => l.code === '4');
-          val = (g3 ? get(g3) : 0) + (g4 ? get(g4) : 0);
-        } else if (code === '8') {
-          const g5 = allLines.find((l) => l.code === '5');
-          // Pró-labore/honorários da diretoria ficam fora do resultado operacional,
-          // mas continuam impactando o caixa retido.
-          const g51 = allLines.find((l) => l.code === '5.1');
-          const g6 = allLines.find((l) => l.code === '6');
-          const g7 = allLines.find((l) => l.code === '7');
-          val = (g5 ? get(g5) : 0) + (g51 ? get(g51) : 0) + (g6 ? get(g6) : 0) + (g7 ? get(g7) : 0);
-        } else {
-          val = 0;
-        }
-      }
-    }
-    computed.set(line.id, val);
-    return val;
-  };
-  allLines.forEach(l => get(l));
-  return computed;
+  return resolveDreTotals(allLines, lineValues).values;
 }
 
 async function fetchPeriodValues(
@@ -325,7 +290,11 @@ export function useDreReport() {
 
       // Current period
       const current = await fetchPeriodValues(filters.dateFrom, filters.dateTo, filters, catToDre);
-      const currentTotals = buildSubtotals(allLines, current.lineValues);
+      const resolved = resolveDreTotals(allLines, current.lineValues);
+      const currentTotals = resolved.values;
+      if (resolved.circular.length) {
+        toast({ title: 'Fórmula circular no DRE', description: `Linhas ${resolved.circular.join(', ')} se referem umas às outras e foram zeradas. Ajuste em Configurações → DRE.`, variant: 'destructive' });
+      }
 
       // Previous period (year-over-year)
       let previousTotals: Map<string, number> | null = null;

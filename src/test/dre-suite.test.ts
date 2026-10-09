@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import lines from './fixtures/dre-lines.json';
 import { computeLineValues, buildSubtotals } from '@/hooks/useDreReport';
 import { resolveValues } from '@/hooks/useDreGerencial';
+import { resolveDreTotals, LEGACY_FORMULAS } from '@/lib/dreTotals';
 import {
   applyDreBase, buildAllocationMap, dateFieldForRegime, splitByUnit, NO_UNIT_KEY,
 } from '@/lib/finance';
@@ -164,9 +165,7 @@ describe('Paridade, estrutura, travas e fórmulas (T16–T20)', () => {
     const sum = ['U1', 'U2', NO_UNIT_KEY].reduce((s, u) => s + gerencial(txs, al, u).get('5'), 0);
     expect(sum).toBe(gerencial(txs, al).get('5'));
   });
-  it.fails('T16b (pendente A4) os dois motores de soma dão o mesmo superávit gerencial', () => {
-    // Hoje o DRE gerencial usa somas fixas no código (grupos 3, 5, 8) e o motor por
-    // fórmula não tem fórmula cadastrada para essas linhas.
+  it('T16b os dois DREs usam o mesmo motor e dão o mesmo superávit gerencial', () => {
     const t = [tx(leafUnder('1.1'), 1000, 'receita'), tx(leafUnder('4.3'), 300, 'despesa')];
     const { lineValues } = computeLineValues(t, new Map(), catMap(), undefined);
     const fixed = buildSubtotals(ALL, lineValues).get(byCode('5').id);
@@ -193,5 +192,33 @@ describe('Paridade, estrutura, travas e fórmulas (T16–T20)', () => {
     const b = { ...byCode('C3'), id: 'x2', code: 'X2', formula: 'X1' } as Line;
     const r = resolveValues([a, b], new Map());
     expect([r.get('x1'), r.get('x2')]).toEqual([0, 0]);
+  });
+});
+
+describe('Passo 4 — totais seguem a configuração das linhas', () => {
+  it('linhas 3, 5 e 8 têm fórmula cadastrada igual à regra antiga', () => {
+    for (const c of ['3', '5', '8']) expect(byCode(c).formula).toBe(LEGACY_FORMULAS[c]);
+  });
+  it('sem fórmula cadastrada, a regra antiga dá o mesmo resultado (números não mudam)', () => {
+    const t = [tx(leafUnder('1.1'), 1000, 'receita'), tx(leafUnder('2.1'), 200, 'despesa'),
+      tx(leafUnder('4.3'), 300, 'despesa'), tx(leafUnder('5.1'), 100, 'despesa'), tx(leafUnder('6.2'), 50, 'receita')];
+    const { lineValues } = computeLineValues(t, new Map(), catMap(), undefined);
+    const comFormula = resolveDreTotals(ALL, lineValues).values;
+    const semFormula = resolveDreTotals(ALL.map((l) => ({ ...l, formula: ['3', '5', '8'].includes(l.code ?? '') ? null : l.formula })), lineValues).values;
+    for (const c of ['3', '5', '8']) expect(comFormula.get(byCode(c).id)).toBe(semFormula.get(byCode(c).id));
+    expect(comFormula.get(byCode('3').id)).toBe(800);
+    expect(comFormula.get(byCode('5').id)).toBe(500);
+    expect(comFormula.get(byCode('8').id)).toBe(450);
+  });
+  it('mudar a fórmula na configuração muda o total, sem mexer no código', () => {
+    const t = [tx(leafUnder('1.1'), 1000, 'receita'), tx(leafUnder('5.1'), 100, 'despesa')];
+    const { lineValues } = computeLineValues(t, new Map(), catMap(), undefined);
+    const custom = ALL.map((l) => (l.code === '8' ? { ...l, formula: '5' } : l));
+    expect(resolveDreTotals(custom, lineValues).values.get(byCode('8').id)).toBe(1000);
+  });
+  it('fórmula circular é reportada para o aviso na tela', () => {
+    const a = { ...byCode('C3'), id: 'x1', code: 'X1', formula: 'X2' } as Line;
+    const b = { ...byCode('C3'), id: 'x2', code: 'X2', formula: 'X1' } as Line;
+    expect(resolveDreTotals([a, b], new Map()).circular.length).toBeGreaterThan(0);
   });
 });
