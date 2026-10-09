@@ -3,6 +3,10 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.2.7 — 09/10/2026
+- DRE, DRE Comparativo e DRE Gerencial respeitam rateios em meses grandes (leitura em lotes).
+- Filtro por unidade em Lançamentos limitado ao período.
+
 ## 1.2.6 — 08/10/2026
 - Lançamentos: filtro por unidade mostra só a parte do rateio (lista e totais).
 - Divisão por unidade exibida embaixo de cada lançamento rateado.
