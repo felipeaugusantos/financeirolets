@@ -83,7 +83,7 @@ function previousWindow(from: string, to: string) {
  *  - soma dos filhos, para subtotais;
  *  - valor lançado × sinal, para linhas analíticas.
  */
-function resolveValues(allLines: Tables<'dre_lines'>[], lineValues: Map<string, number>) {
+export function resolveValues(allLines: Tables<'dre_lines'>[], lineValues: Map<string, number>) {
   const byCode = new Map<string, Tables<'dre_lines'>>();
   allLines.forEach((l) => { if (l.code) byCode.set(l.code, l); });
   const computed = new Map<string, number>();
