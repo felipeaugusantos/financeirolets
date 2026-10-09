@@ -73,7 +73,7 @@ function shiftDateBackOneYear(d: string) {
 }
 
 // Compute totals per dre_line_id from a set of transactions, given allocations and filter
-function computeLineValues(
+export function computeLineValues(
   transactions: DreTxRow[],
   allocMap: Map<string, AllocationRow[]>,
   catToDre: Map<string, string>,
@@ -155,7 +155,7 @@ function computeLineValues(
   return { lineValues, unallocTotal, unallocCount, unallocItems, outOfDreTotal, outOfDreCount, outOfDreItems, lineItems };
 }
 
-function buildSubtotals(allLines: DreLineRow[], lineValues: Map<string, number>) {
+export function buildSubtotals(allLines: DreLineRow[], lineValues: Map<string, number>) {
   const computed = new Map<string, number>();
   const get = (line: DreLineRow): number => {
     if (computed.has(line.id)) return computed.get(line.id)!;
