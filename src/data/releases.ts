@@ -45,6 +45,15 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.2.7',
+    date: '2026-10-09',
+    summary: 'DRE respeita os rateios entre unidades em todos os meses.',
+    items: [
+      { area: 'Relatórios', kind: 'correcao', title: 'Rateio entre unidades respeitado no DRE', detail: 'Em meses com muitos lançamentos, o DRE, o DRE Comparativo e o DRE Gerencial mostravam o lançamento rateado inteiro na unidade principal. Agora cada unidade recebe a sua parte. O total consolidado não muda.', tech: 'fetchAllocationsFor em lotes de 150 + erro visível.' },
+      { area: 'Lançamentos', kind: 'correcao', title: 'Filtro por unidade mais estável', detail: 'O filtro por unidade na lista de Lançamentos não falha mais quando a unidade tem muitos lançamentos rateados.', tech: 'id.in só com rateios de outra unidade principal no período; teto de 150.' },
+    ],
+  },
+  {
     version: '1.2.6',
     date: '2026-10-08',
     summary: 'Lista de Lançamentos mostra o rateio por unidade.',
