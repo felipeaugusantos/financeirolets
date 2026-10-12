@@ -92,8 +92,37 @@ export async function exportToPdf({ title, subtitle, filename, element, captureW
   };
 
   if (tables.length) {
-    // Tabela em texto de verdade: letra legível em qualquer tamanho de relatório.
     let startY = margin + headerHeight;
+    // Conteúdo fora das tabelas (cartões de totais, gráficos, resumos) vai como imagem no topo.
+    const probe = element.cloneNode(true) as HTMLElement;
+    probe.querySelectorAll('table, button, [data-pdf-hide]').forEach((n) => n.remove());
+    const hasExtra = !!(probe.textContent || '').trim() || !!probe.querySelector('svg, canvas, img');
+    if (hasExtra) {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        windowWidth: captureWidth,
+        onclone: (_doc, el) => {
+          el.style.width = `${captureWidth}px`;
+          el.style.maxWidth = `${captureWidth}px`;
+          el.querySelectorAll<HTMLElement>('table, button, [data-pdf-hide]').forEach((n) => { n.style.display = 'none'; });
+        },
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      if (canvas.width && canvas.height) {
+        const imgWidth = pageWidth - margin * 2;
+        const maxH = pageHeight - margin - headerHeight - footerHeight;
+        let w = imgWidth;
+        let h = (canvas.height * w) / canvas.width;
+        if (h > maxH) { w = (w * maxH) / h; h = maxH; }
+        drawHeader();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, startY, w, h);
+        startY += h + 6;
+        if (startY > pageHeight - footerHeight - margin - 20) { pdf.addPage(); startY = margin + headerHeight; }
+      }
+    }
+    // Tabela em texto de verdade: letra legível em qualquer tamanho de relatório.
     tables.forEach((t) => {
       const { head, body } = tableToRows(t);
       autoTable(pdf, {
