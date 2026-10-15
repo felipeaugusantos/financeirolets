@@ -277,7 +277,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
           .select('transaction_id, allocation_type, percentage, amount, unit:units(name)').in('transaction_id', c)))
           .then(results => {
             const byTx = new Map<string, { unit: string; value: number }[]>();
-            const totalOf = new Map(typed.map(t => [t.id, t.full_net_amount ?? Number(t.net_amount) ?? 0]));
+            const totalOf = new Map(typed.map(t => [t.id, t.full_net_amount ?? Number(t.net_amount)]));
             for (const r of results) for (const a of (r.data ?? []) as unknown as { transaction_id: string; allocation_type: string; percentage: number | null; amount: number | null; unit: { name: string } | null }[]) {
               const total = totalOf.get(a.transaction_id) ?? 0;
               const v = a.allocation_type === 'percentual' && a.percentage != null ? total * Number(a.percentage) / 100 : Number(a.amount ?? 0);

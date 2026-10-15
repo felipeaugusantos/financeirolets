@@ -22,6 +22,7 @@ import BankReconciliation from "./pages/BankReconciliation";
 import ReconciliationRules from "./pages/ReconciliationRules";
 import CardReconciliation from "./pages/CardReconciliation";
 
+import Ifood from "./pages/Ifood";
 import Releases from "./pages/Releases";
 import NotFound from "./pages/NotFound";
 
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/conciliacao/regras" element={<ProtectedRoute><ReconciliationRules /></ProtectedRoute>} />
               <Route path="/conciliacao/cartao" element={<ProtectedRoute><CardReconciliation /></ProtectedRoute>} />
 
+              <Route path="/ifood" element={<ProtectedRoute><Ifood /></ProtectedRoute>} />
               <Route path="/novidades" element={<ProtectedRoute><Releases /></ProtectedRoute>} />
               <Route path="/auditoria" element={<ProtectedRoute><AuditPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
