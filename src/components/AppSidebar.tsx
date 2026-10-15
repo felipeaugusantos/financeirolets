@@ -9,6 +9,7 @@ import {
   Landmark,
   ChevronDown,
   Sparkles,
+  Bike,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -37,6 +38,7 @@ const navItems = [
   { title: 'Lançamentos', url: '/lancamentos', icon: Receipt },
   { title: 'Pagar / Receber', url: '/contas', icon: CreditCard },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
+  { title: 'iFood', url: '/ifood', icon: Bike },
 ];
 
 const reconciliationItems = [
