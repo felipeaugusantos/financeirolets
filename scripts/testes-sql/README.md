@@ -28,3 +28,8 @@ logo abaixo; erros `ERROR:` nos casos de falha são o comportamento esperado.
 ```bash
 bun run scripts/testes-sql/dashboard-paridade.ts /tmp/pgtest 5544 t 25   # host do socket, porta, banco, rodadas
 ```
+
+## iFood (SQL 13)
+
+- `13-ifood-base.test.sql`: duas lojas, unicidade de `merchant_id` e do pedido por loja, exclusão em cascata e RLS
+  (usuário sem papel não lê). Erros `ERROR:` nos casos marcados são o esperado.
