@@ -116,6 +116,7 @@ export default function TransactionFormDialog({ open, onOpenChange, onSave, init
     // Depender do objeto `initialData` inteiro fazia o efeito rodar de novo a cada
     // render do pai, sobrescrevendo datas já escolhidas pelo usuário.
     if (!open) return;
+    if (!initialData?.id) resetForm();
     if (initialData) {
       setType(initialData.type || 'despesa');
       setDescription(initialData.description || '');

@@ -26,9 +26,10 @@ const PAYMENT_METHODS = [
 interface Props {
   filters: TFilters;
   onChange: (f: TFilters) => void;
+  categoryLocked?: boolean;
 }
 
-export default function TransactionFilters({ filters, onChange }: Props) {
+export default function TransactionFilters({ filters, onChange, categoryLocked = false }: Props) {
   const [open, setOpen] = useState(false);
   const { data: categories } = useSupabaseCrud<Tables<'categories'>>('categories', 'name');
   const { data: accounts } = useSupabaseCrud<Tables<'accounts'>>('accounts', 'name');
@@ -100,7 +101,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="space-y-1">
+          {!categoryLocked && <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Categoria</Label>
             <Select value={filters.category_id || '__none__'} onValueChange={v => set('category_id', v === '__none__' ? undefined : v)}>
               <SelectTrigger className="rounded-xl bg-card border-border text-xs h-8"><SelectValue /></SelectTrigger>
@@ -110,7 +111,7 @@ export default function TransactionFilters({ filters, onChange }: Props) {
                 {categories.filter((c) => c.active).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
+          </div>}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Conta</Label>
             <Select value={filters.account_id || '__none__'} onValueChange={v => set('account_id', v === '__none__' ? undefined : v)}>
