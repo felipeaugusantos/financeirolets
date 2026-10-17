@@ -14,19 +14,17 @@ Buscar empresas → Revisar e salvar lead → Qualificar
 → Acompanhar pedido → Solicitar lançamento ao Financeiro
 ````
 
-Uma empresa pode ter vários contatos e várias oportunidades. Exemplo: o mesmo cliente pode contratar um coffee break e depois uma encomenda de brindes, sem duplicar o cadastro.
+Uma empresa pode ter vários contatos e oportunidades sem duplicar o cadastro.
 
 ## Plano tela a tela
 
 ### 1. Minha agenda
-**Objetivo:** mostrar o que o vendedor precisa tratar hoje.
 - Contatos agendados, propostas aguardando retorno e eventos próximos, com empresa, unidade, responsável e próxima ação.
 - Filtros por período, unidade e responsável, respeitando o acesso do usuário.
 - Ações: abrir negociação, registrar contato e concluir ou reagendar tarefa.
 - Pendências atrasadas em destaque; estado vazio sem informações fictícias.
 
 ### 2. Buscar empresas
-**Objetivo:** encontrar potenciais clientes corporativos, separadamente da busca nos leads já cadastrados.
 - Escolher cidade/bairro ou unidade como referência, raio de busca e segmento: escritórios, clínicas, agências, escolas, hotéis e outros.
 - Resultados em lista; mapa como visualização complementar quando a integração estiver habilitada.
 - Cada resultado mostra nome, endereço, distância e telefone/site quando realmente disponíveis, além da fonte e data da consulta.
@@ -34,63 +32,54 @@ Uma empresa pode ter vários contatos e várias oportunidades. Exemplo: o mesmo 
 **Limites:** busca geográfica não garante CNPJ, e-mail, nome do decisor, porte ou faturamento. Esses campos ficam vazios ou aguardam validação; não serão inventados. Distância em raio não representa tempo de entrega.
 
 ### 3. Revisar e adicionar leads
-**Objetivo:** salvar somente empresas úteis, com responsável e origem conhecidos.
 - Revisar nome, contato disponível, endereço, unidade comercial, responsável, segmento e origem.
 - Marcar interesse inicial: coffee break, evento corporativo ou encomenda.
 - Verificar duplicidade por CNPJ, identificador da fonte e, secundariamente, telefone/site e nome com endereço.
 - Permitir vincular a uma empresa existente, descartar ou salvar; coincidências aproximadas exigem revisão, não mesclagem automática.
 
 ### 4. Leads e empresas
-**Objetivo:** manter a carteira comercial organizada.
 - Lista com empresa, segmento, unidade, responsável, situação, último contato e próxima ação.
 - Busca por nome, CNPJ, telefone e e-mail; filtros por origem, interesse e situação.
 - Situações do lead: novo, em contato, qualificado e descartado. A etapa da negociação pertence à oportunidade, não à empresa.
 - Ações: novo lead, abrir ficha e criar oportunidade.
 
 ### 5. Ficha da empresa
-**Objetivo:** concentrar contexto, contatos e histórico.
 - Abas: dados, contatos, oportunidades e histórico.
 - Contatos com nome, cargo e canal; registrar se os dados foram confirmados e a origem.
 - Histórico de ligação, reunião, degustação, mensagem registrada, proposta e tarefa.
 - Notas sobre interesse, frequência de eventos e restrições alimentares relevantes ao pedido, evitando dados pessoais desnecessários.
 
 ### 6. Funil de oportunidades
-**Objetivo:** acompanhar cada negociação em quadro ou lista.
 - Etapas sugeridas: qualificação → briefing/degustação → proposta → negociação → ganha ou perdida.
 - Cada oportunidade mostra empresa, tipo de venda, valor estimado, data do evento/entrega, unidade, responsável e próxima ação.
 - Mudança de etapa por seletor e, no quadro, arraste; opções acessíveis sem arraste no celular.
 - Registrar motivo de perda; alertar sobre eventos vencidos e propostas sem retorno.
 
 ### 7. Oportunidade e briefing do coffee break
-**Objetivo:** coletar o necessário para orçar e entregar.
 - Empresa e contato, unidade comercial, unidade de produção/atendimento quando diferente, vendedor e tipo de pedido.
 - Data e horário do evento, número de participantes, endereço, retirada/entrega, janela de montagem e necessidades de serviço.
 - Itens desejados, quantidade, restrições alimentares, orçamento informado e observações.
 - Para encomendas sem evento, usar data de entrega e quantidades, sem exigir participantes.
 
 ### 8. Proposta comercial
-**Objetivo:** preparar uma oferta clara e rastreável.
 - Itens/pacotes, quantidade, preço unitário, desconto, entrega, serviço e total discriminado.
 - Condições de pagamento, validade, data do evento, inclusões, exclusões e observações.
 - Preços, sinal, pedido mínimo e política de cancelamento serão informados pela equipe; não serão presumidos.
 - Salvar rascunho, gerar PDF legível, registrar envio e criar nova revisão preservando a anterior.
 
 ### 9. Pedidos e eventos confirmados
-**Objetivo:** transformar o aceite em acompanhamento de execução.
 - Resumo da proposta aceita, itens, quantidades, responsáveis, datas e condições combinadas.
 - Etapas de acompanhamento: confirmado, em preparação, entregue e cancelado, com histórico.
 - Checklist de confirmação, produção, entrega/retirada e comprovante opcional.
 - Alterações após aceite exigem nova revisão ou justificativa; cancelamento comercial não apaga nem cancela automaticamente lançamentos financeiros existentes.
 
 ### 10. Solicitações ao Financeiro
-**Objetivo:** evitar redigitação sem gerar receitas indevidas.
 - Vendedor solicita o lançamento a partir de um pedido aprovado; Financeiro/Admin revisa cliente, unidade, categoria, valor, vencimentos, competência e condições.
 - Vincular a um parceiro existente ou confirmar sua criação antes do lançamento.
 - Mostrar prévia das parcelas e vínculos; competência segue o reconhecimento definido, não automaticamente a data do aceite.
 - Aprovação explícita por usuário autorizado antes de gravar. Nenhum lançamento histórico será reclassificado e meses fechados permanecem protegidos.
 
 ### 11. Indicadores comerciais
-**Objetivo:** comparar desempenho por unidade e responsável.
 - Leads adicionados, contatos realizados, oportunidades abertas, propostas enviadas, conversão, ticket médio e tempo de fechamento.
 - Separar valor estimado, propostas aceitas e valores efetivamente recebidos, com ligação aos registros de origem.
 - Filtros com período de referência explícito: criação, fechamento ou data do evento, conforme o indicador.
@@ -131,4 +120,4 @@ Uma empresa pode ter vários contatos e várias oportunidades. Exemplo: o mesmo 
 - Conferir oposição ao contato, falhas de consulta, ausência de dados e PDF completo.
 - Executar a jornada inteira com sessão autorizada, em ambiente de teste; publicar por fases sem modificar dados históricos.
 
-**Resultado esperado:** encontrar empresas para coffee breaks, organizar a abordagem, fechar propostas e acompanhar entregas; só depois conectar as vendas aprovadas ao financeiro, com revisão e sem duplicidade.
+
