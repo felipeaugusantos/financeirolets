@@ -36,6 +36,7 @@ import {
 const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Lançamentos', url: '/lancamentos', icon: Receipt },
+  { title: 'Depreciação e CSLL', url: '/lancamentos-contabeis', icon: Receipt },
   { title: 'Pagar / Receber', url: '/contas', icon: CreditCard },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
   { title: 'iFood', url: '/ifood', icon: Bike },

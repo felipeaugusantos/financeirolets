@@ -14,12 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { useDeleteHistory, DeletedCapture } from '@/hooks/useDeleteHistory';
 import { filtersFromUrl } from '@/lib/transactionUrl';
+import type { Tables } from '@/integrations/supabase/types';
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
 
-export default function Transactions() {
+export default function Transactions({ accountingCategory }: { accountingCategory?: Tables<'categories'> } = {}) {
   const [searchParams] = useSearchParams();
   // Permite abrir a tela já filtrada: Conferência de lançamentos (q) e cartões do Dashboard (tipo, período, regime).
   const [filters, setFilters] = useState<TFilters>(() => filtersFromUrl(searchParams));
@@ -28,7 +29,7 @@ export default function Transactions() {
   const [cardSaleOpen, setCardSaleOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
 
-  const appliedFilters = { ...filters, search: search || undefined };
+  const appliedFilters = { ...filters, search: search || undefined, ...(accountingCategory ? { category_id: accountingCategory.id } : {}) };
   const { data, loading, totals, listComplete, create, update, remove, restore, markAs, fetchData } = useTransactions(appliedFilters);
   const { toast } = useToast();
   const history = useDeleteHistory();
@@ -141,15 +142,15 @@ export default function Transactions() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-card-foreground">Lançamentos</h1>
-          <p className="text-sm text-muted-foreground">Receitas e despesas</p>
+          <h1 className="font-heading text-2xl font-bold text-card-foreground">{accountingCategory ? `Lançamentos de ${accountingCategory.name}` : 'Lançamentos'}</h1>
+          <p className="text-sm text-muted-foreground">{accountingCategory ? 'DRE contábil' : 'Receitas e despesas'}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCardSaleOpen(true)}>
+          {!accountingCategory && <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCardSaleOpen(true)}>
             <CreditCard className="h-4 w-4" />
             <span className="hidden sm:inline">Venda no cartão</span>
-          </Button>
-          <Button className="rounded-xl gap-2" onClick={handleNew}>
+          </Button>}
+          <Button className="rounded-xl gap-2" onClick={handleNew} aria-label="Novo lançamento">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Novo</span>
           </Button>
@@ -222,7 +223,7 @@ export default function Transactions() {
             </AlertDescription>
           </Alert>
         )}
-        <TransactionFilters filters={filters} onChange={setFilters} />
+        <TransactionFilters filters={filters} onChange={setFilters} categoryLocked={!!accountingCategory} />
       </div>
 
       {/* Persistent undo/redo bar */}
@@ -306,7 +307,7 @@ export default function Transactions() {
           affects_dre: editingTx.affects_dre,
           affects_cashflow: editingTx.affects_cashflow,
           is_reversal: editingTx.is_reversal,
-        } : undefined}
+        } : accountingCategory ? { type: 'despesa', category_id: accountingCategory.id } : undefined}
       />
 
       <CardSaleDialog open={cardSaleOpen} onOpenChange={setCardSaleOpen} onCreated={fetchData} />

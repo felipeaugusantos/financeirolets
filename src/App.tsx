@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
+import AccountingTransactions from "./pages/AccountingTransactions";
 import Accounts from "./pages/Accounts";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/SettingsPage";
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+              <Route path="/lancamentos-contabeis" element={<ProtectedRoute><AccountingTransactions /></ProtectedRoute>} />
               <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
               <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
