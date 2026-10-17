@@ -612,6 +612,224 @@ export type Database = {
           },
         ]
       }
+      ifood_order_financials: {
+        Row: {
+          commission: number
+          created_at: string
+          delivery_cost: number
+          expected_payout_date: string | null
+          gross_value: number
+          id: string
+          ifood_promo: number
+          merchant_promo: number
+          net_value: number
+          order_id: string
+          payment_fee: number
+          raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          commission?: number
+          created_at?: string
+          delivery_cost?: number
+          expected_payout_date?: string | null
+          gross_value?: number
+          id?: string
+          ifood_promo?: number
+          merchant_promo?: number
+          net_value?: number
+          order_id: string
+          payment_fee?: number
+          raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          commission?: number
+          created_at?: string
+          delivery_cost?: number
+          expected_payout_date?: string | null
+          gross_value?: number
+          id?: string
+          ifood_promo?: number
+          merchant_promo?: number
+          net_value?: number
+          order_id?: string
+          payment_fee?: number
+          raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_order_financials_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "ifood_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ifood_order_items: {
+        Row: {
+          ean: string | null
+          external_code: string | null
+          id: string
+          line_no: number
+          name: string
+          options_price: number
+          order_id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          ean?: string | null
+          external_code?: string | null
+          id?: string
+          line_no: number
+          name: string
+          options_price?: number
+          order_id: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Update: {
+          ean?: string | null
+          external_code?: string | null
+          id?: string
+          line_no?: number
+          name?: string
+          options_price?: number
+          order_id?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "ifood_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ifood_orders: {
+        Row: {
+          additional_fees: number
+          benefits_total: number
+          created_at: string
+          delivered_by: string | null
+          delivery_fee: number
+          display_id: string | null
+          id: string
+          ifood_order_id: string
+          order_amount: number
+          order_type: string | null
+          ordered_at: string | null
+          payment_method: string | null
+          raw: Json | null
+          status: string | null
+          store_id: string
+          sub_total: number
+          updated_at: string
+        }
+        Insert: {
+          additional_fees?: number
+          benefits_total?: number
+          created_at?: string
+          delivered_by?: string | null
+          delivery_fee?: number
+          display_id?: string | null
+          id?: string
+          ifood_order_id: string
+          order_amount?: number
+          order_type?: string | null
+          ordered_at?: string | null
+          payment_method?: string | null
+          raw?: Json | null
+          status?: string | null
+          store_id: string
+          sub_total?: number
+          updated_at?: string
+        }
+        Update: {
+          additional_fees?: number
+          benefits_total?: number
+          created_at?: string
+          delivered_by?: string | null
+          delivery_fee?: number
+          display_id?: string | null
+          id?: string
+          ifood_order_id?: string
+          order_amount?: number
+          order_type?: string | null
+          ordered_at?: string | null
+          payment_method?: string | null
+          raw?: Json | null
+          status?: string | null
+          store_id?: string
+          sub_total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_orders_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "ifood_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ifood_stores: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          merchant_id: string | null
+          name: string
+          secret_prefix: string | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          merchant_id?: string | null
+          name: string
+          secret_prefix?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          merchant_id?: string | null
+          name?: string
+          secret_prefix?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_stores_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kaikin_messages: {
         Row: {
           content: string
