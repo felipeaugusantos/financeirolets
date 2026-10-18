@@ -7,6 +7,7 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) throw new Error('Credenciais públicas necessárias para testar proteção do CRM');
 const anon = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 const sql = readFileSync('drizzle/migrations/0000_crm_workspace.sql', 'utf8');
+const integritySql = readFileSync('drizzle/migrations/0001_crm_parent_access_integrity.sql', 'utf8');
 const uuid = '00000000-0000-0000-0000-000000000000';
 
 describe('CRM permanece isolado dos lançamentos financeiros', () => {
@@ -25,6 +26,11 @@ describe('CRM permanece isolado dos lançamentos financeiros', () => {
   it('contatos dependem do acesso à empresa e atividades validam a empresa da oportunidade', () => {
     expect(sql).toMatch(/c\.id=company_id AND public\.crm_can_access\(c\.owner_id,c\.unit_id\)/);
     expect(sql).toMatch(/o\.company_id=crm_activities\.company_id/);
+  });
+  it('transferência de carteira só é permitida ao administrador e filhos herdam a carteira', () => {
+    expect(integritySql).toContain("NEW.owner_id IS DISTINCT FROM OLD.owner_id OR NEW.unit_id IS DISTINCT FROM OLD.unit_id");
+    expect(integritySql).toContain("NOT public.has_role(auth.uid(),'admin')");
+    expect(integritySql).toContain('c.unit_id IS DISTINCT FROM NEW.unit_id OR c.owner_id IS DISTINCT FROM NEW.owner_id');
   });
   const records = {
     crm_companies: { name: 'RLS validation', unit_id: uuid, owner_id: uuid },

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { Building2, CalendarDays, ChevronRight, ListFilter, Plus, Search, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
@@ -32,7 +32,6 @@ export default function Crm() {
   const { roles, loading: rolesLoading } = useCurrentUserRoles();
   const { toast } = useToast();
   const location = useLocation();
-  const navigate = useNavigate();
   const { companyId } = useParams();
   const companies = useSupabaseCrud<Company>('crm_companies');
   const opportunities = useSupabaseCrud<Opportunity>('crm_opportunities');
@@ -100,15 +99,16 @@ export default function Crm() {
     if (editor.kind === 'contact') return typeof id === 'string' ? contacts.update(id, row) : contacts.create(row);
     const parent = companies.data.find(c => c.id === row.company_id);
     if (!parent || parent.do_not_contact || !parent.active) { toast({ title: 'Empresa indisponível para contato', variant: 'destructive' }); return false; }
+    if (row.unit_id !== parent.unit_id) { toast({ title: 'Use a unidade comercial da empresa', variant: 'destructive' }); return false; }
     if (editor.kind === 'opportunity') {
       if (!validateCrmStage(raw.stage as Opportunity['stage'] & typeof CRM_STAGES[number], String(raw.loss_reason ?? ''))) { toast({ title: 'Informe o motivo de perda', variant: 'destructive' }); return false; }
       row.estimated_value = Number(raw.estimated_value || 0);
       row.attendees = raw.attendees === '' || raw.attendees == null ? null : Number(raw.attendees);
       if (!Number.isFinite(row.estimated_value) || row.estimated_value < 0 || (typeof row.attendees === 'number' && (!Number.isInteger(row.attendees) || row.attendees < 1))) { toast({ title: 'Confira valor e participantes', variant: 'destructive' }); return false; }
       row.closed_at = ['ganha','perdida'].includes(String(raw.stage)) ? editor.data?.closed_at || new Date().toISOString() : null;
-      return typeof id === 'string' ? opportunities.update(id, row) : opportunities.create({ ...row, owner_id: user.id });
+      return typeof id === 'string' ? opportunities.update(id, row) : opportunities.create({ ...row, owner_id: parent.owner_id });
     }
-    return typeof id === 'string' ? activities.update(id, row) : activities.create({ ...row, owner_id: user.id });
+    return typeof id === 'string' ? activities.update(id, row) : activities.create({ ...row, owner_id: parent.owner_id });
   };
   const archive = (kind: Editor['kind'], id: string) => {
     if (!window.confirm('Arquivar este registro? O histórico será preservado.')) return;
