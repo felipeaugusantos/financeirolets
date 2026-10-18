@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, CreditCard, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, Receipt, CreditCard, BarChart3, Settings, Building2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const tabs = [
@@ -7,6 +7,7 @@ const tabs = [
   { label: 'Contas', url: '/contas', icon: CreditCard },
   { label: 'DRE', url: '/relatorios', icon: BarChart3 },
   { label: 'Config', url: '/configuracoes', icon: Settings },
+  { label: 'CRM', url: '/crm/agenda', icon: Building2 },
 ];
 
 export function BottomTabs() {
@@ -15,7 +16,7 @@ export function BottomTabs() {
   return (
     <nav className="bottom-tabs md:hidden border-border shadow-elevated">
       {tabs.map((tab) => {
-        const active = location.pathname === tab.url;
+        const active = tab.label === 'CRM' ? location.pathname.startsWith('/crm') : location.pathname === tab.url;
         return (
           <Link
             key={tab.url}

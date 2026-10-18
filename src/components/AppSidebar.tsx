@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Sparkles,
   Bike,
+  Building2,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -40,6 +41,7 @@ const navItems = [
   { title: 'Pagar / Receber', url: '/contas', icon: CreditCard },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
   { title: 'iFood', url: '/ifood', icon: Bike },
+  { title: 'CRM', url: '/crm/agenda', icon: Building2 },
 ];
 
 const reconciliationItems = [

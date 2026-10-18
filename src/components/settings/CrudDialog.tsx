@@ -28,9 +28,10 @@ interface CrudDialogProps {
   title: string;
   fields: FieldConfig[];
   initialData?: FormValues;
+  contentClassName?: string;
 }
 
-export function CrudDialog({ open, onClose, onSave, title, fields, initialData }: CrudDialogProps) {
+export function CrudDialog({ open, onClose, onSave, title, fields, initialData, contentClassName }: CrudDialogProps) {
   const [form, setForm] = useState<FormValues>({});
   const [saving, setSaving] = useState(false);
 
@@ -60,23 +61,24 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="rounded-2xl max-w-md">
+      <DialogContent className={contentClassName ?? "rounded-2xl max-w-md"}>
         <DialogHeader>
           <DialogTitle className="font-heading">{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           {fields.map(f => (
             <div key={f.name} className="space-y-1.5">
-              <Label className="text-xs font-medium">{f.label}</Label>
+              <Label htmlFor={f.name} className="text-xs font-medium">{f.label}</Label>
               {f.type === 'select' ? (
                 <Select value={String(form[f.name] || '')} onValueChange={v => setForm(p => ({ ...p, [f.name]: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectTrigger id={f.name}><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
                     {f.options?.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               ) : f.type === 'textarea' ? (
                 <Textarea
+                  id={f.name}
                   value={String(form[f.name] || '')}
                   onChange={e => setForm(p => ({ ...p, [f.name]: e.target.value }))}
                   placeholder={f.placeholder}
@@ -84,6 +86,7 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData }
                 />
               ) : (
                 <Input
+                  id={f.name}
                   type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
                   value={String(form[f.name] || '')}
                   onChange={e => setForm(p => ({ ...p, [f.name]: f.type === 'number' ? Number(e.target.value) : e.target.value }))}

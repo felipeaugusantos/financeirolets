@@ -1,10 +1,11 @@
 # Tasks
-- [ ] CRM phase 1: companies, agenda, opportunities, coffee-break briefing and isolated permissions — blocked: managed migrator replays an existing card_statement_entries migration; no CRM schema was applied. Domain rules/tests prepared.
+- [x] Resolve the legacy migration replay conflict without touching financial data; original history retained intact and additive CRM migrations applied.
+- [x] CRM phase 1: companies, contacts, agenda, opportunities, coffee-break briefing and isolated permissions; 29 targeted tests pass.
 - [ ] CRM phase 2: external discovery and review — requires provider connection.
 - [ ] CRM phase 3: proposals and orders — requires commercial prices and conditions.
 - [ ] CRM phase 4: financial handoff — requires explicit approval for financial writes after validation.
 - [x] Prepare a screen-by-screen CRM plan for corporate sales and coffee breaks, including lead search and safe financial handoff.
 - [x] Add a Depreciação e CSLL view using the existing transaction list and form.
 - [x] Verify category selection and new-record defaults with automated tests; 14 regression tests pass.
-- [ ] Verify the authenticated screen in preview — blocked: requesting user has no matching auth account; sign-in required.
+- [ ] Verify CRM and accounting screens end-to-end with a real session — blocked: requesting user has no matching auth account; sign-in required. Signed-out route protection verified; no financial data changed.
 - [x] Check existing records: none exist to reclassify, confirmed by the user.
