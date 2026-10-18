@@ -15,6 +15,13 @@
       "when": 1792328679878,
       "tag": "0001_crm_parent_access_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792328704859,
+      "tag": "0002_crm_explicit_private_grants",
+      "breakpoints": true
     }
   ]
 }
