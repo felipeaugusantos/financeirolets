@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { CrudTable, type ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, type FieldConfig, type FormValues } from '@/components/settings/CrudDialog';
 import { CRM_STAGES, normalizeCompanyDocument, validateCrmStage } from '@/lib/crmRules';
+import { CompanyDiscovery } from '@/components/crm/CompanyDiscovery';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Company = Tables<'crm_companies'>;
@@ -25,7 +26,7 @@ const leadStates = [{ value: 'novo', label: 'Novo' }, { value: 'em_contato', lab
 const interests = [{ value: 'coffee_break', label: 'Coffee break' }, { value: 'evento_corporativo', label: 'Evento corporativo' }, { value: 'encomenda', label: 'Encomenda' }];
 const money = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateLabel = (date: string | null) => date ? date.split('-').reverse().join('/') : '—';
-const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }];
+const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }];
 
 export default function Crm() {
   const { user } = useAuth();
@@ -47,6 +48,7 @@ export default function Crm() {
   const company = companies.data.find(c => c.id === companyId);
   const isAgenda = location.pathname.endsWith('/agenda');
   const isPipeline = location.pathname.endsWith('/funil');
+  const isDiscovery = location.pathname.endsWith('/buscar');
   const canUse = roles.some(r => ['admin', 'gerente_unidade', 'vendedor'].includes(r));
   const loading = companies.loading || opportunities.loading || activities.loading || contacts.loading;
   const unitOptions = useMemo(() => units.data.filter(u => u.active).map(u => ({ value: u.id, label: u.name })), [units.data]);
@@ -130,13 +132,13 @@ export default function Crm() {
   return <div className="space-y-6">
     <header className="flex items-center gap-3"><Building2 className="h-7 w-7 text-primary" /><div><h1 className="font-heading text-2xl font-semibold">CRM</h1><p className="text-sm text-muted-foreground">Vendas corporativas e coffee breaks</p></div></header>
     <nav aria-label="CRM" className="flex flex-wrap gap-2 border-b border-border pb-3">{nav.map(n => <Button asChild variant={location.pathname.startsWith(n.path) ? 'secondary' : 'ghost'} key={n.path}><Link to={n.path}><n.icon className="mr-2 h-4 w-4" />{n.label}</Link></Button>)}</nav>
-    {!companyId && <div className="flex flex-wrap items-end gap-3">
+    {!companyId && !isDiscovery && <div className="flex flex-wrap items-end gap-3">
       <div className="relative flex-1 min-w-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar no CRM" placeholder="Buscar empresa, CNPJ ou contato" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" /></div>
       <Select value={unitFilter} onValueChange={setUnitFilter}><SelectTrigger className="w-full sm:w-52" aria-label="Filtrar unidade"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as unidades</SelectItem>{unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent></Select>
       {!isAgenda && !isPipeline && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
       {isAgenda && <><div><Label htmlFor="crm-from">De</Label><Input id="crm-from" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div><div><Label htmlFor="crm-to">Até</Label><Input id="crm-to" type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div></>}
     </div>}
-    {companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
+    {isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
       <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-heading text-xl font-semibold">{company.name}</h2><p className="text-sm text-muted-foreground">{unitName(company.unit_id)} · {company.segment || 'Sem segmento'}</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => openEditor('company', company)}>Editar empresa</Button><Button variant="outline" onClick={() => void companies.update(company.id, { do_not_contact: !company.do_not_contact })}>{company.do_not_contact ? 'Permitir contato' : 'Não contatar'}</Button></div></div>
       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">{[['CNPJ',company.document],['Telefone',company.phone],['E-mail',company.email],['Endereço',company.address],['Origem',company.source],['Observações',company.notes]].map(([label,value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl>
       {company.do_not_contact && <Badge variant="destructive">Não contatar</Badge>}
@@ -148,7 +150,7 @@ export default function Crm() {
       <div className="divide-y divide-border">{visibleOpportunities.filter(o => o.event_date && o.stage !== 'perdida' && (!fromDate || o.event_date >= fromDate) && (!toDate || o.event_date <= toDate)).sort((a,b) => (a.event_date ?? '').localeCompare(b.event_date ?? '')).map(o => <div key={o.id} className="flex flex-wrap justify-between gap-2 py-3"><Link to={`/crm/empresas/${o.company_id}`} className="font-medium text-primary">{o.title} · {companyName(o.company_id)}</Link><span className="text-sm text-muted-foreground">{dateLabel(o.event_date)} {o.event_time}</span></div>)}{!visibleOpportunities.some(o => o.event_date && o.stage !== 'perdida' && (!fromDate || o.event_date >= fromDate) && (!toDate || o.event_date <= toDate)) && <p className="text-muted-foreground py-3">Nenhum evento no período.</p>}</div>
       <CrudTable title="Minha agenda" columns={activityColumns} data={visibleActivities} loading={loading} hasActive={false} onAdd={() => openEditor('activity')} onEdit={a => openEditor('activity', a)} onDelete={id => archive('activity', id)} />
     </> : isPipeline ? <>
-      <div className="flex justify-between items-center gap-2"><h2 className="font-heading text-lg font-semibold">Funil de oportunidades</h2><Button onClick={() => openEditor('opportunity')} size="sm"><Plus className="h-4 w-4 mr-1" />Nova oportunidade</Button></div>
+      <div className="flex flex-wrap justify-between items-center gap-2"><h2 className="font-heading text-lg font-semibold">Funil de oportunidades</h2><div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><Link to="/crm/buscar"><Search className="h-4 w-4 mr-1" />Buscar empresas</Link></Button><Button onClick={() => openEditor('opportunity')} size="sm"><Plus className="h-4 w-4 mr-1" />Nova oportunidade</Button></div></div>
       {loading ? <p>Carregando oportunidades…</p> : <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">{CRM_STAGES.map(stage => <section key={stage} className="min-w-0 border-t-2 border-primary pt-3"><div className="flex justify-between mb-3"><h3 className="font-heading font-medium text-sm">{stages[stage]}</h3><Badge variant="secondary">{visibleOpportunities.filter(o => o.stage === stage).length}</Badge></div><div className="space-y-3">{visibleOpportunities.filter(o => o.stage === stage).map(o => <article key={o.id} className="border border-border rounded-lg p-3 space-y-2 bg-card"><Link to={`/crm/empresas/${o.company_id}`} className="text-sm text-primary">{companyName(o.company_id)}</Link><h4 className="font-medium break-words">{o.title}</h4><p className="text-sm">{money(o.estimated_value)}</p><p className="text-xs text-muted-foreground">{dateLabel(o.event_date)} · {unitName(o.unit_id)}</p><Button size="sm" variant="outline" onClick={() => openEditor('opportunity', o)}>Abrir briefing</Button></article>)}{!visibleOpportunities.some(o => o.stage === stage) && <p className="text-xs text-muted-foreground py-4">Nenhuma oportunidade</p>}</div></section>)}</div>}
     </> : <CrudTable title="Leads e empresas" columns={companyColumns} data={filteredCompanies} loading={loading} hasActive={false} onAdd={() => openEditor('company')} onEdit={c => openEditor('company', c)} onDelete={id => archive('company', id)} />}
     {editor && <CrudDialog open onClose={() => setEditor(null)} title={`${editor.data?.id ? 'Editar' : 'Novo'} ${ {company:'lead / empresa',contact:'contato',activity:'contato / tarefa',opportunity:'oportunidade e briefing'}[editor.kind]}`} fields={fields} initialData={editor.data} onSave={save} contentClassName="rounded-lg max-w-2xl max-h-[85vh] overflow-y-auto" />}
