@@ -8,6 +8,13 @@
       "when": 1792328551653,
       "tag": "0000_crm_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792328679878,
+      "tag": "0001_crm_parent_access_integrity",
+      "breakpoints": true
     }
   ]
 }
