@@ -3,6 +3,11 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.3.0 — 18/10/2026
+- Módulo CRM (agenda, empresas, funil, ficha) com acesso por perfil.
+- Busca de empresas por CNPJ e Google Maps com importação.
+- PDFs legíveis e completos; DRE contábil reclassificado; tela Depreciação e CSLL.
+
 ## 1.2.8 — 09/10/2026
 - Totais do DRE seguem as fórmulas das linhas (motor único nos 3 DREs); aviso de fórmula circular.
 - Suíte de testes T1–T20 do DRE.

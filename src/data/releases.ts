@@ -45,6 +45,19 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.3.0',
+    date: '2026-10-18',
+    summary: 'Novo módulo CRM comercial, busca de empresas, PDFs mais legíveis e DRE contábil mais completo.',
+    items: [
+      { area: 'Geral', kind: 'novidade', title: 'CRM comercial', detail: 'Nova área CRM com Minha agenda, Leads e empresas, Funil de oportunidades e ficha de cada empresa com contatos, oportunidades e histórico. Foco em vendas corporativas e coffee breaks. Nada do CRM entra no financeiro.', tech: 'Tabelas crm_companies/contacts/opportunities/activities com RLS (crm_can_access), arquivamento em vez de exclusão; src/pages/Crm.tsx.' },
+      { area: 'Geral', kind: 'novidade', title: 'Busca de empresas por CNPJ e localização', detail: 'No CRM, busque empresas pelo CNPJ ou por região no Google Maps e adicione as escolhidas direto na lista de empresas, sem duplicar cadastros.', tech: 'Função crm-discovery (Google Places limitado a 20 resultados, consulta CNPJ única); external_id por carteira.' },
+      { area: 'Acessos', kind: 'melhoria', title: 'Acesso ao CRM por perfil', detail: 'Administradores veem tudo; gerentes veem as unidades deles; vendedores veem só a própria carteira.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'PDF com letras maiores e completo', detail: 'Os PDFs do DRE, Fluxo de Caixa e conciliação saem com texto legível, cabeçalho em cada página e incluem também os quadros de totais e gráficos.', tech: 'exportPdf com jspdf-autotable + captura html2canvas do conteúdo fora das tabelas.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'DRE contábil mais correto', detail: 'Matéria-Prima e Embalagens passam a aparecer em Custo das Mercadorias Vendidas e IRPJ em IR e CSLL. Novas categorias Depreciação e CSLL.', tech: 'Somente dre_line_contabil_id; DRE gerencial inalterado.' },
+      { area: 'Lançamentos', kind: 'novidade', title: 'Tela Depreciação e CSLL', detail: 'Tela própria para registrar lançamentos de Depreciação e CSLL com a categoria já escolhida.' },
+    ],
+  },
+  {
     version: '1.2.8',
     date: '2026-10-09',
     summary: 'Totais do DRE seguem a configuração das linhas.',
