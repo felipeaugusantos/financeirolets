@@ -1,5 +1,6 @@
 # Tasks
-- [ ] CRM phase 1: companies, agenda, opportunities, coffee-break briefing and isolated permissions — blocked: managed migrator replays an existing card_statement_entries migration; no CRM schema was applied. Domain rules/tests prepared.
+- [ ] Resolve the legacy migration replay conflict without touching financial data.
+- [ ] CRM phase 1: companies, contacts, agenda, opportunities, coffee-break briefing and isolated permissions.
 - [ ] CRM phase 2: external discovery and review — requires provider connection.
 - [ ] CRM phase 3: proposals and orders — requires commercial prices and conditions.
 - [ ] CRM phase 4: financial handoff — requires explicit approval for financial writes after validation.

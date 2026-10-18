@@ -3,8 +3,7 @@ import { defineConfig } from "drizzle-kit";
 export default defineConfig({
   dialect: "postgresql",
   schema: "./drizzle/schema.ts",
-  out: "./drizzle/migrations",
-  dbCredentials: {
-    url: process.env.LOVABLE_DB_MIGRATION_URL ?? "",
-  },
+  // Legacy migrations mirror schema already applied by the original workflow.
+  // Keep that history intact; new Cloud migrations must not replay it.
+  out: "./drizzle/cloud-migrations",
 });
