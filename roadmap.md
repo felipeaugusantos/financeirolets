@@ -1,7 +1,7 @@
 # Tasks
 - [x] Resolve the legacy migration replay conflict without touching financial data; original history retained intact and additive CRM migrations applied.
 - [x] CRM phase 1: companies, contacts, agenda, opportunities, coffee-break briefing and isolated permissions; 29 targeted tests pass.
-- [ ] CRM phase 2: external discovery and review — requires provider connection.
+- [ ] CRM phase 2: CNPJ and location discovery, review and automatic company import; preserve financial records.
 - [ ] CRM phase 3: proposals and orders — requires commercial prices and conditions.
 - [ ] CRM phase 4: financial handoff — requires explicit approval for financial writes after validation.
 - [x] Prepare a screen-by-screen CRM plan for corporate sales and coffee breaks, including lead search and safe financial handoff.
