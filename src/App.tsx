@@ -14,6 +14,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import AccountingTransactions from "./pages/AccountingTransactions";
+import Crm from "./pages/Crm";
 import Accounts from "./pages/Accounts";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/SettingsPage";
@@ -57,6 +58,11 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
               <Route path="/lancamentos-contabeis" element={<ProtectedRoute><AccountingTransactions /></ProtectedRoute>} />
+              <Route path="/crm" element={<Navigate to="/crm/agenda" replace />} />
+              <Route path="/crm/agenda" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/empresas" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/empresas/:companyId" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/funil" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
               <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
