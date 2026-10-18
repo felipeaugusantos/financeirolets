@@ -11,9 +11,10 @@ import {
   Sparkles,
   Bike,
   Building2,
+  Briefcase,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -75,6 +76,7 @@ export function AppSidebar() {
     ? [settingsItem, releasesItem, ...adminNavItems]
     : [settingsItem, releasesItem];
   const reconciliationActive = location.pathname.startsWith('/conciliacao');
+  const managementActive = location.pathname === '/contas' || location.pathname.startsWith('/gestao');
 
 
   return (
@@ -111,7 +113,42 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
 
-
+              <Collapsible defaultOpen={managementActive} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={managementActive} className="hover:bg-sidebar-accent/50">
+                      <Briefcase className="h-4 w-4" />
+                      {!collapsed && (
+                        <>
+                          <span>Gestão Empresarial</span>
+                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  {!collapsed && (
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {managementItems.map((sub) => {
+                          const active = sub.match(location.pathname, location.search);
+                          return (
+                            <SidebarMenuSubItem key={sub.url}>
+                              <SidebarMenuSubButton asChild isActive={active}>
+                                <Link
+                                  to={sub.url}
+                                  className={active ? 'bg-sidebar-accent text-primary font-medium' : 'hover:bg-sidebar-accent/50'}
+                                >
+                                  <span>{sub.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  )}
+                </SidebarMenuItem>
+              </Collapsible>
 
               <Collapsible defaultOpen={reconciliationActive} className="group/collapsible">
                 <SidebarMenuItem>
