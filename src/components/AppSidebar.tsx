@@ -11,9 +11,10 @@ import {
   Sparkles,
   Bike,
   Building2,
+  Briefcase,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -38,10 +39,15 @@ const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Lançamentos', url: '/lancamentos', icon: Receipt },
   { title: 'Depreciação e CSLL', url: '/lancamentos-contabeis', icon: Receipt },
-  { title: 'Pagar / Receber', url: '/contas', icon: CreditCard },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
   { title: 'iFood', url: '/ifood', icon: Bike },
   { title: 'CRM', url: '/crm/agenda', icon: Building2 },
+];
+
+const managementItems = [
+  { title: 'Contas a Pagar', url: '/contas?tab=pagar', match: (p: string, s: string) => p === '/contas' && !s.includes('tab=receber') },
+  { title: 'Contas a Receber', url: '/contas?tab=receber', match: (p: string, s: string) => p === '/contas' && s.includes('tab=receber') },
+  { title: 'Importação de Notas', url: '/gestao/notas', match: (p: string) => p === '/gestao/notas' },
 ];
 
 const reconciliationItems = [
@@ -49,7 +55,6 @@ const reconciliationItems = [
   { title: 'Conciliação', url: '/conciliacao/conciliar' },
   { title: 'Regras de Conciliação', url: '/conciliacao/regras' },
   { title: 'Conciliação de Cartão', url: '/conciliacao/cartao' },
-
 ];
 
 const settingsItem = { title: 'Configurações', url: '/configuracoes', icon: Settings };
@@ -71,6 +76,7 @@ export function AppSidebar() {
     ? [settingsItem, releasesItem, ...adminNavItems]
     : [settingsItem, releasesItem];
   const reconciliationActive = location.pathname.startsWith('/conciliacao');
+  const managementActive = location.pathname === '/contas' || location.pathname.startsWith('/gestao');
 
 
   return (
@@ -107,7 +113,42 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
 
-
+              <Collapsible defaultOpen={managementActive} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={managementActive} className="hover:bg-sidebar-accent/50">
+                      <Briefcase className="h-4 w-4" />
+                      {!collapsed && (
+                        <>
+                          <span>Gestão Empresarial</span>
+                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  {!collapsed && (
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {managementItems.map((sub) => {
+                          const active = sub.match(location.pathname, location.search);
+                          return (
+                            <SidebarMenuSubItem key={sub.url}>
+                              <SidebarMenuSubButton asChild isActive={active}>
+                                <Link
+                                  to={sub.url}
+                                  className={active ? 'bg-sidebar-accent text-primary font-medium' : 'hover:bg-sidebar-accent/50'}
+                                >
+                                  <span>{sub.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  )}
+                </SidebarMenuItem>
+              </Collapsible>
 
               <Collapsible defaultOpen={reconciliationActive} className="group/collapsible">
                 <SidebarMenuItem>
