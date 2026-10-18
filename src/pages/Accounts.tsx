@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -419,6 +420,8 @@ function BillsTab({ tab }: { tab: 'pagar' | 'receber' }) {
 }
 
 export default function Accounts() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'receber' ? 'receber' : 'pagar';
   return (
     <div className="space-y-6">
       <div>
@@ -426,7 +429,7 @@ export default function Accounts() {
         <p className="text-sm text-muted-foreground">Gerencie vencimentos e pagamentos</p>
       </div>
 
-      <Tabs defaultValue="pagar" className="w-full">
+      <Tabs value={tab} onValueChange={(v) => setSearchParams({ tab: v }, { replace: true })} className="w-full">
         <TabsList className="w-full grid grid-cols-2 rounded-xl bg-muted">
           <TabsTrigger value="pagar" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             A Pagar

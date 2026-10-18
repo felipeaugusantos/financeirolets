@@ -16,6 +16,7 @@ import Transactions from "./pages/Transactions";
 import AccountingTransactions from "./pages/AccountingTransactions";
 import Crm from "./pages/Crm";
 import Accounts from "./pages/Accounts";
+import FiscalInvoices from "./pages/FiscalInvoices";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/SettingsPage";
 import AuditPage from "./pages/AuditPage";
@@ -65,6 +66,9 @@ const App = () => (
               <Route path="/crm/empresas/:companyId" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/crm/funil" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+              <Route path="/gestao/pagar" element={<Navigate to="/contas?tab=pagar" replace />} />
+              <Route path="/gestao/receber" element={<Navigate to="/contas?tab=receber" replace />} />
+              <Route path="/gestao/notas" element={<ProtectedRoute><FiscalInvoices /></ProtectedRoute>} />
               <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/configuracoes" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/conciliacao" element={<Navigate to="/conciliacao/conciliar" replace />} />

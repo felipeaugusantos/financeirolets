@@ -38,10 +38,15 @@ const navItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Lançamentos', url: '/lancamentos', icon: Receipt },
   { title: 'Depreciação e CSLL', url: '/lancamentos-contabeis', icon: Receipt },
-  { title: 'Pagar / Receber', url: '/contas', icon: CreditCard },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
   { title: 'iFood', url: '/ifood', icon: Bike },
   { title: 'CRM', url: '/crm/agenda', icon: Building2 },
+];
+
+const managementItems = [
+  { title: 'Contas a Pagar', url: '/contas?tab=pagar', match: (p: string, s: string) => p === '/contas' && !s.includes('tab=receber') },
+  { title: 'Contas a Receber', url: '/contas?tab=receber', match: (p: string, s: string) => p === '/contas' && s.includes('tab=receber') },
+  { title: 'Importação de Notas', url: '/gestao/notas', match: (p: string) => p === '/gestao/notas' },
 ];
 
 const reconciliationItems = [
@@ -49,7 +54,6 @@ const reconciliationItems = [
   { title: 'Conciliação', url: '/conciliacao/conciliar' },
   { title: 'Regras de Conciliação', url: '/conciliacao/regras' },
   { title: 'Conciliação de Cartão', url: '/conciliacao/cartao' },
-
 ];
 
 const settingsItem = { title: 'Configurações', url: '/configuracoes', icon: Settings };
