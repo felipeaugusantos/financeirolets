@@ -637,6 +637,7 @@ export type Database = {
           do_not_contact: boolean
           document: string | null
           email: string | null
+          external_id: string | null
           id: string
           interest: string
           name: string
@@ -656,6 +657,7 @@ export type Database = {
           do_not_contact?: boolean
           document?: string | null
           email?: string | null
+          external_id?: string | null
           id?: string
           interest?: string
           name: string
@@ -675,6 +677,7 @@ export type Database = {
           do_not_contact?: boolean
           document?: string | null
           email?: string | null
+          external_id?: string | null
           id?: string
           interest?: string
           name?: string

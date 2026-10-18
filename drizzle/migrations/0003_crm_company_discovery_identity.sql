@@ -1,0 +1,3 @@
+ALTER TABLE public.crm_companies ADD COLUMN IF NOT EXISTS external_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS crm_companies_external_portfolio_unique ON public.crm_companies(unit_id,owner_id,external_id) WHERE external_id IS NOT NULL;
+COMMENT ON COLUMN public.crm_companies.external_id IS 'Public provider identifier for deduplicating imported prospects within the commercial portfolio; not a financial link.';
