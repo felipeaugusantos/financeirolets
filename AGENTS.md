@@ -1,6 +1,7 @@
 # AGENTS
 
-- Managed Cloud migrations use `drizzle/cloud-migrations`; retain the legacy migration directory unchanged because its schema already exists and replaying it breaks additive CRM migrations.
+- Managed Cloud migrations use `drizzle/migrations`; the original history is retained unchanged in `drizzle/legacy-migrations` because replaying already-applied financial schema blocks additive migrations.
+- CRM screens reuse `useSupabaseCrud` and existing CRUD controls; records are archived rather than deleted to preserve commercial history and remain isolated from financial postings.
 
 - CRM commercial domain rules live in `src/lib/crmRules.ts` independently of financial calculations — estimates must never post revenue or alter DRE totals.
 

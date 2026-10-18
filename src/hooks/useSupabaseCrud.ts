@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-type TableName = 'units' | 'business_fronts' | 'accounts' | 'categories' | 'dre_lines' | 'partners';
+type TableName = 'units' | 'business_fronts' | 'accounts' | 'categories' | 'dre_lines' | 'partners' | 'crm_companies' | 'crm_contacts' | 'crm_opportunities' | 'crm_activities';
 
 type CrudError = { message: string } | null;
 
