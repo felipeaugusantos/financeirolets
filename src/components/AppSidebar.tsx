@@ -41,7 +41,7 @@ const navItems = [
   { title: 'Depreciação e CSLL', url: '/lancamentos-contabeis', icon: Receipt },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
   { title: 'iFood', url: '/ifood', icon: Bike },
-  { title: 'Fábrica: ficha e produção', url: '/fabrica', icon: ChefHat },
+  { title: 'Fábrica & Operações', url: '/fabrica', icon: ChefHat },
   { title: 'CRM', url: '/crm/agenda', icon: Building2 },
 ];
 
@@ -100,7 +100,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url.split('/').slice(0, 2).join('/') + '/'))}>
                     <NavLink
                       to={item.url}
                       end={item.url === '/'}
