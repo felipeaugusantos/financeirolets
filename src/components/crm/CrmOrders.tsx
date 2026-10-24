@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
+import { Plus, Receipt, Cookie, TrendingDown, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import { CrudTable, type ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, type FieldConfig, type FormValues } from '@/components/settings/CrudDialog';
 import { ORDER_STATUSES, PAYMENT_TERMS, customerAverages, inactiveCustomers, monthToDateComparison, orderDueDate } from '@/lib/crmRules';
 import type { Tables } from '@/integrations/supabase/types';
+import { OrderItemsDialog } from '@/components/crm/OrderItemsDialog';
 
 type Order = Tables<'crm_orders'>;
 type Company = Tables<'crm_companies'>;
@@ -33,6 +34,7 @@ export function CrmOrders({ companies, unitFilter, search }: Props) {
   const [invoicing, setInvoicing] = useState<Order | null>(null);
   const [categoryId, setCategoryId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [itemsFor, setItemsFor] = useState<Order | { id: string; status: string } | null>(null);
   const today = new Date().toLocaleDateString('en-CA');
   const companyName = (id: string) => companies.find(c => c.id === id)?.name ?? 'Empresa indisponível';
 
@@ -49,9 +51,6 @@ export function CrmOrders({ companies, unitFilter, search }: Props) {
     { name: 'company_id', label: 'Cliente', type: 'select', required: true, options: companyOptions },
     { name: 'order_date', label: 'Data do pedido', type: 'date', required: true },
     { name: 'delivery_date', label: 'Data de envio', type: 'date' },
-    { name: 'quantity_boxes', label: 'Caixas', type: 'number' },
-    { name: 'quantity_cookies', label: 'Cookies', type: 'number' },
-    { name: 'total_amount', label: 'Valor do pedido (R$)', type: 'number', required: true },
     { name: 'payment_terms', label: 'Condição de pagamento', type: 'select', required: true, options: Object.entries(PAYMENT_TERMS).map(([value, t]) => ({ value, label: t.label })) },
     { name: 'seller_name', label: 'Vendedor' },
     { name: 'status', label: 'Situação', type: 'select', required: true, options: ORDER_STATUSES.filter(s => s !== 'faturado').map(value => ({ value, label: statusLabel[value] })) },
@@ -61,23 +60,24 @@ export function CrmOrders({ companies, unitFilter, search }: Props) {
   const save = async (raw: FormValues): Promise<boolean | string> => {
     const company = companies.find(c => c.id === raw.company_id);
     if (!company || !user) { toast({ title: 'Escolha o cliente', variant: 'destructive' }); return false; }
-    const amount = Number(raw.total_amount || 0), boxes = Number(raw.quantity_boxes || 0), cookies = Number(raw.quantity_cookies || 0);
-    if (![amount, boxes, cookies].every(n => Number.isFinite(n) && n >= 0)) { toast({ title: 'Confira valor e quantidades', variant: 'destructive' }); return false; }
     const orderDate = String(raw.order_date || today);
     const delivery = raw.delivery_date ? String(raw.delivery_date) : null;
     const terms = String(raw.payment_terms || 'boleto_7');
     const row = {
       company_id: company.id, unit_id: company.unit_id, owner_id: company.owner_id,
-      order_date: orderDate, delivery_date: delivery, quantity_boxes: Math.round(boxes), quantity_cookies: Math.round(cookies),
-      total_amount: amount, payment_terms: terms, due_date: orderDueDate(delivery ?? orderDate, terms),
+      order_date: orderDate, delivery_date: delivery, payment_terms: terms, due_date: orderDueDate(delivery ?? orderDate, terms),
       seller_name: raw.seller_name ? String(raw.seller_name) : null, status: String(raw.status || 'pendente'), notes: raw.notes ? String(raw.notes) : null,
     };
     const id = editor?.id;
-    return typeof id === 'string' ? orders.update(id, row) : orders.create(row);
+    if (typeof id === 'string') return orders.update(id, row);
+    const created = await orders.create({ ...row, quantity_boxes: 0, quantity_cookies: 0, total_amount: 0 });
+    if (created) setTimeout(() => setItemsFor({ id: created, status: 'pendente' }), 0);
+    return created;
   };
 
   const invoice = async () => {
     if (!invoicing || !categoryId || !user) return;
+    if (!(Number(invoicing.total_amount) > 0)) { toast({ title: 'Adicione os produtos do pedido antes de faturar', variant: 'destructive' }); return; }
     setBusy(true);
     const o = invoicing;
     const { data: tx, error } = await supabase.from('transactions').insert({
@@ -98,8 +98,8 @@ export function CrmOrders({ companies, unitFilter, search }: Props) {
     { key: 'order_date', label: 'Pedido', render: (v: string) => dateLabel(v) },
     { key: 'company_id', label: 'Cliente', render: (v: string) => <Link className="text-primary" to={`/crm/empresas/${v}`}>{companyName(v)}</Link> },
     { key: 'delivery_date', label: 'Envio', render: (v: string) => dateLabel(v) },
-    { key: 'quantity_boxes', label: 'Caixas' },
-    { key: 'total_amount', label: 'Valor', render: (v: number) => money(Number(v)) },
+    { key: 'quantity_boxes', label: 'Produtos', render: (v: number, o) => <Button size="sm" variant="ghost" className="gap-1" onClick={() => setItemsFor(o)}><Cookie className="h-3 w-3" />{v} cx</Button> },
+    { key: 'total_amount', label: 'Valor', render: (v: number, o) => <span>{money(Number(v))}{Number(o.total_cost) > 0 && <span className="block text-xs text-muted-foreground">custo {money(Number(o.total_cost))}</span>}</span> },
     { key: 'payment_terms', label: 'Condição', render: (v: string, o) => <span>{PAYMENT_TERMS[v]?.label ?? v}<span className="block text-xs text-muted-foreground">vence {dateLabel(o.due_date)}</span></span> },
     { key: 'status', label: 'Situação', render: (v: string, o) => v === 'faturado' || v === 'cancelado'
       ? <Badge variant={v === 'faturado' ? 'secondary' : 'outline'}>{statusLabel[v]}</Badge>
@@ -126,6 +126,7 @@ export function CrmOrders({ companies, unitFilter, search }: Props) {
     </div>
 
     {editor && <CrudDialog open onClose={() => setEditor(null)} title={editor.id ? 'Editar pedido' : 'Novo pedido'} fields={fields} initialData={editor} onSave={save} contentClassName="rounded-lg max-w-2xl max-h-[85vh] overflow-y-auto" />}
+    {itemsFor && <OrderItemsDialog orderId={itemsFor.id} locked={itemsFor.status === 'faturado'} onClose={() => setItemsFor(null)} onSaved={() => void orders.fetch()} />}
     <Dialog open={!!invoicing} onOpenChange={o => !o && setInvoicing(null)}>
       <DialogContent>
         <DialogHeader><DialogTitle>Faturar pedido</DialogTitle></DialogHeader>
