@@ -45,6 +45,19 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.4.0',
+    date: '2026-10-24',
+    summary: 'Gestão Empresarial, clientes e produtos no CRM, pedidos com produtos, Fábrica e iFood ligado ao financeiro.',
+    items: [
+      { area: 'Geral', kind: 'novidade', title: 'Menu Gestão Empresarial', detail: 'Novo grupo no menu com Contas a Pagar, Contas a Receber e Importação de Notas (leitura de XML de NF-e/NFC-e, com pré-visualização).', tech: 'src/lib/nfeParser.ts; src/pages/FiscalInvoices.tsx.' },
+      { area: 'Geral', kind: 'novidade', title: 'Clientes e Produtos no CRM', detail: 'Abas Clientes (com responsável, endereço de entrega e condição de pagamento) e Produtos (cada tipo de cookie com embalagem, cookies por embalagem e preço).', tech: 'crm_products; status "cliente" em crm_companies.' },
+      { area: 'Geral', kind: 'novidade', title: 'Pedidos com produtos', detail: 'Nos pedidos de distribuição, escolha os cookies e as quantidades: caixas, cookies e total são calculados sozinhos, com custo de fábrica e margem. Só é possível faturar pedido com produtos.', tech: 'crm_order_items; orderLinesTotals em factoryRules.ts.' },
+      { area: 'Geral', kind: 'novidade', title: 'Fábrica: ficha técnica e produção', detail: 'Cadastro de ingredientes, ficha técnica com custo por cookie e por embalagem, e sugestão de produção por unidade com lista de ingredientes a comprar.', tech: 'factory_ingredients/recipes/recipe_items/forecasts; src/pages/Factory.tsx.' },
+      { area: 'Geral', kind: 'novidade', title: 'iFood: rentabilidade e repasses semanais', detail: 'Tela iFood com os 5 indicadores (faturamento, descontos, motoqueiro, produto, líquido) e repasses semanais conferidos com o extrato. Admin e Financeiro podem lançar cada semana no Contas a Receber.', tech: 'ifoodProfit.ts; ifood_payout_postings (bruto + despesas pendentes).' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Baixa automática na conciliação', detail: 'Ao vincular uma linha do extrato a uma conta pendente, ela passa a recebida/paga na data e conta do extrato. No repasse iFood, as despesas recebem baixa junto. Ao desvincular, volta para pendente.', tech: 'src/lib/ofxSettle.ts com marcador [baixa pela conciliação].' },
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-10-18',
     summary: 'Novo módulo CRM comercial, busca de empresas, PDFs mais legíveis e DRE contábil mais completo.',
