@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { purchaseToIngredient, ingredientCostPerUnit, productionPlan, recipeCost, type Ingredient, type Recipe } from '@/lib/factoryRules';
+import { ordersDemand, purchaseToIngredient, ingredientCostPerUnit, productionPlan, recipeCost, type Ingredient, type Recipe } from '@/lib/factoryRules';
 
 const money = (v: number, d = 2) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: d, maximumFractionDigits: d });
 const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -68,6 +68,21 @@ export default function Factory() {
     ]);
     setIngredients(i.data ?? []); setLinked(Object.fromEntries((i.data ?? []).map(x => [x.id, { tx: x.last_purchase_tx_id, date: x.last_purchase_date }]))); setProducts(p.data ?? []); setUnits(u.data ?? []); setRecipes((r.data ?? []) as RecipeRow[]);
   }, []);
+  type DemandOrder = { id: string; unit_id: string; company_id: string; delivery_date: string | null; status: string; crm_order_items: { product_id: string; packages: number; cookies_per_package: number }[] };
+  const [demandOrders, setDemandOrders] = useState<DemandOrder[]>([]);
+  const horizon = (() => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 2); return d.toISOString().slice(0, 10); })();
+  const loadDemand = useCallback(async () => {
+    const { data } = await supabase.from('crm_orders').select('id,unit_id,company_id,delivery_date,status,crm_order_items(product_id,packages,cookies_per_package)')
+      .eq('active', true).in('status', ['pendente', 'em_producao']).gte('delivery_date', date).lte('delivery_date', horizon).order('delivery_date');
+    setDemandOrders((data ?? []) as DemandOrder[]);
+  }, [date, horizon]);
+  useEffect(() => { void loadDemand(); }, [loadDemand]);
+  const demand = useMemo(() => ordersDemand(demandOrders.map(o => ({ unit_id: o.unit_id, items: o.crm_order_items }))), [demandOrders]);
+  const startProduction = async () => {
+    const ids = demandOrders.filter(o => o.status === 'pendente').map(o => o.id);
+    if (!ids.length) return;
+    if (fail((await supabase.from('crm_orders').update({ status: 'em_producao' }).in('id', ids)).error)) { toast({ title: `${ids.length} pedido(s) em produção` }); void loadDemand(); }
+  };
   const loadForecasts = useCallback(async () => {
     const { data } = await supabase.from('factory_forecasts').select('id,unit_id,product_id,quantity').eq('production_date', date);
     setForecasts(data ?? []);
@@ -76,7 +91,7 @@ export default function Factory() {
   useEffect(() => { void loadForecasts(); }, [loadForecasts]);
 
   const recipeList: Recipe[] = useMemo(() => recipes.map(r => ({ product_id: r.product_id, yield_units: r.yield_units, items: r.factory_recipe_items })), [recipes]);
-  const plan = useMemo(() => productionPlan(forecasts, recipeList, ingredients), [forecasts, recipeList, ingredients]);
+  const plan = useMemo(() => productionPlan([...forecasts, ...demand], recipeList, ingredients), [forecasts, demand, recipeList, ingredients]);
   const productName = (id: string) => products.find(p => p.id === id)?.name ?? '—';
   const ingById = (id: string) => ingredients.find(i => i.id === id);
 
@@ -159,6 +174,14 @@ export default function Factory() {
 
         <TabsContent value="producao" className="space-y-4">
           <div><Label>Dia da produção</Label><Input type="date" className="w-44" value={date} onChange={e => setDate(e.target.value)} /></div>
+          <Card className="rounded-2xl"><CardHeader className="flex flex-row items-center justify-between gap-2 pb-2"><CardTitle className="text-base">Pedidos com entrega até {horizon.split('-').reverse().join('/')}</CardTitle>
+            {demandOrders.some(o => o.status === 'pendente') && <Button size="sm" onClick={() => void startProduction()}>Iniciar produção</Button>}</CardHeader>
+            <CardContent>{!demandOrders.length ? <p className="text-sm text-muted-foreground">Nenhum pedido pendente para esta fornada.</p> : <Table>
+              <TableHeader><TableRow><TableHead>Entrega</TableHead><TableHead>Unidade</TableHead><TableHead>Produtos</TableHead><TableHead>Situação</TableHead></TableRow></TableHeader>
+              <TableBody>{demandOrders.map(o => <TableRow key={o.id}><TableCell>{(o.delivery_date ?? '').split('-').reverse().join('/')}</TableCell><TableCell>{units.find(u => u.id === o.unit_id)?.name ?? '—'}</TableCell>
+                <TableCell>{o.crm_order_items.length ? o.crm_order_items.map(it => `${num(it.packages)}× ${productName(it.product_id)}`).join(', ') : <Badge variant="destructive">sem produtos</Badge>}</TableCell>
+                <TableCell><Badge variant={o.status === 'em_producao' ? 'default' : 'outline'}>{o.status === 'em_producao' ? 'Em produção' : 'Pendente'}</Badge></TableCell></TableRow>)}</TableBody></Table>}
+              <p className="mt-2 text-xs text-muted-foreground">Esses pedidos já entram em "O que produzir" e nos ingredientes, somados à previsão das lojas abaixo.</p></CardContent></Card>
           <Card className="rounded-2xl"><CardHeader className="pb-2"><CardTitle className="text-base">Previsão por unidade (quantidade de cookies)</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">{!products.length ? <p className="text-sm text-muted-foreground">Cadastre os produtos em CRM › Produtos.</p> : <Table>
               <TableHeader><TableRow><TableHead>Produto</TableHead>{units.map(u => <TableHead key={u.id} className="text-right">{u.name}</TableHead>)}<TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
