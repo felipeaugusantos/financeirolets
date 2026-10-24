@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { settleOnLink, reopenOnUnlink } from '@/lib/ofxSettle';
 import { supabase } from '@/integrations/supabase/client';
 import { callRpc } from '@/lib/rpc';
 import { unlinkErrorText, unlinkSummaryText, type UnlinkSummary } from '@/lib/ofxUnlink';
@@ -417,15 +418,19 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       transaction_id: transactionId, status: 'vinculado', match_note: note ?? null, ...decisionStamp(),
     });
     if (err) { toast({ title: 'Erro ao vincular', description: err, variant: 'destructive' }); return false; }
+    const settleErr = await settleOnLink(entryId, transactionId);
+    if (settleErr) toast({ title: 'Vinculado, mas a baixa do lançamento falhou', description: settleErr, variant: 'destructive' });
     await load();
     return true;
   }, [updateEntry, decisionStamp, load, toast]);
 
   const unlinkEntry = useCallback(async (entryId: string) => {
+    const { data: prev } = await supabase.from('bank_statement_entries').select('transaction_id').eq('id', entryId).maybeSingle();
     const err = await updateEntry(entryId, {
       transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
     });
     if (err) { toast({ title: 'Erro ao desvincular', description: err, variant: 'destructive' }); return false; }
+    await reopenOnUnlink(prev?.transaction_id ?? null);
     await load();
     return true;
   }, [updateEntry, decisionStamp, load, toast]);
@@ -625,9 +630,12 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
 
   /** Vincula várias linhas de uma vez aos lançamentos indicados. */
   const linkMany = useCallback((pairs: { entryId: string; transactionId: string; note?: string }[]) =>
-    runBatch('Vinculadas', pairs.map(p => () => updateEntry(p.entryId, {
-      transaction_id: p.transactionId, status: 'vinculado', match_note: p.note ?? null, ...decisionStamp(),
-    })))
+    runBatch('Vinculadas', pairs.map(p => async () => {
+      const err = await updateEntry(p.entryId, {
+        transaction_id: p.transactionId, status: 'vinculado', match_note: p.note ?? null, ...decisionStamp(),
+      });
+      return err ?? settleOnLink(p.entryId, p.transactionId);
+    }))
   , [runBatch, updateEntry, decisionStamp]);
 
   /**
@@ -720,9 +728,13 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
    * para pendente. O lançamento em si não é alterado nem apagado.
    */
   const unlinkMany = useCallback((entryIds: string[]) =>
-    runBatch('Conciliações excluídas', entryIds.map(id => () => updateEntry(id, {
-      transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
-    })))
+    runBatch('Conciliações excluídas', entryIds.map(id => async () => {
+      const { data: prev } = await supabase.from('bank_statement_entries').select('transaction_id').eq('id', id).maybeSingle();
+      const err = await updateEntry(id, {
+        transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
+      });
+      return err ?? reopenOnUnlink(prev?.transaction_id ?? null);
+    }))
   , [runBatch, updateEntry, decisionStamp]);
 
   /**

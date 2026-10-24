@@ -43,6 +43,13 @@
       "when": 1792850233147,
       "tag": "0005_crm_order_items",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792850536248,
+      "tag": "0006_ifood_payout_postings",
+      "breakpoints": true
     }
   ]
 }

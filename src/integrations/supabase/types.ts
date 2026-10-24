@@ -1407,6 +1407,57 @@ export type Database = {
           },
         ]
       }
+      ifood_payout_postings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expense_ids: string[]
+          gross: number
+          id: string
+          net: number
+          receivable_id: string
+          store_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expense_ids?: string[]
+          gross?: number
+          id?: string
+          net?: number
+          receivable_id: string
+          store_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expense_ids?: string[]
+          gross?: number
+          id?: string
+          net?: number
+          receivable_id?: string
+          store_id?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_payout_postings_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ifood_payout_postings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "ifood_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ifood_stores: {
         Row: {
           active: boolean
