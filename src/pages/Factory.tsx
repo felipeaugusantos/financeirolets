@@ -4,6 +4,7 @@ import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import type { Tables } from '@/integrations/supabase/types';
 import { CrmOrders } from '@/components/crm/CrmOrders';
 import { CrmProducts } from '@/components/crm/CrmProducts';
+import { FactoryBatches } from '@/components/factory/FactoryBatches';
 import { ChefHat, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -126,9 +127,10 @@ export default function Factory() {
         <p className="text-sm text-muted-foreground">Pedidos e distribuição, produtos, fichas técnicas, ingredientes e sugestão de produção.</p>
       </div>
       <Tabs value={tab} onValueChange={v => navigate(v === 'producao' ? '/fabrica' : `/fabrica/${v}`)}>
-        <TabsList className="flex h-auto flex-wrap"><TabsTrigger value="pedidos">Distribuição & pedidos</TabsTrigger><TabsTrigger value="producao">Sugestão de produção</TabsTrigger><TabsTrigger value="fichas">Fichas técnicas</TabsTrigger><TabsTrigger value="ingredientes">Ingredientes</TabsTrigger><TabsTrigger value="produtos">Produtos</TabsTrigger></TabsList>
+        <TabsList className="flex h-auto flex-wrap"><TabsTrigger value="pedidos">Distribuição & pedidos</TabsTrigger><TabsTrigger value="producao">Sugestão de produção</TabsTrigger><TabsTrigger value="fornadas">Fornadas</TabsTrigger><TabsTrigger value="fichas">Fichas técnicas</TabsTrigger><TabsTrigger value="ingredientes">Ingredientes</TabsTrigger><TabsTrigger value="produtos">Produtos</TabsTrigger></TabsList>
         <TabsContent value="pedidos"><CrmOrders companies={companies.data} unitFilter="all" search="" /></TabsContent>
         <TabsContent value="produtos"><CrmProducts /></TabsContent>
+        <TabsContent value="fornadas"><FactoryBatches products={products} recipes={recipeList} ingredients={ingredients} plannedToday={{ date, items: plan.products.map(p => ({ product_id: p.product_id, units: p.units })) }} /></TabsContent>
 
         <TabsContent value="ingredientes" className="space-y-3">
           <Card className="rounded-2xl"><CardContent className="p-3 text-sm"><p className="text-muted-foreground">Matéria-prima e embalagens no Contas a Pagar neste mês</p><p className="text-lg font-bold">{money(realMonth)}</p><p className="text-xs text-muted-foreground">Use "Pela conta a pagar" para atualizar o custo do ingrediente com o valor real da compra.</p></CardContent></Card>
