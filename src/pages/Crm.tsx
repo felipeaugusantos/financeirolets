@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { CrudTable, type ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, type FieldConfig, type FormValues } from '@/components/settings/CrudDialog';
-import { CRM_STAGES, normalizeCompanyDocument, validateCrmStage } from '@/lib/crmRules';
+import { CRM_STAGES, PAYMENT_TERMS, normalizeCompanyDocument, orderDueDate, validateCrmStage } from '@/lib/crmRules';
 import { CompanyDiscovery } from '@/components/crm/CompanyDiscovery';
 import { CrmOrders } from '@/components/crm/CrmOrders';
 import { CrmProducts } from '@/components/crm/CrmProducts';
@@ -40,6 +40,15 @@ export default function Crm() {
   const opportunities = useSupabaseCrud<Opportunity>('crm_opportunities');
   const activities = useSupabaseCrud<Activity>('crm_activities');
   const contacts = useSupabaseCrud<Contact>('crm_contacts');
+  const orders = useSupabaseCrud<Tables<'crm_orders'>>('crm_orders', 'order_date');
+  const sendToFactory = async (o: Opportunity) => {
+    const parent = companies.data.find(c => c.id === o.company_id);
+    if (!parent) return;
+    const base = o.event_date ?? new Date().toLocaleDateString('en-CA');
+    const terms = parent.payment_terms && PAYMENT_TERMS[parent.payment_terms] ? parent.payment_terms : 'boleto_7';
+    const id = await orders.create({ company_id: o.company_id, unit_id: o.production_unit_id ?? o.unit_id, owner_id: o.owner_id, opportunity_id: o.id, order_date: new Date().toLocaleDateString('en-CA'), delivery_date: o.event_date, payment_terms: terms, due_date: orderDueDate(base, terms), status: 'pendente', quantity_boxes: 0, quantity_cookies: 0, total_amount: 0, notes: [o.title, o.requested_items].filter(Boolean).join(' — ') || null });
+    if (id) toast({ title: 'Pedido enviado à Fábrica', description: 'Abra Fábrica › Distribuição & pedidos e adicione os produtos.' });
+  };
   const units = useSupabaseCrud<Tables<'units'>>('units', 'name');
   const [editor, setEditor] = useState<Editor | null>(null);
   const [search, setSearch] = useState('');
@@ -149,7 +158,7 @@ export default function Crm() {
       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">{[['CNPJ',company.document],['Telefone',company.phone],['E-mail',company.email],['Endereço',company.address],['Origem',company.source],['Observações',company.notes]].map(([label,value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl>
       {company.do_not_contact && <Badge variant="destructive">Não contatar</Badge>}
       <CrudTable title="Contatos" hasActive={false} columns={[{ key: 'name', label: 'Nome' }, { key: 'position', label: 'Cargo' }, { key: 'phone', label: 'Telefone' }, { key: 'email', label: 'E-mail' }]} data={contacts.data.filter(c => c.company_id === company.id && c.active)} loading={contacts.loading} onAdd={() => openEditor('contact')} onEdit={c => openEditor('contact', c)} onDelete={id => archive('contact', id)} />
-      <CrudTable title="Oportunidades" hasActive={false} columns={[{ key: 'title', label: 'Oportunidade' }, { key: 'stage', label: 'Etapa', render: (v: string) => stages[v] }, { key: 'estimated_value', label: 'Valor estimado', render: (v: number) => money(v) }, { key: 'event_date', label: 'Evento', render: (v: string) => dateLabel(v) }]} data={visibleOpportunities} loading={opportunities.loading} onAdd={() => openEditor('opportunity')} onEdit={o => openEditor('opportunity', o)} onDelete={id => archive('opportunity', id)} />
+      <CrudTable title="Oportunidades" hasActive={false} columns={[{ key: 'title', label: 'Oportunidade' }, { key: 'stage', label: 'Etapa', render: (v: string) => stages[v] }, { key: 'estimated_value', label: 'Valor estimado', render: (v: number) => money(v) }, { key: 'event_date', label: 'Evento', render: (v: string) => dateLabel(v) }, { key: 'id', label: 'Fábrica', render: (_: string, o: Opportunity) => orders.data.some(x => x.opportunity_id === o.id) ? <Link className="text-primary text-sm" to="/fabrica/pedidos">Pedido criado</Link> : o.stage === 'ganha' ? <Button size="sm" variant="outline" onClick={() => void sendToFactory(o)}>Enviar à fábrica</Button> : <span className="text-xs text-muted-foreground">ao ganhar</span> }]} data={visibleOpportunities} loading={opportunities.loading} onAdd={() => openEditor('opportunity')} onEdit={o => openEditor('opportunity', o)} onDelete={id => archive('opportunity', id)} />
       <CrudTable title="Histórico e próximas ações" hasActive={false} columns={activityColumns} data={visibleActivities} loading={activities.loading} onAdd={() => openEditor('activity')} onEdit={a => openEditor('activity', a)} onDelete={id => archive('activity', id)} />
     </> : isAgenda ? <>
       <div className="flex flex-wrap justify-between items-center gap-2"><h2 className="font-heading text-lg font-semibold">Próximos eventos</h2><Button variant="outline" asChild><Link to="/crm/funil">Abrir funil <ChevronRight className="ml-1 h-4 w-4" /></Link></Button></div>
