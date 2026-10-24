@@ -100,7 +100,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url.split('/').slice(0, 2).join('/') + '/'))}>
                     <NavLink
                       to={item.url}
                       end={item.url === '/'}
