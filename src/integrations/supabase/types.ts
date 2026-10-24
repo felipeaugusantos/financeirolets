@@ -633,6 +633,7 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          contact_name: string | null
           created_at: string
           do_not_contact: boolean
           document: string | null
@@ -643,6 +644,7 @@ export type Database = {
           name: string
           notes: string | null
           owner_id: string
+          payment_terms: string | null
           phone: string | null
           segment: string | null
           source: string
@@ -653,6 +655,7 @@ export type Database = {
         Insert: {
           active?: boolean
           address?: string | null
+          contact_name?: string | null
           created_at?: string
           do_not_contact?: boolean
           document?: string | null
@@ -663,6 +666,7 @@ export type Database = {
           name: string
           notes?: string | null
           owner_id?: string
+          payment_terms?: string | null
           phone?: string | null
           segment?: string | null
           source?: string
@@ -673,6 +677,7 @@ export type Database = {
         Update: {
           active?: boolean
           address?: string | null
+          contact_name?: string | null
           created_at?: string
           do_not_contact?: boolean
           document?: string | null
@@ -683,6 +688,7 @@ export type Database = {
           name?: string
           notes?: string | null
           owner_id?: string
+          payment_terms?: string | null
           phone?: string | null
           segment?: string | null
           source?: string
@@ -929,6 +935,51 @@ export type Database = {
           },
         ]
       }
+      crm_products: {
+        Row: {
+          active: boolean
+          code: string | null
+          cookies_per_package: number
+          created_at: string
+          flavor_type: string | null
+          id: string
+          name: string
+          notes: string | null
+          package: string
+          price: number
+          updated_at: string
+          weight_grams: number | null
+        }
+        Insert: {
+          active?: boolean
+          code?: string | null
+          cookies_per_package?: number
+          created_at?: string
+          flavor_type?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          package?: string
+          price?: number
+          updated_at?: string
+          weight_grams?: number | null
+        }
+        Update: {
+          active?: boolean
+          code?: string | null
+          cookies_per_package?: number
+          created_at?: string
+          flavor_type?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          package?: string
+          price?: number
+          updated_at?: string
+          weight_grams?: number | null
+        }
+        Relationships: []
+      }
       dre_lines: {
         Row: {
           active: boolean
@@ -978,6 +1029,158 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "dre_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      factory_forecasts: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          production_date: string
+          quantity: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          production_date: string
+          quantity?: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          production_date?: string
+          quantity?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_forecasts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "crm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_forecasts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      factory_ingredients: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          package_cost: number
+          package_size: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          package_cost?: number
+          package_size?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          package_cost?: number
+          package_size?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      factory_recipe_items: {
+        Row: {
+          created_at: string
+          id: string
+          ingredient_id: string
+          quantity: number
+          recipe_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ingredient_id: string
+          quantity?: number
+          recipe_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ingredient_id?: string
+          quantity?: number
+          recipe_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_recipe_items_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "factory_ingredients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_recipe_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "factory_recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      factory_recipes: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          product_id: string
+          updated_at: string
+          yield_units: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          updated_at?: string
+          yield_units?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          updated_at?: string
+          yield_units?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_recipes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "crm_products"
             referencedColumns: ["id"]
           },
         ]
