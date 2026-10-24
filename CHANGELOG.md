@@ -3,6 +3,9 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.4.0 — 2026-10-24
+Gestão Empresarial, Clientes e Produtos no CRM, pedidos com produtos, Fábrica, iFood com repasses no financeiro, baixa automática na conciliação.
+
 ## 1.3.0 — 18/10/2026
 - Módulo CRM (agenda, empresas, funil, ficha) com acesso por perfil.
 - Busca de empresas por CNPJ e Google Maps com importação.
