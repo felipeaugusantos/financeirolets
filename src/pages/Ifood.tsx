@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { weekPostingLines, profitIndicators, weeklyStatement, cancelRate, type BankLine, type IfoodOrderRow, type PayoutStatus } from '@/lib/ifoodProfit';
+import { weekPostingLines, profitIndicators, weeklyStatement, cancelRate, type BankLine, type IfoodOrderRow, type IfoodFinancial, type PayoutStatus } from '@/lib/ifoodProfit';
 
 const money = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateLabel = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/');
@@ -72,13 +72,13 @@ export default function Ifood() {
         .gte('ordered_at', `${start}T03:00:00Z`).lt('ordered_at', `${end}T23:59:59-03:00`);
       if (storeId !== 'all') q = q.eq('store_id', storeId);
       const { data } = await q;
-      setOrders((data ?? []).map((o: any) => ({ ...o, financial: Array.isArray(o.ifood_order_financials) ? o.ifood_order_financials[0] ?? null : o.ifood_order_financials })));
+      setOrders((data ?? []).map((o) => ({ ...o, financial: (Array.isArray(o.ifood_order_financials) ? o.ifood_order_financials[0] ?? null : o.ifood_order_financials) as unknown as IfoodFinancial | null })));
       const { data: b } = await supabase.from('bank_statement_entries').select('id,posted_at,amount,memo').ilike('memo', '%ifood%').gte('posted_at', start).lte('posted_at', new Date(Date.UTC(y, m, 10)).toISOString().slice(0, 10));
       setBank(b ?? []);
       const units = (storeId === 'all' ? stores : stores.filter(s => s.id === storeId)).map(s => s.unit_id).filter(Boolean) as string[];
       if (!units.length) { setCosts({ rider: 0, product: 0 }); return; }
       const { data: tx } = await supabase.from('transactions').select('amount,type,categories(name)').in('unit_id', units).eq('type', 'despesa').gte('competence_date', start).lte('competence_date', end);
-      const sum = (re: RegExp) => (tx ?? []).filter((t: any) => re.test(t.categories?.name ?? '')).reduce((s, t: any) => s + Number(t.amount), 0);
+      const sum = (re: RegExp) => ((tx ?? []) as unknown as { amount: number | string; categories: { name: string } | null }[]).filter((t) => re.test(t.categories?.name ?? '')).reduce((s, t) => s + Number(t.amount), 0);
       setCosts({ rider: sum(/motob|motoq|entrega/i), product: sum(/mat[eé]ria|embalag/i) });
     })();
   }, [month, storeId, stores]);

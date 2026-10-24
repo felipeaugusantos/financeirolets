@@ -31,7 +31,7 @@ export function OrderItemsDialog({ orderId, locked, onClose, onSaved }: Props) {
       supabase.from('crm_order_items').select('*').eq('order_id', orderId).order('created_at'),
     ]);
     setProducts(p.data ?? []);
-    setRecipes((r.data ?? []).map((x: any) => ({ product_id: x.product_id, yield_units: x.yield_units, items: x.factory_recipe_items })));
+    setRecipes((r.data ?? []).map((x) => ({ product_id: x.product_id, yield_units: x.yield_units, items: x.factory_recipe_items as Recipe['items'] })));
     setIngredients(i.data ?? []);
     setLines((it.data ?? []).map(l => ({ key: l.id, product_id: l.product_id, packages: l.packages, cookies_per_package: l.cookies_per_package, unit_price: l.unit_price, unit_cost: l.unit_cost })));
   })(); }, [orderId]);

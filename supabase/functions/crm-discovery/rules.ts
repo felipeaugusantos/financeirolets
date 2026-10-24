@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const discoverySchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('cnpj'), unitId: z.string().uuid(), cnpj: z.string().transform(s => s.replace(/[.\/\-\s]/g, '')).pipe(z.string().regex(/^\d{14}$/, 'Informe um CNPJ com 14 dígitos')) }),
+  z.object({ mode: z.literal('cnpj'), unitId: z.string().uuid(), cnpj: z.string().transform(s => s.replace(/[./\-\s]/g, '')).pipe(z.string().regex(/^\d{14}$/, 'Informe um CNPJ com 14 dígitos')) }),
   z.object({ mode: z.literal('location'), unitId: z.string().uuid(), segment: z.string().trim().min(2).max(100), location: z.string().trim().min(3).max(160) }),
 ]);
 export type DiscoveryInput = z.input<typeof discoverySchema>;
