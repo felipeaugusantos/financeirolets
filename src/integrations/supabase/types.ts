@@ -1094,6 +1094,65 @@ export type Database = {
           },
         ]
       }
+      factory_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          estimated_cost: number
+          finished_at: string | null
+          id: string
+          lost_units: number
+          notes: string | null
+          planned_units: number
+          produced_units: number
+          product_id: string
+          production_date: string
+          real_cost: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          estimated_cost?: number
+          finished_at?: string | null
+          id?: string
+          lost_units?: number
+          notes?: string | null
+          planned_units?: number
+          produced_units?: number
+          product_id: string
+          production_date: string
+          real_cost?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          estimated_cost?: number
+          finished_at?: string | null
+          id?: string
+          lost_units?: number
+          notes?: string | null
+          planned_units?: number
+          produced_units?: number
+          product_id?: string
+          production_date?: string
+          real_cost?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "crm_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       factory_forecasts: {
         Row: {
           created_at: string
