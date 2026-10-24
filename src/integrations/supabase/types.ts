@@ -844,6 +844,91 @@ export type Database = {
           },
         ]
       }
+      crm_orders: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          delivery_date: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          owner_id: string
+          payment_terms: string
+          quantity_boxes: number
+          quantity_cookies: number
+          seller_name: string | null
+          status: string
+          total_amount: number
+          transaction_id: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          delivery_date?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          owner_id: string
+          payment_terms?: string
+          quantity_boxes?: number
+          quantity_cookies?: number
+          seller_name?: string | null
+          status?: string
+          total_amount?: number
+          transaction_id?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          delivery_date?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          owner_id?: string
+          payment_terms?: string
+          quantity_boxes?: number
+          quantity_cookies?: number
+          seller_name?: string | null
+          status?: string
+          total_amount?: number
+          transaction_id?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_orders_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dre_lines: {
         Row: {
           active: boolean
