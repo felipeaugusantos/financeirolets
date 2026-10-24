@@ -24,3 +24,13 @@ describe('iFood — rentabilidade', () => {
     expect(w).toMatchObject({ start: '2026-10-12', end: '2026-10-18', orders: 2, gross: 200, commission: 20, paymentFee: 4, promo: 10, net: 112.5, payoutDate: '2026-10-21', received: 112.5, status: 'conferido' });
   });
 });
+
+import { weekPostingLines } from '@/lib/ifoodProfit';
+describe('iFood — repasse semanal no financeiro', () => {
+  it('receita bruta menos despesas fecha no líquido do banco, com ajuste nas taxas', () => {
+    const p = weekPostingLines({ gross: 200, commission: 20, paymentFee: 4, promo: 10, net: 160 });
+    expect(p.revenue).toBe(200);
+    expect(p.expenses).toEqual([{ kind: 'fees', label: 'Comissão e taxas iFood', amount: 30 }, { kind: 'promo', label: 'Promoções da loja no iFood', amount: 10 }]);
+    expect(p.revenue - p.expenses.reduce((s, e) => s + e.amount, 0)).toBe(p.net);
+  });
+});

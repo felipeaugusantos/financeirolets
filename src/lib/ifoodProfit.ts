@@ -71,3 +71,18 @@ export function weeklyStatement(orders: IfoodOrderRow[], bank: BankLine[], today
 }
 
 export const cancelRate = (orders: IfoodOrderRow[]) => orders.length ? r2((orders.filter(o => isCancelled(o.status)).length / orders.length) * 100) : 0;
+
+/**
+ * Lançamentos de um repasse semanal: receita pelo bruto e despesas (comissão + taxa + ajustes; promoções da loja).
+ * A soma fecha exatamente no líquido que cai no banco, para a conciliação dar baixa sem diferença.
+ */
+export function weekPostingLines(w: { gross: number; commission: number; paymentFee: number; promo: number; net: number }) {
+  const fees = r2(w.commission + w.paymentFee);
+  const adjust = r2(w.gross - fees - w.promo - w.net);
+  const feesTotal = r2(fees + adjust);
+  return {
+    revenue: r2(w.gross),
+    expenses: [{ kind: 'fees' as const, label: 'Comissão e taxas iFood', amount: feesTotal }, { kind: 'promo' as const, label: 'Promoções da loja no iFood', amount: r2(w.promo) }].filter(e => e.amount > 0),
+    net: r2(w.net),
+  };
+}
