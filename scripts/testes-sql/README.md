@@ -33,3 +33,11 @@ bun run scripts/testes-sql/dashboard-paridade.ts /tmp/pgtest 5544 t 25   # host 
 
 - `13-ifood-base.test.sql`: duas lojas, unicidade de `merchant_id` e do pedido por loja, exclusão em cascata e RLS
   (usuário sem papel não lê). Erros `ERROR:` nos casos marcados são o esperado.
+
+## CRM, pedidos B2B, Fábrica e repasses do iFood (SQL 14)
+
+- Scripts de produção em `scripts/producao/14-crm-fabrica/` (`14-00-diagnostico.sql` só lê; `14a` a `14f` são idempotentes).
+- `14-crm-acesso.test.sql`: acesso por papel (vendedor, gerente, operador, admin, anônimo), trava de carteira,
+  "não contatar", pedido único por oportunidade, previsão de fábrica única e permissões. Rodar depois dos scripts 14a-14f.
+- Verificação feita: aplicar 14a-14f e as migrações `drizzle/migrations/0000-0009` em dois bancos limpos e comparar colunas,
+  índices, políticas, gatilhos, restrições, permissões e funções (resultado idêntico).
