@@ -1134,6 +1134,8 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          last_purchase_date: string | null
+          last_purchase_tx_id: string | null
           name: string
           package_cost: number
           package_size: number
@@ -1144,6 +1146,8 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          last_purchase_date?: string | null
+          last_purchase_tx_id?: string | null
           name: string
           package_cost?: number
           package_size?: number
@@ -1154,13 +1158,23 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          last_purchase_date?: string | null
+          last_purchase_tx_id?: string | null
           name?: string
           package_cost?: number
           package_size?: number
           unit?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "factory_ingredients_last_purchase_tx_id_fkey"
+            columns: ["last_purchase_tx_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       factory_recipe_items: {
         Row: {

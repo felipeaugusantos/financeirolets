@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ingredientCostPerUnit, productionPlan, recipeCost, type Ingredient, type Recipe } from '@/lib/factoryRules';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { purchaseToIngredient, ingredientCostPerUnit, productionPlan, recipeCost, type Ingredient, type Recipe } from '@/lib/factoryRules';
 
 const money = (v: number, d = 2) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: d, maximumFractionDigits: d });
 const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -28,16 +29,35 @@ export default function Factory() {
   const [forecasts, setForecasts] = useState<{ id: string; unit_id: string; product_id: string; quantity: number }[]>([]);
   const [newIng, setNewIng] = useState({ name: '', unit: 'g', package_size: '1000', package_cost: '' });
   const [productId, setProductId] = useState('');
+  type Payable = { id: string; description: string; amount: number; competence_date: string; status: string; categories: { name: string } | null; partners: { name: string } | null };
+  const [payables, setPayables] = useState<Payable[]>([]);
+  const [buyFor, setBuyFor] = useState<Ingredient | null>(null);
+  const [buy, setBuy] = useState({ tx: '', qty: '' });
+  const [linked, setLinked] = useState<Record<string, { tx: string | null; date: string | null }>>({});
+  useEffect(() => {
+    const since = new Date(); since.setMonth(since.getMonth() - 3);
+    supabase.from('transactions').select('id,description,amount,competence_date,status,categories(name),partners(name)').eq('type', 'despesa').neq('status', 'cancelado')
+      .gte('competence_date', since.toLocaleDateString('en-CA')).order('competence_date', { ascending: false }).limit(1000)
+      .then(({ data }) => setPayables(((data ?? []) as unknown as Payable[]).filter(t => /mat[eé]ria|embalag|insumo|ingred/i.test(t.categories?.name ?? ''))));
+  }, []);
+  const monthStart = new Date().toLocaleDateString('en-CA').slice(0, 7);
+  const realMonth = payables.filter(p => p.competence_date.startsWith(monthStart)).reduce((s, p) => s + Number(p.amount), 0);
+  const registerPurchase = async () => {
+    const tx = payables.find(p => p.id === buy.tx); const calc = tx && purchaseToIngredient(Number(tx.amount), Number(buy.qty));
+    if (!buyFor || !tx || !calc) { toast({ title: 'Escolha a conta e a quantidade comprada', variant: 'destructive' }); return; }
+    const { error } = await supabase.from('factory_ingredients').update({ package_size: calc.package_size, package_cost: calc.package_cost, last_purchase_tx_id: tx.id, last_purchase_date: tx.competence_date }).eq('id', buyFor.id);
+    if (fail(error)) { toast({ title: 'Custo atualizado pela compra', description: `${money(calc.costPerUnit, 4)} por ${buyFor.unit}` }); setBuyFor(null); setBuy({ tx: '', qty: '' }); void load(); }
+  };
 
   const fail = (e: { message: string } | null) => { if (e) toast({ title: 'Não foi possível salvar', description: e.message, variant: 'destructive' }); return !e; };
   const load = useCallback(async () => {
     const [i, p, u, r] = await Promise.all([
-      supabase.from('factory_ingredients').select('id,name,unit,package_size,package_cost').eq('active', true).order('name'),
+      supabase.from('factory_ingredients').select('id,name,unit,package_size,package_cost,last_purchase_tx_id,last_purchase_date').eq('active', true).order('name'),
       supabase.from('crm_products').select('id,name,cookies_per_package,price').eq('active', true).order('name'),
       supabase.from('units').select('id,name').eq('active', true).order('name'),
       supabase.from('factory_recipes').select('id,product_id,yield_units,factory_recipe_items(id,ingredient_id,quantity)'),
     ]);
-    setIngredients(i.data ?? []); setProducts(p.data ?? []); setUnits(u.data ?? []); setRecipes((r.data ?? []) as RecipeRow[]);
+    setIngredients(i.data ?? []); setLinked(Object.fromEntries((i.data ?? []).map(x => [x.id, { tx: x.last_purchase_tx_id, date: x.last_purchase_date }]))); setProducts(p.data ?? []); setUnits(u.data ?? []); setRecipes((r.data ?? []) as RecipeRow[]);
   }, []);
   const loadForecasts = useCallback(async () => {
     const { data } = await supabase.from('factory_forecasts').select('id,unit_id,product_id,quantity').eq('production_date', date);
@@ -85,6 +105,7 @@ export default function Factory() {
         <TabsList><TabsTrigger value="producao">Sugestão de produção</TabsTrigger><TabsTrigger value="fichas">Fichas técnicas</TabsTrigger><TabsTrigger value="ingredientes">Ingredientes</TabsTrigger></TabsList>
 
         <TabsContent value="ingredientes" className="space-y-3">
+          <Card className="rounded-2xl"><CardContent className="p-3 text-sm"><p className="text-muted-foreground">Matéria-prima e embalagens no Contas a Pagar neste mês</p><p className="text-lg font-bold">{money(realMonth)}</p><p className="text-xs text-muted-foreground">Use "Pela conta a pagar" para atualizar o custo do ingrediente com o valor real da compra.</p></CardContent></Card>
           <div className="flex flex-wrap items-end gap-2">
             <div><Label>Ingrediente</Label><Input value={newIng.name} onChange={e => setNewIng({ ...newIng, name: e.target.value })} placeholder="Farinha de trigo" /></div>
             <div><Label>Medida</Label><Select value={newIng.unit} onValueChange={unit => setNewIng({ ...newIng, unit })}><SelectTrigger className="w-24"><SelectValue /></SelectTrigger><SelectContent>{['g', 'ml', 'un'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
@@ -92,11 +113,12 @@ export default function Factory() {
             <div><Label>Preço da embalagem (R$)</Label><Input className="w-36" value={newIng.package_cost} onChange={e => setNewIng({ ...newIng, package_cost: e.target.value })} /></div>
             <Button onClick={addIngredient}><Plus className="mr-1 h-4 w-4" />Adicionar</Button>
           </div>
-          <Table><TableHeader><TableRow><TableHead>Ingrediente</TableHead><TableHead className="text-right">Embalagem</TableHead><TableHead className="text-right">Preço</TableHead><TableHead className="text-right">Custo por medida</TableHead><TableHead /></TableRow></TableHeader>
+          <Table><TableHeader><TableRow><TableHead>Ingrediente</TableHead><TableHead className="text-right">Embalagem</TableHead><TableHead className="text-right">Preço</TableHead><TableHead className="text-right">Custo por medida</TableHead><TableHead>Última compra</TableHead><TableHead /></TableRow></TableHeader>
             <TableBody>{ingredients.map(i => <TableRow key={i.id}>
               <TableCell>{i.name}</TableCell><TableCell className="text-right">{num(i.package_size)} {i.unit}</TableCell>
               <TableCell className="text-right"><Input className="ml-auto w-28 text-right" defaultValue={i.package_cost} onBlur={e => Number(e.target.value) !== Number(i.package_cost) && updateIngredient(i.id, { package_cost: Number(e.target.value) })} /></TableCell>
               <TableCell className="text-right">{money(ingredientCostPerUnit(i), 4)} / {i.unit}</TableCell>
+              <TableCell><Button size="sm" variant="outline" onClick={() => setBuyFor(i)}>Pela conta a pagar</Button>{linked[i.id]?.date && <span className="block text-xs text-muted-foreground">{linked[i.id]!.date!.split('-').reverse().join('/')} · {payables.find(p => p.id === linked[i.id]?.tx)?.description ?? 'conta vinculada'}</span>}</TableCell>
               <TableCell><Button size="icon" variant="ghost" aria-label="Arquivar" onClick={() => updateIngredient(i.id, { active: false })}><Trash2 className="h-4 w-4" /></Button></TableCell>
             </TableRow>)}</TableBody></Table>
         </TabsContent>
@@ -148,6 +170,20 @@ export default function Factory() {
           </div>
         </TabsContent>
       </Tabs>
+      <Dialog open={!!buyFor} onOpenChange={o => !o && setBuyFor(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Custo real de {buyFor?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div><Label>Conta a pagar da compra (últimos 3 meses)</Label>
+              <Select value={buy.tx} onValueChange={tx => setBuy({ ...buy, tx })}><SelectTrigger><SelectValue placeholder="Escolha a conta" /></SelectTrigger>
+                <SelectContent>{payables.map(p => <SelectItem key={p.id} value={p.id}>{p.competence_date.split('-').reverse().join('/')} · {p.partners?.name ?? p.description} · {money(Number(p.amount))}</SelectItem>)}</SelectContent></Select>
+              {!payables.length && <p className="text-xs text-muted-foreground">Nenhuma conta de matéria-prima ou embalagens nos últimos 3 meses.</p>}</div>
+            <div><Label>Quantidade comprada ({buyFor?.unit})</Label><Input type="number" min={0} value={buy.qty} onChange={e => setBuy({ ...buy, qty: e.target.value })} placeholder="ex.: 50000 para 50 kg" /></div>
+            {(() => { const tx = payables.find(p => p.id === buy.tx); const c = tx && purchaseToIngredient(Number(tx.amount), Number(buy.qty)); return c ? <p>Novo custo: <strong>{money(c.costPerUnit, 4)} por {buyFor?.unit}</strong>. A conta a pagar não é alterada.</p> : null; })()}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setBuyFor(null)}>Voltar</Button><Button onClick={() => void registerPurchase()}>Atualizar custo</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

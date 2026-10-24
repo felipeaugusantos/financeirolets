@@ -30,3 +30,11 @@ describe('Pedido com produtos', () => {
       .toEqual({ boxes: 12, cookies: 84, total: 400, cost: 105, margin: 295, marginPct: 73.75 });
   });
 });
+
+import { purchaseToIngredient } from '@/lib/factoryRules';
+describe('Custo real pela compra', () => {
+  it('conta de R$ 250 por 50 kg de farinha = R$ 0,005 por grama', () => {
+    expect(purchaseToIngredient(250, 50000)).toEqual({ package_size: 50000, package_cost: 250, costPerUnit: 0.005 });
+    expect(purchaseToIngredient(250, 0)).toBeNull();
+  });
+});

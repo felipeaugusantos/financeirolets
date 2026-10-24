@@ -50,6 +50,13 @@
       "when": 1792850536248,
       "tag": "0006_ifood_payout_postings",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792850710419,
+      "tag": "0007_ingredient_purchase_link",
+      "breakpoints": true
     }
   ]
 }

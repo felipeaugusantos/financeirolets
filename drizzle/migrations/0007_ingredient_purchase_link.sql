@@ -1,0 +1,2 @@
+ALTER TABLE public.factory_ingredients ADD COLUMN IF NOT EXISTS last_purchase_tx_id uuid REFERENCES public.transactions(id);
+ALTER TABLE public.factory_ingredients ADD COLUMN IF NOT EXISTS last_purchase_date date;
