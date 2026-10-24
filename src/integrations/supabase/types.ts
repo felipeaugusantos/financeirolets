@@ -907,6 +907,7 @@ export type Database = {
           due_date: string | null
           id: string
           notes: string | null
+          opportunity_id: string | null
           order_date: string
           owner_id: string
           payment_terms: string
@@ -928,6 +929,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           notes?: string | null
+          opportunity_id?: string | null
           order_date?: string
           owner_id: string
           payment_terms?: string
@@ -949,6 +951,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           notes?: string | null
+          opportunity_id?: string | null
           order_date?: string
           owner_id?: string
           payment_terms?: string
@@ -968,6 +971,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_orders_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "crm_opportunities"
             referencedColumns: ["id"]
           },
           {

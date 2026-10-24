@@ -1,0 +1,2 @@
+ALTER TABLE public.crm_orders ADD COLUMN IF NOT EXISTS opportunity_id uuid REFERENCES public.crm_opportunities(id);
+CREATE UNIQUE INDEX IF NOT EXISTS crm_orders_opportunity_uniq ON public.crm_orders(opportunity_id) WHERE opportunity_id IS NOT NULL;
