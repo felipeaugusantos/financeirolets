@@ -57,3 +57,9 @@ export function orderLinesTotals(lines: OrderLine[]) {
   const cost = r2(lines.reduce((s, l) => s + Number(l.packages) * Number(l.unit_cost), 0));
   return { boxes, cookies, total, cost, margin: r2(total - cost), marginPct: total ? r2(((total - cost) / total) * 100) : 0 };
 }
+
+/** Custo real a partir de uma compra do Contas a Pagar: valor pago ÷ quantidade comprada (na medida do ingrediente). */
+export function purchaseToIngredient(amount: number, quantityBought: number) {
+  if (!(quantityBought > 0) || !(amount >= 0)) return null;
+  return { package_size: quantityBought, package_cost: r2(amount), costPerUnit: r4(amount / quantityBought) };
+}
