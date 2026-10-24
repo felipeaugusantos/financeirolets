@@ -45,6 +45,18 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.5.0',
+    date: '2026-10-24',
+    summary: 'Menu Fábrica & Operações, rotina completa do pedido corporativo até a entrega e painel de fornadas com custo real.',
+    items: [
+      { area: 'Geral', kind: 'melhoria', title: 'Menu Fábrica & Operações', detail: 'Distribuição & pedidos e Produtos saíram do CRM e agora ficam na Fábrica, junto com Sugestão de produção, Fichas técnicas e Ingredientes. O CRM ficou só com a parte comercial. Os links antigos levam para a nova página.', tech: 'Rotas /fabrica/:tab; redirects de /crm/pedidos e /crm/produtos.' },
+      { area: 'Geral', kind: 'novidade', title: 'Do CRM para a fábrica em um clique', detail: 'Oportunidade ganha ganha o botão "Enviar à fábrica", que cria o pedido com cliente, data de entrega e condição de pagamento. Cada oportunidade gera um só pedido.', tech: 'crm_orders.opportunity_id (único).' },
+      { area: 'Geral', kind: 'novidade', title: 'Prazo de entrega e etapas do pedido', detail: 'Cada pedido mostra se está atrasado, é para hoje ou em quantos dias, e avança por Produzir → Marcar enviado → Faturar.', tech: 'deliveryDeadline em crmRules.ts.' },
+      { area: 'Geral', kind: 'novidade', title: 'Pedidos entram na fornada', detail: 'A Sugestão de produção soma os pedidos com entrega nos próximos 2 dias à previsão das lojas e calcula produção e ingredientes. O botão "Iniciar produção" coloca os pedidos em produção.', tech: 'ordersDemand em factoryRules.ts.' },
+      { area: 'Geral', kind: 'novidade', title: 'Painel de fornadas', detail: 'Nova aba Fornadas com o que já foi produzido: situação, cookies bons, perdas, custo previsto e custo real, além de totais e custo por cookie no período.', tech: 'factory_batches; batchRealCost e batchesSummary.' },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-10-24',
     summary: 'Gestão Empresarial, clientes e produtos no CRM, pedidos com produtos, Fábrica e iFood ligado ao financeiro.',
