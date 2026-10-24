@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CrudTable, type ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, type FieldConfig, type FormValues } from '@/components/settings/CrudDialog';
-import { ORDER_STATUSES, PAYMENT_TERMS, customerAverages, inactiveCustomers, monthToDateComparison, orderDueDate } from '@/lib/crmRules';
+import { ORDER_STATUSES, PAYMENT_TERMS, deliveryDeadline, customerAverages, inactiveCustomers, monthToDateComparison, orderDueDate } from '@/lib/crmRules';
 import type { Tables } from '@/integrations/supabase/types';
 import { OrderItemsDialog } from '@/components/crm/OrderItemsDialog';
 
@@ -97,13 +97,17 @@ export function CrmOrders({ companies, unitFilter, search }: Props) {
   const columns: ColumnConfig<Order>[] = [
     { key: 'order_date', label: 'Pedido', render: (v: string) => dateLabel(v) },
     { key: 'company_id', label: 'Cliente', render: (v: string) => <Link className="text-primary" to={`/crm/empresas/${v}`}>{companyName(v)}</Link> },
-    { key: 'delivery_date', label: 'Envio', render: (v: string) => dateLabel(v) },
+    { key: 'delivery_date', label: 'Entrega / prazo', render: (v: string, o) => { const d = deliveryDeadline(v, o.status, today); return <span>{dateLabel(v)}{d.kind !== 'done' && d.kind !== 'none' && <Badge className="ml-1" variant={d.kind === 'late' ? 'destructive' : d.kind === 'today' ? 'default' : 'outline'}>{d.kind === 'late' ? `atrasado ${-d.days}d` : d.kind === 'today' ? 'hoje' : `em ${d.days}d`}</Badge>}</span>; } },
     { key: 'quantity_boxes', label: 'Produtos', render: (v: number, o) => <Button size="sm" variant="ghost" className="gap-1" onClick={() => setItemsFor(o)}><Cookie className="h-3 w-3" />{v} cx</Button> },
     { key: 'total_amount', label: 'Valor', render: (v: number, o) => <span>{money(Number(v))}{Number(o.total_cost) > 0 && <span className="block text-xs text-muted-foreground">custo {money(Number(o.total_cost))}</span>}</span> },
     { key: 'payment_terms', label: 'Condição', render: (v: string, o) => <span>{PAYMENT_TERMS[v]?.label ?? v}<span className="block text-xs text-muted-foreground">vence {dateLabel(o.due_date)}</span></span> },
     { key: 'status', label: 'Situação', render: (v: string, o) => v === 'faturado' || v === 'cancelado'
       ? <Badge variant={v === 'faturado' ? 'secondary' : 'outline'}>{statusLabel[v]}</Badge>
-      : <Button size="sm" variant="outline" className="gap-1" onClick={() => setInvoicing(o)}><Receipt className="h-3 w-3" />{statusLabel[v]} · Faturar</Button> },
+      : <div className="flex flex-wrap gap-1">
+          {v === 'pendente' && <Button size="sm" variant="secondary" onClick={() => void orders.update(o.id, { status: 'em_producao' })}>Produzir</Button>}
+          {v === 'em_producao' && <Button size="sm" variant="secondary" onClick={() => void orders.update(o.id, { status: 'enviado' })}>Marcar enviado</Button>}
+          <Button size="sm" variant="outline" className="gap-1" onClick={() => setInvoicing(o)}><Receipt className="h-3 w-3" />{statusLabel[v]} · Faturar</Button>
+        </div> },
   ];
 
   const variation = kpi.variation;
