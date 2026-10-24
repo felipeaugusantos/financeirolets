@@ -73,3 +73,11 @@ export function customerAverages(orders: OrderLike[]) {
   });
   return [...map].map(([company_id, e]) => ({ company_id, avgAmount: e.amount / e.months.size, avgBoxes: e.boxes / e.months.size, months: e.months.size }));
 }
+
+/** Prazo de entrega do pedido: atrasado, hoje, em N dias, entregue ou sem data. */
+export function deliveryDeadline(delivery: string | null, status: string, today: string) {
+  if (['enviado', 'faturado', 'cancelado'].includes(status)) return { kind: 'done' as const, days: 0 };
+  if (!delivery) return { kind: 'none' as const, days: 0 };
+  const days = Math.round((Date.parse(`${delivery}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
+  return { kind: days < 0 ? 'late' as const : days === 0 ? 'today' as const : 'upcoming' as const, days };
+}

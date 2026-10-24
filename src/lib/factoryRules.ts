@@ -63,3 +63,15 @@ export function purchaseToIngredient(amount: number, quantityBought: number) {
   if (!(quantityBought > 0) || !(amount >= 0)) return null;
   return { package_size: quantityBought, package_cost: r2(amount), costPerUnit: r4(amount / quantityBought) };
 }
+
+/** Demanda dos pedidos para a fornada: cookies por unidade e produto (caixas × cookies por caixa). */
+export function ordersDemand(orders: { unit_id: string; items: { product_id: string; packages: number; cookies_per_package: number }[] }[]): Forecast[] {
+  const map = new Map<string, Forecast>();
+  orders.forEach(o => o.items.forEach(it => {
+    const k = `${o.unit_id}|${it.product_id}`;
+    const f = map.get(k) ?? { unit_id: o.unit_id, product_id: it.product_id, quantity: 0 };
+    f.quantity += Number(it.packages) * Number(it.cookies_per_package);
+    map.set(k, f);
+  }));
+  return [...map.values()];
+}
