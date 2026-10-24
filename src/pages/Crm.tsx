@@ -28,7 +28,7 @@ const leadStates = [{ value: 'novo', label: 'Novo' }, { value: 'em_contato', lab
 const interests = [{ value: 'coffee_break', label: 'Coffee break' }, { value: 'evento_corporativo', label: 'Evento corporativo' }, { value: 'encomenda', label: 'Encomenda' }, { value: 'distribuicao', label: 'Distribuição / revenda' }];
 const money = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateLabel = (date: string | null) => date ? date.split('-').reverse().join('/') : '—';
-const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/clientes', label: 'Clientes', icon: Users }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/produtos', label: 'Produtos', icon: Cookie }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }, { path: '/crm/pedidos', label: 'Distribuição & pedidos', icon: Package }];
+const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/clientes', label: 'Clientes', icon: Users }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }];
 
 export default function Crm() {
   const { user } = useAuth();

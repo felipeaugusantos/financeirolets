@@ -66,9 +66,9 @@ const App = () => (
               <Route path="/crm/empresas" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/crm/empresas/:companyId" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/crm/funil" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
-              <Route path="/crm/pedidos" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/pedidos" element={<Navigate to="/fabrica/pedidos" replace />} />
               <Route path="/crm/clientes" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
-              <Route path="/crm/produtos" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/produtos" element={<Navigate to="/fabrica/produtos" replace />} />
               <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
               <Route path="/gestao/pagar" element={<Navigate to="/contas?tab=pagar" replace />} />
               <Route path="/gestao/receber" element={<Navigate to="/contas?tab=receber" replace />} />
@@ -82,6 +82,7 @@ const App = () => (
               <Route path="/conciliacao/cartao" element={<ProtectedRoute><CardReconciliation /></ProtectedRoute>} />
 
               <Route path="/fabrica" element={<ProtectedRoute><Factory /></ProtectedRoute>} />
+              <Route path="/fabrica/:tab" element={<ProtectedRoute><Factory /></ProtectedRoute>} />
               <Route path="/ifood" element={<ProtectedRoute><Ifood /></ProtectedRoute>} />
               <Route path="/novidades" element={<ProtectedRoute><Releases /></ProtectedRoute>} />
               <Route path="/auditoria" element={<ProtectedRoute><AuditPage /></ProtectedRoute>} />

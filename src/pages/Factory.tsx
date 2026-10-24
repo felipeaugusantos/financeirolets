@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
+import type { Tables } from '@/integrations/supabase/types';
+import { CrmOrders } from '@/components/crm/CrmOrders';
+import { CrmProducts } from '@/components/crm/CrmProducts';
 import { ChefHat, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +26,10 @@ type RecipeRow = { id: string; product_id: string; yield_units: number; factory_
 
 export default function Factory() {
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = location.pathname.split('/')[2] || 'producao';
+  const companies = useSupabaseCrud<Tables<'crm_companies'>>('crm_companies');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [units, setUnits] = useState<Row[]>([]);
@@ -98,11 +107,13 @@ export default function Factory() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 font-heading text-2xl font-bold"><ChefHat className="h-6 w-6 text-primary" /> Fábrica</h1>
-        <p className="text-sm text-muted-foreground">Ficha técnica, custo por unidade e sugestão de produção. Só planejamento: nada é lançado no financeiro.</p>
+        <h1 className="flex items-center gap-2 font-heading text-2xl font-bold"><ChefHat className="h-6 w-6 text-primary" /> Fábrica & Operações</h1>
+        <p className="text-sm text-muted-foreground">Pedidos e distribuição, produtos, fichas técnicas, ingredientes e sugestão de produção.</p>
       </div>
-      <Tabs defaultValue="producao">
-        <TabsList><TabsTrigger value="producao">Sugestão de produção</TabsTrigger><TabsTrigger value="fichas">Fichas técnicas</TabsTrigger><TabsTrigger value="ingredientes">Ingredientes</TabsTrigger></TabsList>
+      <Tabs value={tab} onValueChange={v => navigate(v === 'producao' ? '/fabrica' : `/fabrica/${v}`)}>
+        <TabsList className="flex h-auto flex-wrap"><TabsTrigger value="pedidos">Distribuição & pedidos</TabsTrigger><TabsTrigger value="producao">Sugestão de produção</TabsTrigger><TabsTrigger value="fichas">Fichas técnicas</TabsTrigger><TabsTrigger value="ingredientes">Ingredientes</TabsTrigger><TabsTrigger value="produtos">Produtos</TabsTrigger></TabsList>
+        <TabsContent value="pedidos"><CrmOrders companies={companies.data} unitFilter="all" search="" /></TabsContent>
+        <TabsContent value="produtos"><CrmProducts /></TabsContent>
 
         <TabsContent value="ingredientes" className="space-y-3">
           <Card className="rounded-2xl"><CardContent className="p-3 text-sm"><p className="text-muted-foreground">Matéria-prima e embalagens no Contas a Pagar neste mês</p><p className="text-lg font-bold">{money(realMonth)}</p><p className="text-xs text-muted-foreground">Use "Pela conta a pagar" para atualizar o custo do ingrediente com o valor real da compra.</p></CardContent></Card>
