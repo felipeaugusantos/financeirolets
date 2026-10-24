@@ -67,6 +67,9 @@ const App = () => (
               <Route path="/crm/empresas/:companyId" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/crm/funil" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/crm/pedidos" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/clientes" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/produtos" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+              <Route path="/crm/unidades" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/contas" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
               <Route path="/gestao/pagar" element={<Navigate to="/contas?tab=pagar" replace />} />
               <Route path="/gestao/receber" element={<Navigate to="/contas?tab=receber" replace />} />
