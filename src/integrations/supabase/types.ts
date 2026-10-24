@@ -850,6 +850,54 @@ export type Database = {
           },
         ]
       }
+      crm_order_items: {
+        Row: {
+          cookies_per_package: number
+          created_at: string
+          id: string
+          order_id: string
+          packages: number
+          product_id: string
+          unit_cost: number
+          unit_price: number
+        }
+        Insert: {
+          cookies_per_package?: number
+          created_at?: string
+          id?: string
+          order_id: string
+          packages?: number
+          product_id: string
+          unit_cost?: number
+          unit_price?: number
+        }
+        Update: {
+          cookies_per_package?: number
+          created_at?: string
+          id?: string
+          order_id?: string
+          packages?: number
+          product_id?: string
+          unit_cost?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "crm_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "crm_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_orders: {
         Row: {
           active: boolean
@@ -867,6 +915,7 @@ export type Database = {
           seller_name: string | null
           status: string
           total_amount: number
+          total_cost: number
           transaction_id: string | null
           unit_id: string
           updated_at: string
@@ -887,6 +936,7 @@ export type Database = {
           seller_name?: string | null
           status?: string
           total_amount?: number
+          total_cost?: number
           transaction_id?: string | null
           unit_id: string
           updated_at?: string
@@ -907,6 +957,7 @@ export type Database = {
           seller_name?: string | null
           status?: string
           total_amount?: number
+          total_cost?: number
           transaction_id?: string | null
           unit_id?: string
           updated_at?: string
