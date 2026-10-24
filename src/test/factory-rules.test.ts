@@ -38,3 +38,16 @@ describe('Custo real pela compra', () => {
     expect(purchaseToIngredient(250, 0)).toBeNull();
   });
 });
+
+import { batchRealCost, batchesSummary } from '@/lib/factoryRules';
+describe('Fornadas', () => {
+  it('custo real conta as perdas e divide pelos cookies bons', () => {
+    expect(batchRealCost(1.25, 90, 10)).toEqual({ total: 125, perGoodUnit: 1.3889 });
+  });
+  it('resumo só soma fornadas concluídas', () => {
+    expect(batchesSummary([
+      { status: 'concluida', produced_units: 90, lost_units: 10, real_cost: 125, planned_units: 100 },
+      { status: 'produzindo', produced_units: 0, lost_units: 0, real_cost: 0, planned_units: 50 },
+    ])).toEqual({ done: 1, open: 1, produced: 90, lost: 10, cost: 125, lossPct: 10, perUnit: 1.3889 });
+  });
+});

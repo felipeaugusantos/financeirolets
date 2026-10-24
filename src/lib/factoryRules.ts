@@ -75,3 +75,19 @@ export function ordersDemand(orders: { unit_id: string; items: { product_id: str
   }));
   return [...map.values()];
 }
+
+/** Custo real da fornada: ingredientes consumidos (boas + perdidas) ao custo atual da ficha; custo por cookie bom. */
+export function batchRealCost(perUnit: number, produced: number, lost: number) {
+  const total = r2(perUnit * (Number(produced) + Number(lost)));
+  return { total, perGoodUnit: Number(produced) > 0 ? r4(total / Number(produced)) : 0 };
+}
+
+/** Resumo das fornadas: produzido, perdas, custo e % de perda (só concluídas contam). */
+export function batchesSummary(batches: { status: string; produced_units: number; lost_units: number; real_cost: number; planned_units: number }[]) {
+  const done = batches.filter(b => b.status === 'concluida');
+  const produced = done.reduce((s, b) => s + Number(b.produced_units), 0);
+  const lost = done.reduce((s, b) => s + Number(b.lost_units), 0);
+  const cost = r2(done.reduce((s, b) => s + Number(b.real_cost), 0));
+  return { done: done.length, open: batches.filter(b => b.status === 'planejada' || b.status === 'produzindo').length, produced, lost, cost,
+    lossPct: produced + lost ? r2((lost / (produced + lost)) * 100) : 0, perUnit: produced ? r4(cost / produced) : 0 };
+}
