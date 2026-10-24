@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { Building2, CalendarDays, ChevronRight, ListFilter, Plus, Search, Check } from 'lucide-react';
+import { Building2, Package, CalendarDays, ChevronRight, ListFilter, Plus, Search, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
@@ -14,6 +14,7 @@ import { CrudTable, type ColumnConfig } from '@/components/settings/CrudTable';
 import { CrudDialog, type FieldConfig, type FormValues } from '@/components/settings/CrudDialog';
 import { CRM_STAGES, normalizeCompanyDocument, validateCrmStage } from '@/lib/crmRules';
 import { CompanyDiscovery } from '@/components/crm/CompanyDiscovery';
+import { CrmOrders } from '@/components/crm/CrmOrders';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Company = Tables<'crm_companies'>;
@@ -26,7 +27,7 @@ const leadStates = [{ value: 'novo', label: 'Novo' }, { value: 'em_contato', lab
 const interests = [{ value: 'coffee_break', label: 'Coffee break' }, { value: 'evento_corporativo', label: 'Evento corporativo' }, { value: 'encomenda', label: 'Encomenda' }];
 const money = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateLabel = (date: string | null) => date ? date.split('-').reverse().join('/') : '—';
-const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }];
+const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }, { path: '/crm/pedidos', label: 'Distribuição & pedidos', icon: Package }];
 
 export default function Crm() {
   const { user } = useAuth();
@@ -49,6 +50,7 @@ export default function Crm() {
   const isAgenda = location.pathname.endsWith('/agenda');
   const isPipeline = location.pathname.endsWith('/funil');
   const isDiscovery = location.pathname.endsWith('/buscar');
+  const isOrders = location.pathname.endsWith('/pedidos');
   const canUse = roles.some(r => ['admin', 'gerente_unidade', 'vendedor'].includes(r));
   const loading = companies.loading || opportunities.loading || activities.loading || contacts.loading;
   const unitOptions = useMemo(() => units.data.filter(u => u.active).map(u => ({ value: u.id, label: u.name })), [units.data]);
@@ -135,10 +137,10 @@ export default function Crm() {
     {!companyId && !isDiscovery && <div className="flex flex-wrap items-end gap-3">
       <div className="relative flex-1 min-w-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar no CRM" placeholder="Buscar empresa, CNPJ ou contato" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" /></div>
       <Select value={unitFilter} onValueChange={setUnitFilter}><SelectTrigger className="w-full sm:w-52" aria-label="Filtrar unidade"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as unidades</SelectItem>{unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent></Select>
-      {!isAgenda && !isPipeline && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
+      {!isAgenda && !isPipeline && !isOrders && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
       {isAgenda && <><div><Label htmlFor="crm-from">De</Label><Input id="crm-from" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div><div><Label htmlFor="crm-to">Até</Label><Input id="crm-to" type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div></>}
     </div>}
-    {isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
+    {isOrders ? <CrmOrders companies={companies.data} unitFilter={unitFilter} search={search} /> : isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
       <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-heading text-xl font-semibold">{company.name}</h2><p className="text-sm text-muted-foreground">{unitName(company.unit_id)} · {company.segment || 'Sem segmento'}</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => openEditor('company', company)}>Editar empresa</Button><Button variant="outline" onClick={() => void companies.update(company.id, { do_not_contact: !company.do_not_contact })}>{company.do_not_contact ? 'Permitir contato' : 'Não contatar'}</Button></div></div>
       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">{[['CNPJ',company.document],['Telefone',company.phone],['E-mail',company.email],['Endereço',company.address],['Origem',company.source],['Observações',company.notes]].map(([label,value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl>
       {company.do_not_contact && <Badge variant="destructive">Não contatar</Badge>}
