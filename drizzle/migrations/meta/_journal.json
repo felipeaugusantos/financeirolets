@@ -36,6 +36,13 @@
       "when": 1792848790430,
       "tag": "0004_crm_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792850233147,
+      "tag": "0005_crm_order_items",
+      "breakpoints": true
     }
   ]
 }

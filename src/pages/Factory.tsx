@@ -1,0 +1,153 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChefHat, Plus, Trash2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ingredientCostPerUnit, productionPlan, recipeCost, type Ingredient, type Recipe } from '@/lib/factoryRules';
+
+const money = (v: number, d = 2) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: d, maximumFractionDigits: d });
+const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+type Row = { id: string; name: string };
+type ProductRow = Row & { cookies_per_package: number; price: number };
+type RecipeRow = { id: string; product_id: string; yield_units: number; factory_recipe_items: { id: string; ingredient_id: string; quantity: number }[] };
+
+export default function Factory() {
+  const { toast } = useToast();
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [units, setUnits] = useState<Row[]>([]);
+  const [recipes, setRecipes] = useState<RecipeRow[]>([]);
+  const [date, setDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString('en-CA'); });
+  const [forecasts, setForecasts] = useState<{ id: string; unit_id: string; product_id: string; quantity: number }[]>([]);
+  const [newIng, setNewIng] = useState({ name: '', unit: 'g', package_size: '1000', package_cost: '' });
+  const [productId, setProductId] = useState('');
+
+  const fail = (e: { message: string } | null) => { if (e) toast({ title: 'Não foi possível salvar', description: e.message, variant: 'destructive' }); return !e; };
+  const load = useCallback(async () => {
+    const [i, p, u, r] = await Promise.all([
+      supabase.from('factory_ingredients').select('id,name,unit,package_size,package_cost').eq('active', true).order('name'),
+      supabase.from('crm_products').select('id,name,cookies_per_package,price').eq('active', true).order('name'),
+      supabase.from('units').select('id,name').eq('active', true).order('name'),
+      supabase.from('factory_recipes').select('id,product_id,yield_units,factory_recipe_items(id,ingredient_id,quantity)'),
+    ]);
+    setIngredients(i.data ?? []); setProducts(p.data ?? []); setUnits(u.data ?? []); setRecipes((r.data ?? []) as RecipeRow[]);
+  }, []);
+  const loadForecasts = useCallback(async () => {
+    const { data } = await supabase.from('factory_forecasts').select('id,unit_id,product_id,quantity').eq('production_date', date);
+    setForecasts(data ?? []);
+  }, [date]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadForecasts(); }, [loadForecasts]);
+
+  const recipeList: Recipe[] = useMemo(() => recipes.map(r => ({ product_id: r.product_id, yield_units: r.yield_units, items: r.factory_recipe_items })), [recipes]);
+  const plan = useMemo(() => productionPlan(forecasts, recipeList, ingredients), [forecasts, recipeList, ingredients]);
+  const productName = (id: string) => products.find(p => p.id === id)?.name ?? '—';
+  const ingById = (id: string) => ingredients.find(i => i.id === id);
+
+  const addIngredient = async () => {
+    const size = Number(newIng.package_size), cost = Number(newIng.package_cost.replace(',', '.'));
+    if (!newIng.name.trim() || !(size > 0) || !(cost >= 0)) { toast({ title: 'Confira nome, tamanho e preço da embalagem', variant: 'destructive' }); return; }
+    if (fail((await supabase.from('factory_ingredients').insert({ name: newIng.name.trim(), unit: newIng.unit, package_size: size, package_cost: cost })).error)) { setNewIng({ name: '', unit: 'g', package_size: '1000', package_cost: '' }); void load(); }
+  };
+  const updateIngredient = async (id: string, patch: { package_cost?: number; active?: boolean }) => { if (fail((await supabase.from('factory_ingredients').update(patch).eq('id', id)).error)) void load(); };
+
+  const recipe = recipes.find(r => r.product_id === productId);
+  const product = products.find(p => p.id === productId);
+  const ensureRecipe = async () => {
+    if (recipe) return recipe.id;
+    const { data, error } = await supabase.from('factory_recipes').insert({ product_id: productId, yield_units: 1 }).select('id').single();
+    fail(error); return data?.id;
+  };
+  const addItem = async (ingredient_id: string) => { const id = await ensureRecipe(); if (id && fail((await supabase.from('factory_recipe_items').insert({ recipe_id: id, ingredient_id, quantity: 0 })).error)) void load(); };
+  const setItemQty = async (id: string, quantity: number) => { if (fail((await supabase.from('factory_recipe_items').update({ quantity }).eq('id', id)).error)) void load(); };
+  const removeItem = async (id: string) => { if (fail((await supabase.from('factory_recipe_items').delete().eq('id', id)).error)) void load(); };
+  const setYield = async (v: number) => { const id = await ensureRecipe(); if (id && v > 0 && fail((await supabase.from('factory_recipes').update({ yield_units: v }).eq('id', id)).error)) void load(); };
+
+  const qty = (unit_id: string, product_id: string) => forecasts.find(f => f.unit_id === unit_id && f.product_id === product_id)?.quantity ?? 0;
+  const setForecast = async (unit_id: string, product_id: string, quantity: number) => {
+    if (fail((await supabase.from('factory_forecasts').upsert({ production_date: date, unit_id, product_id, quantity: Math.max(0, quantity) }, { onConflict: 'production_date,unit_id,product_id' })).error)) void loadForecasts();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="flex items-center gap-2 font-heading text-2xl font-bold"><ChefHat className="h-6 w-6 text-primary" /> Fábrica</h1>
+        <p className="text-sm text-muted-foreground">Ficha técnica, custo por unidade e sugestão de produção. Só planejamento: nada é lançado no financeiro.</p>
+      </div>
+      <Tabs defaultValue="producao">
+        <TabsList><TabsTrigger value="producao">Sugestão de produção</TabsTrigger><TabsTrigger value="fichas">Fichas técnicas</TabsTrigger><TabsTrigger value="ingredientes">Ingredientes</TabsTrigger></TabsList>
+
+        <TabsContent value="ingredientes" className="space-y-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div><Label>Ingrediente</Label><Input value={newIng.name} onChange={e => setNewIng({ ...newIng, name: e.target.value })} placeholder="Farinha de trigo" /></div>
+            <div><Label>Medida</Label><Select value={newIng.unit} onValueChange={unit => setNewIng({ ...newIng, unit })}><SelectTrigger className="w-24"><SelectValue /></SelectTrigger><SelectContent>{['g', 'ml', 'un'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Tamanho da embalagem</Label><Input type="number" className="w-36" value={newIng.package_size} onChange={e => setNewIng({ ...newIng, package_size: e.target.value })} /></div>
+            <div><Label>Preço da embalagem (R$)</Label><Input className="w-36" value={newIng.package_cost} onChange={e => setNewIng({ ...newIng, package_cost: e.target.value })} /></div>
+            <Button onClick={addIngredient}><Plus className="mr-1 h-4 w-4" />Adicionar</Button>
+          </div>
+          <Table><TableHeader><TableRow><TableHead>Ingrediente</TableHead><TableHead className="text-right">Embalagem</TableHead><TableHead className="text-right">Preço</TableHead><TableHead className="text-right">Custo por medida</TableHead><TableHead /></TableRow></TableHeader>
+            <TableBody>{ingredients.map(i => <TableRow key={i.id}>
+              <TableCell>{i.name}</TableCell><TableCell className="text-right">{num(i.package_size)} {i.unit}</TableCell>
+              <TableCell className="text-right"><Input className="ml-auto w-28 text-right" defaultValue={i.package_cost} onBlur={e => Number(e.target.value) !== Number(i.package_cost) && updateIngredient(i.id, { package_cost: Number(e.target.value) })} /></TableCell>
+              <TableCell className="text-right">{money(ingredientCostPerUnit(i), 4)} / {i.unit}</TableCell>
+              <TableCell><Button size="icon" variant="ghost" aria-label="Arquivar" onClick={() => updateIngredient(i.id, { active: false })}><Trash2 className="h-4 w-4" /></Button></TableCell>
+            </TableRow>)}</TableBody></Table>
+        </TabsContent>
+
+        <TabsContent value="fichas" className="space-y-4">
+          <Select value={productId} onValueChange={setProductId}><SelectTrigger className="w-72"><SelectValue placeholder="Escolha o produto" /></SelectTrigger><SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
+          {!products.length && <p className="text-sm text-muted-foreground">Cadastre os produtos em CRM › Produtos.</p>}
+          {productId && <>
+            <div className="flex flex-wrap items-end gap-4">
+              <div><Label>Rendimento da receita (cookies)</Label><Input key={productId + (recipe?.yield_units ?? 1)} type="number" className="w-40" defaultValue={recipe?.yield_units ?? 1} onBlur={e => setYield(Number(e.target.value))} /></div>
+              {recipe && product && (() => { const c = recipeCost({ product_id: productId, yield_units: recipe.yield_units, items: recipe.factory_recipe_items }, ingredients); const pkg = c.perUnit * product.cookies_per_package; return <>
+                <Card className="rounded-2xl"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Custo da receita</p><p className="text-lg font-bold">{money(c.total)}</p></CardContent></Card>
+                <Card className="rounded-2xl"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Custo por cookie</p><p className="text-lg font-bold text-primary">{money(c.perUnit, 4)}</p></CardContent></Card>
+                <Card className="rounded-2xl"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Custo da embalagem ({product.cookies_per_package} un.)</p><p className="text-lg font-bold">{money(pkg)}</p>{Number(product.price) > 0 && <p className="text-xs text-muted-foreground">margem {num(((product.price - pkg) / product.price) * 100)}% sobre {money(product.price)}</p>}</CardContent></Card>
+              </>; })()}
+            </div>
+            <Table><TableHeader><TableRow><TableHead>Ingrediente</TableHead><TableHead className="text-right">Quantidade na receita</TableHead><TableHead className="text-right">Custo</TableHead><TableHead /></TableRow></TableHeader>
+              <TableBody>{recipe?.factory_recipe_items.map(it => { const ing = ingById(it.ingredient_id); return <TableRow key={it.id}>
+                <TableCell>{ing?.name ?? '—'}</TableCell>
+                <TableCell className="text-right"><div className="flex items-center justify-end gap-1"><Input className="w-28 text-right" defaultValue={it.quantity} onBlur={e => Number(e.target.value) !== Number(it.quantity) && setItemQty(it.id, Number(e.target.value))} /><span className="text-xs text-muted-foreground">{ing?.unit}</span></div></TableCell>
+                <TableCell className="text-right">{money(ing ? ingredientCostPerUnit(ing) * it.quantity : 0)}</TableCell>
+                <TableCell><Button size="icon" variant="ghost" aria-label="Remover" onClick={() => removeItem(it.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
+              </TableRow>; })}</TableBody></Table>
+            <Select value="" onValueChange={addItem}><SelectTrigger className="w-72"><SelectValue placeholder="+ Adicionar ingrediente" /></SelectTrigger><SelectContent>{ingredients.filter(i => !recipe?.factory_recipe_items.some(it => it.ingredient_id === i.id)).map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent></Select>
+          </>}
+        </TabsContent>
+
+        <TabsContent value="producao" className="space-y-4">
+          <div><Label>Dia da produção</Label><Input type="date" className="w-44" value={date} onChange={e => setDate(e.target.value)} /></div>
+          <Card className="rounded-2xl"><CardHeader className="pb-2"><CardTitle className="text-base">Previsão por unidade (quantidade de cookies)</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">{!products.length ? <p className="text-sm text-muted-foreground">Cadastre os produtos em CRM › Produtos.</p> : <Table>
+              <TableHeader><TableRow><TableHead>Produto</TableHead>{units.map(u => <TableHead key={u.id} className="text-right">{u.name}</TableHead>)}<TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+              <TableBody>{products.map(p => <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.name}</TableCell>
+                {units.map(u => <TableCell key={u.id} className="text-right"><Input key={date + qty(u.id, p.id)} type="number" min={0} className="ml-auto w-20 text-right" defaultValue={qty(u.id, p.id) || ''} onBlur={e => Number(e.target.value || 0) !== qty(u.id, p.id) && setForecast(u.id, p.id, Number(e.target.value || 0))} /></TableCell>)}
+                <TableCell className="text-right font-semibold">{num(forecasts.filter(f => f.product_id === p.id).reduce((s, f) => s + Number(f.quantity), 0))}</TableCell>
+              </TableRow>)}</TableBody></Table>}</CardContent></Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="rounded-2xl"><CardHeader className="pb-2"><CardTitle className="text-base">O que produzir</CardTitle></CardHeader><CardContent>
+              <Table><TableHeader><TableRow><TableHead>Produto</TableHead><TableHead className="text-right">Cookies</TableHead><TableHead className="text-right">Receitas</TableHead><TableHead className="text-right">Custo</TableHead></TableRow></TableHeader>
+                <TableBody>{plan.products.filter(p => p.units > 0).map(p => <TableRow key={p.product_id}><TableCell>{productName(p.product_id)} {p.missingRecipe && <Badge variant="destructive">sem ficha</Badge>}</TableCell><TableCell className="text-right">{num(p.units)}</TableCell><TableCell className="text-right">{num(p.batches)}</TableCell><TableCell className="text-right">{money(p.cost)}</TableCell></TableRow>)}</TableBody></Table>
+              <p className="mt-2 text-right text-sm font-semibold">Custo total previsto: {money(plan.totalCost)}</p>
+            </CardContent></Card>
+            <Card className="rounded-2xl"><CardHeader className="pb-2"><CardTitle className="text-base">Ingredientes a separar / comprar</CardTitle></CardHeader><CardContent>
+              <Table><TableHeader><TableRow><TableHead>Ingrediente</TableHead><TableHead className="text-right">Quantidade</TableHead><TableHead className="text-right">Embalagens</TableHead><TableHead className="text-right">Custo</TableHead></TableRow></TableHeader>
+                <TableBody>{plan.shopping.map(s => <TableRow key={s.ingredient_id}><TableCell>{s.name}</TableCell><TableCell className="text-right">{num(s.quantity)} {s.unit}</TableCell><TableCell className="text-right">{s.packages}</TableCell><TableCell className="text-right">{money(s.cost)}</TableCell></TableRow>)}</TableBody></Table>
+            </CardContent></Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

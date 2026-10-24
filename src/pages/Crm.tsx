@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { Building2, Package, CalendarDays, ChevronRight, ListFilter, Plus, Search, Check } from 'lucide-react';
+import { Building2, Package, CalendarDays, ChevronRight, ListFilter, Plus, Search, Check, Users, Cookie } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
@@ -15,6 +15,7 @@ import { CrudDialog, type FieldConfig, type FormValues } from '@/components/sett
 import { CRM_STAGES, normalizeCompanyDocument, validateCrmStage } from '@/lib/crmRules';
 import { CompanyDiscovery } from '@/components/crm/CompanyDiscovery';
 import { CrmOrders } from '@/components/crm/CrmOrders';
+import { CrmProducts } from '@/components/crm/CrmProducts';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Company = Tables<'crm_companies'>;
@@ -23,11 +24,11 @@ type Activity = Tables<'crm_activities'>;
 type Contact = Tables<'crm_contacts'>;
 type Editor = { kind: 'company' | 'opportunity' | 'activity' | 'contact'; data?: FormValues };
 const stages: Record<string, string> = { qualificacao: 'Qualificação', briefing: 'Briefing / degustação', proposta: 'Proposta', negociacao: 'Negociação', ganha: 'Ganha', perdida: 'Perdida' };
-const leadStates = [{ value: 'novo', label: 'Novo' }, { value: 'em_contato', label: 'Em contato' }, { value: 'qualificado', label: 'Qualificado' }, { value: 'descartado', label: 'Descartado' }];
-const interests = [{ value: 'coffee_break', label: 'Coffee break' }, { value: 'evento_corporativo', label: 'Evento corporativo' }, { value: 'encomenda', label: 'Encomenda' }];
+const leadStates = [{ value: 'novo', label: 'Novo' }, { value: 'em_contato', label: 'Em contato' }, { value: 'qualificado', label: 'Qualificado' }, { value: 'descartado', label: 'Descartado' }, { value: 'cliente', label: 'Cliente' }];
+const interests = [{ value: 'coffee_break', label: 'Coffee break' }, { value: 'evento_corporativo', label: 'Evento corporativo' }, { value: 'encomenda', label: 'Encomenda' }, { value: 'distribuicao', label: 'Distribuição / revenda' }];
 const money = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateLabel = (date: string | null) => date ? date.split('-').reverse().join('/') : '—';
-const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }, { path: '/crm/pedidos', label: 'Distribuição & pedidos', icon: Package }];
+const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/clientes', label: 'Clientes', icon: Users }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/produtos', label: 'Produtos', icon: Cookie }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }, { path: '/crm/pedidos', label: 'Distribuição & pedidos', icon: Package }];
 
 export default function Crm() {
   const { user } = useAuth();
@@ -51,6 +52,8 @@ export default function Crm() {
   const isPipeline = location.pathname.endsWith('/funil');
   const isDiscovery = location.pathname.endsWith('/buscar');
   const isOrders = location.pathname.endsWith('/pedidos');
+  const isProducts = location.pathname.endsWith('/produtos');
+  const isClients = location.pathname.endsWith('/clientes');
   const canUse = roles.some(r => ['admin', 'gerente_unidade', 'vendedor'].includes(r));
   const loading = companies.loading || opportunities.loading || activities.loading || contacts.loading;
   const unitOptions = useMemo(() => units.data.filter(u => u.active).map(u => ({ value: u.id, label: u.name })), [units.data]);
@@ -62,14 +65,15 @@ export default function Crm() {
   const visibleOpportunities = opportunities.data.filter(o => o.active && (companyId ? o.company_id === companyId : (unitFilter === 'all' || o.unit_id === unitFilter) && `${o.title} ${companyName(o.company_id)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())));
   const visibleActivities = activities.data.filter(a => a.active && (companyId ? a.company_id === companyId : (unitFilter === 'all' || a.unit_id === unitFilter) && `${a.title} ${companyName(a.company_id)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && (!fromDate || (a.due_date ?? '') >= fromDate) && (!toDate || (a.due_date ?? '') <= toDate)).sort((a, b) => Number(a.completed) - Number(b.completed) || (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'));
   const openEditor = (kind: Editor['kind'], row?: Company | Opportunity | Activity | Contact) => {
-    setEditor({ kind, data: row ? { ...row } : { company_id: companyId ?? '', unit_id: company?.unit_id ?? '', owner_id: user?.id ?? '', stage: 'qualificacao', interest: 'coffee_break', status: 'novo', sale_type: 'coffee_break', delivery_mode: 'entrega', kind: 'tarefa', source: 'manual' } });
+    setEditor({ kind, data: row ? { ...row } : { ...(kind === 'company' && isClients ? { status: 'cliente', interest: 'distribuicao' } : {}), company_id: companyId ?? '', unit_id: company?.unit_id ?? '', owner_id: user?.id ?? '', stage: 'qualificacao', interest: 'coffee_break', status: 'novo', sale_type: 'coffee_break', delivery_mode: 'entrega', kind: 'tarefa', source: 'manual' } });
   };
   const fields = useMemo<FieldConfig[]>(() => {
     const unit: FieldConfig = { name: 'unit_id', label: 'Unidade comercial', type: 'select', required: true, options: unitOptions };
     const parent: FieldConfig = { name: 'company_id', label: 'Empresa', type: 'select', required: true, options: companyOptions };
     if (editor?.kind === 'company') return [
       { name: 'name', label: 'Empresa', required: true }, { name: 'document', label: 'CNPJ' }, { name: 'phone', label: 'Telefone' }, { name: 'email', label: 'E-mail' },
-      { name: 'segment', label: 'Segmento' }, { name: 'address', label: 'Endereço' }, unit,
+      { name: 'contact_name', label: 'Responsável' }, { name: 'segment', label: 'Segmento' }, { name: 'address', label: 'Endereço de entrega' }, unit,
+      { name: 'payment_terms', label: 'Condição de pagamento padrão' },
       { name: 'interest', label: 'Interesse', type: 'select', options: interests, required: true },
       { name: 'status', label: 'Situação', type: 'select', options: leadStates, required: true },
       { name: 'source', label: 'Origem', required: true }, { name: 'notes', label: 'Observações', type: 'textarea' }
@@ -134,13 +138,13 @@ export default function Crm() {
   return <div className="space-y-6">
     <header className="flex items-center gap-3"><Building2 className="h-7 w-7 text-primary" /><div><h1 className="font-heading text-2xl font-semibold">CRM</h1><p className="text-sm text-muted-foreground">Vendas corporativas e coffee breaks</p></div></header>
     <nav aria-label="CRM" className="flex flex-wrap gap-2 border-b border-border pb-3">{nav.map(n => <Button asChild variant={location.pathname.startsWith(n.path) ? 'secondary' : 'ghost'} key={n.path}><Link to={n.path}><n.icon className="mr-2 h-4 w-4" />{n.label}</Link></Button>)}</nav>
-    {!companyId && !isDiscovery && <div className="flex flex-wrap items-end gap-3">
+    {!companyId && !isDiscovery && !isProducts && <div className="flex flex-wrap items-end gap-3">
       <div className="relative flex-1 min-w-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar no CRM" placeholder="Buscar empresa, CNPJ ou contato" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" /></div>
       <Select value={unitFilter} onValueChange={setUnitFilter}><SelectTrigger className="w-full sm:w-52" aria-label="Filtrar unidade"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as unidades</SelectItem>{unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent></Select>
-      {!isAgenda && !isPipeline && !isOrders && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
+      {!isAgenda && !isPipeline && !isOrders && !isClients && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
       {isAgenda && <><div><Label htmlFor="crm-from">De</Label><Input id="crm-from" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div><div><Label htmlFor="crm-to">Até</Label><Input id="crm-to" type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div></>}
     </div>}
-    {isOrders ? <CrmOrders companies={companies.data} unitFilter={unitFilter} search={search} /> : isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
+    {isProducts ? <CrmProducts /> : isOrders ? <CrmOrders companies={companies.data} unitFilter={unitFilter} search={search} /> : isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
       <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-heading text-xl font-semibold">{company.name}</h2><p className="text-sm text-muted-foreground">{unitName(company.unit_id)} · {company.segment || 'Sem segmento'}</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => openEditor('company', company)}>Editar empresa</Button><Button variant="outline" onClick={() => void companies.update(company.id, { do_not_contact: !company.do_not_contact })}>{company.do_not_contact ? 'Permitir contato' : 'Não contatar'}</Button></div></div>
       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">{[['CNPJ',company.document],['Telefone',company.phone],['E-mail',company.email],['Endereço',company.address],['Origem',company.source],['Observações',company.notes]].map(([label,value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl>
       {company.do_not_contact && <Badge variant="destructive">Não contatar</Badge>}
@@ -154,7 +158,7 @@ export default function Crm() {
     </> : isPipeline ? <>
       <div className="flex flex-wrap justify-between items-center gap-2"><h2 className="font-heading text-lg font-semibold">Funil de oportunidades</h2><div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><Link to="/crm/buscar"><Search className="h-4 w-4 mr-1" />Buscar empresas</Link></Button><Button onClick={() => openEditor('opportunity')} size="sm"><Plus className="h-4 w-4 mr-1" />Nova oportunidade</Button></div></div>
       {loading ? <p>Carregando oportunidades…</p> : <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">{CRM_STAGES.map(stage => <section key={stage} className="min-w-0 border-t-2 border-primary pt-3"><div className="flex justify-between mb-3"><h3 className="font-heading font-medium text-sm">{stages[stage]}</h3><Badge variant="secondary">{visibleOpportunities.filter(o => o.stage === stage).length}</Badge></div><div className="space-y-3">{visibleOpportunities.filter(o => o.stage === stage).map(o => <article key={o.id} className="border border-border rounded-lg p-3 space-y-2 bg-card"><Link to={`/crm/empresas/${o.company_id}`} className="text-sm text-primary">{companyName(o.company_id)}</Link><h4 className="font-medium break-words">{o.title}</h4><p className="text-sm">{money(o.estimated_value)}</p><p className="text-xs text-muted-foreground">{dateLabel(o.event_date)} · {unitName(o.unit_id)}</p><Button size="sm" variant="outline" onClick={() => openEditor('opportunity', o)}>Abrir briefing</Button></article>)}{!visibleOpportunities.some(o => o.stage === stage) && <p className="text-xs text-muted-foreground py-4">Nenhuma oportunidade</p>}</div></section>)}</div>}
-    </> : <CrudTable title="Leads e empresas" columns={companyColumns} data={filteredCompanies} loading={loading} hasActive={false} onAdd={() => openEditor('company')} onEdit={c => openEditor('company', c)} onDelete={id => archive('company', id)} />}
-    {editor && <CrudDialog open onClose={() => setEditor(null)} title={`${editor.data?.id ? 'Editar' : 'Novo'} ${ {company:'lead / empresa',contact:'contato',activity:'contato / tarefa',opportunity:'oportunidade e briefing'}[editor.kind]}`} fields={fields} initialData={editor.data} onSave={save} contentClassName="rounded-lg max-w-2xl max-h-[85vh] overflow-y-auto" />}
+    </> : isClients ? <CrudTable title="Clientes" columns={companyColumns} data={companies.data.filter(c => c.active && c.status === 'cliente' && matches(c))} loading={loading} hasActive={false} onAdd={() => openEditor('company')} onEdit={c => openEditor('company', c)} onDelete={id => archive('company', id)} /> : <CrudTable title="Leads e empresas" columns={companyColumns} data={filteredCompanies} loading={loading} hasActive={false} onAdd={() => openEditor('company')} onEdit={c => openEditor('company', c)} onDelete={id => archive('company', id)} />}
+    {editor && <CrudDialog open onClose={() => setEditor(null)} title={`${editor.data?.id ? 'Editar' : 'Novo'} ${ {company: isClients ? 'cliente' : 'lead / empresa',contact:'contato',activity:'contato / tarefa',opportunity:'oportunidade e briefing'}[editor.kind]}`} fields={fields} initialData={editor.data} onSave={save} contentClassName="rounded-lg max-w-2xl max-h-[85vh] overflow-y-auto" />}
   </div>;
 }

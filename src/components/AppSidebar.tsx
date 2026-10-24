@@ -9,7 +9,7 @@ import {
   Landmark,
   ChevronDown,
   Sparkles,
-  Bike,
+  Bike, ChefHat,
   Building2,
   Briefcase,
 } from 'lucide-react';
@@ -41,6 +41,7 @@ const navItems = [
   { title: 'Depreciação e CSLL', url: '/lancamentos-contabeis', icon: Receipt },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
   { title: 'iFood', url: '/ifood', icon: Bike },
+  { title: 'Fábrica: ficha e produção', url: '/fabrica', icon: ChefHat },
   { title: 'CRM', url: '/crm/agenda', icon: Building2 },
 ];
 
