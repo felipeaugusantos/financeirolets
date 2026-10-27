@@ -46,7 +46,7 @@ export default function Crm() {
     if (!parent) return;
     const base = o.event_date ?? new Date().toLocaleDateString('en-CA');
     const terms = parent.payment_terms && PAYMENT_TERMS[parent.payment_terms] ? parent.payment_terms : 'boleto_7';
-    const id = await orders.create({ company_id: o.company_id, unit_id: o.production_unit_id ?? o.unit_id, owner_id: o.owner_id, opportunity_id: o.id, order_date: new Date().toLocaleDateString('en-CA'), delivery_date: o.event_date, payment_terms: terms, due_date: orderDueDate(base, terms), status: 'pendente', quantity_boxes: 0, quantity_cookies: 0, total_amount: 0, notes: [o.title, o.requested_items].filter(Boolean).join(' — ') || null });
+    const id = await orders.create({ company_id: o.company_id, unit_id: o.unit_id, owner_id: o.owner_id, opportunity_id: o.id, order_date: new Date().toLocaleDateString('en-CA'), delivery_date: o.event_date, payment_terms: terms, due_date: orderDueDate(base, terms), status: 'pendente', quantity_boxes: 0, quantity_cookies: 0, total_amount: 0, notes: [o.title, o.requested_items].filter(Boolean).join(' — ') || null });
     if (id) toast({ title: 'Pedido enviado à Fábrica', description: 'Abra Fábrica › Distribuição & pedidos e adicione os produtos.' });
   };
   const units = useSupabaseCrud<Tables<'units'>>('units', 'name');
@@ -74,7 +74,7 @@ export default function Crm() {
   const visibleOpportunities = opportunities.data.filter(o => o.active && (companyId ? o.company_id === companyId : (unitFilter === 'all' || o.unit_id === unitFilter) && `${o.title} ${companyName(o.company_id)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())));
   const visibleActivities = activities.data.filter(a => a.active && (companyId ? a.company_id === companyId : (unitFilter === 'all' || a.unit_id === unitFilter) && `${a.title} ${companyName(a.company_id)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && (!fromDate || (a.due_date ?? '') >= fromDate) && (!toDate || (a.due_date ?? '') <= toDate)).sort((a, b) => Number(a.completed) - Number(b.completed) || (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'));
   const openEditor = (kind: Editor['kind'], row?: Company | Opportunity | Activity | Contact) => {
-    setEditor({ kind, data: row ? { ...row } : { ...(kind === 'company' && isClients ? { status: 'cliente', interest: 'distribuicao' } : {}), company_id: companyId ?? '', unit_id: company?.unit_id ?? '', owner_id: user?.id ?? '', stage: 'qualificacao', interest: 'coffee_break', status: 'novo', sale_type: 'coffee_break', delivery_mode: 'entrega', kind: 'tarefa', source: 'manual' } });
+    setEditor({ kind, data: row ? { ...row } : { company_id: companyId ?? '', unit_id: company?.unit_id ?? '', owner_id: user?.id ?? '', stage: 'qualificacao', interest: 'coffee_break', status: 'novo', sale_type: 'coffee_break', delivery_mode: 'entrega', kind: 'tarefa', source: 'manual', ...(kind === 'company' && isClients ? { status: 'cliente', interest: 'distribuicao' } : {}) } });
   };
   const fields = useMemo<FieldConfig[]>(() => {
     const unit: FieldConfig = { name: 'unit_id', label: 'Unidade comercial', type: 'select', required: true, options: unitOptions };
