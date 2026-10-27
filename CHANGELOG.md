@@ -3,6 +3,9 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.6.0 — 2026-10-27
+Lojas iFood nas Configurações; importação da planilha do Portal; botão Lançar dos repasses semanais.
+
 ## 1.5.0 — 2026-10-24
 Menu Fábrica & Operações; pedido do CRM até a entrega com prazo; pedidos na fornada; painel de fornadas com custo real.
 
