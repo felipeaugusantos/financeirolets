@@ -16,9 +16,10 @@ export function CashForecastCard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const today = toLocalISODate(new Date());
-    const limit = new Date(); limit.setDate(limit.getDate() + 30);
-    (async () => {
+    let alive = true;
+    const load = async () => {
+      const today = toLocalISODate(new Date());
+      const limit = new Date(); limit.setDate(limit.getDate() + 30);
       const rows: { type: string; net_amount: number; due_date: string | null }[] = [];
       for (let from = 0; ; from += 1000) {
         const { data: page, error: e } = await supabase
@@ -29,12 +30,26 @@ export function CashForecastCard() {
           .not('due_date', 'is', null)
           .lte('due_date', toLocalISODate(limit))
           .range(from, from + 999);
+        if (!alive) return;
         if (e) { setError(e.message); return; }
         rows.push(...(page ?? []));
         if (!page || page.length < 1000) break;
       }
+      setError(null);
       setData(buildCashForecast(rows, today));
-    })();
+    };
+    load();
+    // Pagar/receber uma conta (aqui ou em outra aba) tira ela da previsão sem recarregar a página.
+    const onFocus = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    const timer = window.setInterval(load, 60_000);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(timer);
+    };
   }, []);
 
   return (
