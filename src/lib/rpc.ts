@@ -15,6 +15,18 @@ export function callRpc<T = unknown>(fn: string, args: Record<string, unknown>):
   return (supabase as any).rpc(fn, args);
 }
 
+/** Operações usadas nas tabelas que ainda não constam em integrations/supabase/types.ts. */
+export interface UntypedTable {
+  upsert(rows: unknown, opts?: { onConflict?: string; ignoreDuplicates?: boolean }): PromiseLike<{ error: { message: string; code?: string } | null }>;
+  insert(rows: unknown): PromiseLike<{ error: { message: string; code?: string } | null }>;
+}
+
+/** Acesso a tabela ainda não tipada (o Lovable regenera types.ts depois que o SQL é aplicado). O cast fica só aqui. */
+export function untypedTable(table: string): UntypedTable {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabase as any).from(table);
+}
+
 const MIGRATION_HINT = 'Aplique a migração 20261006120000 (scripts/producao/09-salvar-e-excluir-lancamento-atomico.sql) antes de usar.';
 
 /** Mensagem em português para os erros das funções de salvar/excluir lançamento. */

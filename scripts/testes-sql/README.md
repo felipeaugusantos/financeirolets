@@ -41,3 +41,9 @@ bun run scripts/testes-sql/dashboard-paridade.ts /tmp/pgtest 5544 t 25   # host 
   "não contatar", pedido único por oportunidade, previsão de fábrica única e permissões. Rodar depois dos scripts 14a-14f.
 - Verificação feita: aplicar 14a-14f e as migrações `drizzle/migrations/0000-0009` em dois bancos limpos e comparar colunas,
   índices, políticas, gatilhos, restrições, permissões e funções (resultado idêntico).
+
+## API de Saldo e Extrato do Bradesco (SQL 15)
+
+- `scripts/producao/15-api-bradesco-saldos.sql` (idêntico à migração): `bank_balance_snapshots` (um saldo por conta, dia e origem) e
+  `bank_api_sync_runs` (histórico das consultas), só para Admin/Financeiro.
+- `15-api-bradesco-saldos.test.sql`: unicidade, validações, RLS por papel, anônimo e exclusão em cascata.

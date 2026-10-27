@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle, Zap, CheckSquare, RefreshCw, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Upload, Link2, Link2Off, EyeOff, PlusCircle, FileText, AlertTriangle, Zap, CheckSquare, RefreshCw, RotateCcw, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
 import ClosingPanel from '@/components/ofx/ClosingPanel';
 import QuickRuleDialog, { QuickRuleSeed } from '@/components/ofx/QuickRuleDialog';
 import AutoPostDialog, { type AutoPostItem } from '@/components/ofx/AutoPostDialog';
+import BankApiImportDialog from '@/components/ofx/BankApiImportDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { reconciledPercent, matchesEntrySearch } from '@/lib/entrySearch';
 import { createdFromStatement } from '@/lib/ofxUnlink';
@@ -105,12 +106,14 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [ruleSeed, setRuleSeed] = useState<QuickRuleSeed | null>(null);
   /** Revisão do lançamento automático das linhas já classificadas por regra. */
   const [autoPostOpen, setAutoPostOpen] = useState(false);
+  /** Importação da resposta da API de Saldo e Extrato do Bradesco. */
+  const [apiOpen, setApiOpen] = useState(false);
 
 
   const {
     enriched, entries, candidates, rules, loading, importing, batchRunning, lastImport, stats,
     importFile, reprocessFile, reapplyRules, linkEntry, unlinkEntry, unlinkAndDeleteEntry, ignoreEntry, createFromEntry,
-    linkMany, ignoreMany, createMany, createGrouped, autoLinkByDescription, unlinkMany, duplicateGroups,
+    linkMany, ignoreMany, createMany, createGrouped, autoLinkByDescription, unlinkMany, duplicateGroups, reload,
   } = useOfxImport(accountId || null, from, to);
 
   // Guarda os filtros para reabrir a tela do mesmo jeito.
@@ -665,6 +668,15 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
               {importing ? 'Processando...' : 'Reprocessar arquivo OFX'}
             </Button>
             <Button
+              variant="outline"
+              className="gap-2 rounded-xl"
+              disabled={!accountId || importing}
+              onClick={() => setApiOpen(true)}
+              title="Importa a resposta da API de Saldo e Extrato do Bradesco (JSON). Só lançamentos fechados; nada vira lançamento sozinho."
+            >
+              <Landmark className="h-4 w-4" /> Importar da API Bradesco
+            </Button>
+            <Button
               variant="ghost"
               className="gap-2 rounded-xl"
               disabled={!accountId || loading || importing}
@@ -1196,6 +1208,17 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         options={options}
         onOpenChange={o => !o && setRuleSeed(null)}
         onSaved={reapplyRules}
+      />
+
+      <BankApiImportDialog
+        open={apiOpen}
+        onOpenChange={setApiOpen}
+        accountId={accountId}
+        accountName={accounts.find(a => a.id === accountId)?.name ?? ''}
+        onImported={range => {
+          void reload();
+          if (range) widenPeriodTo({ statements: [{ transactions: [{ posted_at: range.from }, { posted_at: range.to }] }] });
+        }}
       />
 
       <AutoPostDialog

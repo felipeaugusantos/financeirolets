@@ -3,6 +3,7 @@ import { settleOnLink, reopenOnUnlink } from '@/lib/ofxSettle';
 import { autoLinkIfoodPayouts } from '@/lib/ifoodAutoMatch';
 import { supabase } from '@/integrations/supabase/client';
 import { callRpc } from '@/lib/rpc';
+import { dropRowsAlreadyFromApi } from '@/lib/bankApiImport';
 import { unlinkErrorText, unlinkSummaryText, type UnlinkSummary } from '@/lib/ofxUnlink';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -264,7 +265,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       const known = new Set(((existing ?? []) as { fitid: string }[]).map(r => r.fitid));
 
       const seen = new Set<string>();
-      const rows = lines
+      const fresh = lines
         .filter(l => {
           if (known.has(l.fitid) || seen.has(l.fitid)) return false;
           seen.add(l.fitid);
@@ -282,6 +283,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
           imported_by: user?.id ?? null,
           status: 'pendente',
         }));
+      // Não duplica o que a API do Bradesco já trouxe para o mesmo dia e valor.
+      const rows = await dropRowsAlreadyFromApi(targetAccountId, fresh);
 
       let inserted = 0;
       if (rows.length > 0) {
@@ -375,8 +378,10 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         });
       }
 
-      if (newRows.length > 0) {
-        const { error } = await supabase.from('bank_statement_entries').upsert(newRows, { onConflict: 'account_id,fitid', ignoreDuplicates: true });
+      // Não duplica o que a API do Bradesco já trouxe para o mesmo dia e valor.
+      const toInsert = await dropRowsAlreadyFromApi(targetAccountId, newRows);
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from('bank_statement_entries').upsert(toInsert, { onConflict: 'account_id,fitid', ignoreDuplicates: true });
         if (error) throw error;
       }
 
@@ -386,9 +391,9 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       await load();
       toast({
         title: 'Arquivo reprocessado',
-        description: `${refreshed} linha(s) pendente(s) atualizadas e ${newRows.length} nova(s). Regras de conciliação reaplicadas.`,
+        description: `${refreshed} linha(s) pendente(s) atualizadas e ${toInsert.length} nova(s). Regras de conciliação reaplicadas.`,
       });
-      return { refreshed, inserted: newRows.length, statements };
+      return { refreshed, inserted: toInsert.length, statements };
     } catch (err: unknown) {
       toast({ title: 'Erro ao reprocessar OFX', description: errorMessage(err), variant: 'destructive' });
       return null;
