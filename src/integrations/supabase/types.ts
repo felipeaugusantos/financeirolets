@@ -141,6 +141,130 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_api_sync_runs: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          error: string | null
+          http_status: number | null
+          id: string
+          kind: string
+          origin: string
+          period_from: string | null
+          period_to: string | null
+          requested_by: string | null
+          return_code: string | null
+          rows_inserted: number
+          rows_received: number
+          rows_skipped: number
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          kind: string
+          origin?: string
+          period_from?: string | null
+          period_to?: string | null
+          requested_by?: string | null
+          return_code?: string | null
+          rows_inserted?: number
+          rows_received?: number
+          rows_skipped?: number
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          kind?: string
+          origin?: string
+          period_from?: string | null
+          period_to?: string | null
+          requested_by?: string | null
+          return_code?: string | null
+          rows_inserted?: number
+          rows_received?: number
+          rows_skipped?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_api_sync_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_balance_snapshots: {
+        Row: {
+          account_id: string
+          blocked: number | null
+          checking_balance: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          invest_auto: number | null
+          invest_grace: number | null
+          invest_redeem: number | null
+          ledger_balance: number | null
+          overdraft_limit: number | null
+          raw: Json | null
+          ref_date: string
+          source: string
+          total_balance: number | null
+          total_resources: number | null
+        }
+        Insert: {
+          account_id: string
+          blocked?: number | null
+          checking_balance?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invest_auto?: number | null
+          invest_grace?: number | null
+          invest_redeem?: number | null
+          ledger_balance?: number | null
+          overdraft_limit?: number | null
+          raw?: Json | null
+          ref_date: string
+          source: string
+          total_balance?: number | null
+          total_resources?: number | null
+        }
+        Update: {
+          account_id?: string
+          blocked?: number | null
+          checking_balance?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invest_auto?: number | null
+          invest_grace?: number | null
+          invest_redeem?: number | null
+          ledger_balance?: number | null
+          overdraft_limit?: number | null
+          raw?: Json | null
+          ref_date?: string
+          source?: string
+          total_balance?: number | null
+          total_resources?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_balance_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_statement_entries: {
         Row: {
           account_id: string
