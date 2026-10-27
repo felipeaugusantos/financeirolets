@@ -109,7 +109,6 @@ export default function Ifood() {
         </Select>
         {canPost && store && <IfoodSheetImport storeId={store.id} storeName={store.name} onDone={() => setReload((r) => r + 1)} />}
         {canPost && !store && <span className="text-xs text-muted-foreground">{stores.length ? 'Escolha uma loja para importar a planilha' : 'Cadastre as lojas em Configurações › Lojas iFood'}</span>}
-        {canPost && !store && <p className="self-center text-xs text-muted-foreground">Escolha uma loja para importar a planilha do portal.</p>}
       </div>
       {ind.missingFinancial > 0 && <p className="text-sm text-muted-foreground">{ind.missingFinancial} pedido(s) ainda sem valores financeiros do iFood.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
