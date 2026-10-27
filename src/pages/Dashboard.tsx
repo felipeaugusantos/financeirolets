@@ -202,12 +202,13 @@ function TreemapNode(props: TreemapNodeProps) {
 }
 
 function CategoryChart({
-  data, emptyLabel, accent, mode,
+  data, emptyLabel, accent, mode, onSelect,
 }: {
   data: Array<{ name: string; value: number }>;
   emptyLabel: string;
   accent: string;
   mode: ChartMode;
+  onSelect?: (name: string) => string | undefined;
 }) {
   if (data.length === 0) {
     return (
@@ -220,7 +221,7 @@ function CategoryChart({
   const total = items.reduce((s, d) => s + d.value, 0);
   if (mode === 'stacked') return <StackedBar data={items} total={total} />;
   if (mode === 'treemap') return <TreemapChart data={items} />;
-  return <CategoryBars data={data} emptyLabel={emptyLabel} accent={accent} />;
+  return <CategoryBars data={data} emptyLabel={emptyLabel} accent={accent} onSelect={onSelect} />;
 }
 
 function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: string }): { from: string; to: string; label: string; isMonth: boolean } {
