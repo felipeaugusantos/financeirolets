@@ -671,47 +671,61 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Unit Ranking */}
-      {unitRanking.length > 0 && (
-        <Card className="shadow-card rounded-2xl border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-heading flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              Ranking de Despesas por Unidade ({period.label})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {unitRanking.map((u, i) => {
-                const maxDesp = unitRanking[0]?.despesas || 1;
-                const pct = (u.despesas / maxDesp) * 100;
-                return (
-                  <div key={u.unitId} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-card-foreground flex items-center gap-2">
-                        <span className="text-muted-foreground w-4 text-right">{i + 1}º</span>
-                        {u.unitName}
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-destructive font-bold">{fmt(u.despesas)}</span>
-                        {u.receitas > 0 && (
-                          <span className="text-success text-[10px]">Rec: {fmt(u.receitas)}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-destructive/70 rounded-full transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Resultado por Unidade */}
+      {unitRanking.length > 0 && (() => {
+        const rows = unitRanking
+          .map((u) => ({ ...u, resultado: u.receitas - u.despesas }))
+          .sort((a, b) => b.resultado - a.resultado);
+        const maxAbs = Math.max(...rows.map((r) => Math.abs(r.resultado)), 1);
+        return (
+          <Card className="shadow-card rounded-2xl border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-heading flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                Resultado por Unidade ({period.label})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-muted-foreground border-b border-border">
+                      <th className="text-left font-medium py-2 pr-2">Unidade</th>
+                      <th className="text-right font-medium py-2 px-2">Receitas</th>
+                      <th className="text-right font-medium py-2 px-2">Despesas</th>
+                      <th className="text-right font-medium py-2 px-2">Resultado</th>
+                      <th className="text-right font-medium py-2 pl-2">Margem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((u) => {
+                      const margem = u.receitas > 0 ? (u.resultado / u.receitas) * 100 : null;
+                      const positive = u.resultado >= 0;
+                      return (
+                        <tr key={u.unitId} className="border-b border-border/50 last:border-0">
+                          <td className="py-2 pr-2">
+                            <div className="font-medium text-card-foreground">{u.unitName}</div>
+                            <div className="h-1.5 mt-1 bg-muted rounded-full overflow-hidden max-w-[160px]">
+                              <div
+                                className={cn('h-full rounded-full', positive ? 'bg-success/70' : 'bg-destructive/70')}
+                                style={{ width: `${(Math.abs(u.resultado) / maxAbs) * 100}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td className="text-right tabular-nums text-success py-2 px-2">{fmt(u.receitas)}</td>
+                          <td className="text-right tabular-nums text-destructive py-2 px-2">{fmt(u.despesas)}</td>
+                          <td className={cn('text-right tabular-nums font-bold py-2 px-2', positive ? 'text-success' : 'text-destructive')}>{fmt(u.resultado)}</td>
+                          <td className="text-right tabular-nums text-muted-foreground py-2 pl-2">{margem === null ? '—' : `${margem.toFixed(1)}%`}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
