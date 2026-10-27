@@ -80,9 +80,10 @@ export function compactBRL(v: number): string {
  * Sem "incluir provisionados": só pagos/recebidos pela data de pagamento (regime=caixa).
  * Com: pagos pela data de pagamento + provisionados pela competência (regime=dashboard).
  */
-export function drilldownUrl(o: { kind: 'receita' | 'despesa'; from: string; to: string; includeProvisioned: boolean }): string {
+export function drilldownUrl(o: { kind: 'receita' | 'despesa'; from: string; to: string; includeProvisioned: boolean; categoryId?: string }): string {
   const sp = new URLSearchParams({
     type: o.kind, dateFrom: o.from, dateTo: o.to, regime: o.includeProvisioned ? 'dashboard' : 'caixa',
   });
+  if (o.categoryId) sp.set('category_id', o.categoryId);
   return `/lancamentos?${sp.toString()}`;
 }

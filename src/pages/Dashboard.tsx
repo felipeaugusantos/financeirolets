@@ -38,12 +38,14 @@ function condenseBars(data: Array<{ name: string; value: number }>) {
 }
 
 function CategoryBars({
-  data, emptyLabel, accent,
+  data, emptyLabel, accent, onSelect,
 }: {
   data: Array<{ name: string; value: number }>;
   emptyLabel: string;
   accent: string;
+  onSelect?: (name: string) => string | undefined;
 }) {
+  const navigate = useNavigate();
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
@@ -59,8 +61,17 @@ function CategoryBars({
       {items.map((d) => {
         const pct = total > 0 ? (d.value / total) * 100 : 0;
         const width = (d.value / max) * 100;
+        const href = onSelect?.(d.name);
         return (
-          <div key={d.name} className="group">
+          <div
+            key={d.name}
+            className={cn('group rounded-md', href && 'cursor-pointer hover:bg-muted/40 px-1 -mx-1')}
+            {...(href ? {
+              role: 'link', tabIndex: 0, title: 'Ver os lançamentos desta categoria',
+              onClick: () => navigate(href),
+              onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') navigate(href); },
+            } : {})}
+          >
             <div className="flex items-baseline justify-between gap-2 mb-1">
               <span className="text-xs font-medium text-card-foreground truncate" title={d.name}>
                 {d.name}
