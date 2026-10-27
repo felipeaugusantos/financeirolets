@@ -45,6 +45,16 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.6.0',
+    date: '2026-10-27',
+    summary: 'Cadastro de lojas iFood, importação da planilha do Portal e lançamento semanal dos repasses.',
+    items: [
+      { area: 'Geral', kind: 'novidade', title: 'Lojas iFood nas Configurações', detail: 'Cadastre cada loja do iFood com Merchant ID e unidade. Com a loja escolhida na tela iFood, aparece o botão de importar planilha.', tech: 'IfoodStoresSettings sobre ifood_stores.' },
+      { area: 'Geral', kind: 'novidade', title: 'Importar planilha do Portal iFood', detail: 'Importe a planilha financeira do Portal do Parceiro; reimportar a mesma planilha atualiza sem duplicar.', tech: 'ifoodSheet.ts / IfoodSheetImport.' },
+      { area: 'Geral', kind: 'novidade', title: 'Botão Lançar no repasse semanal', detail: 'Cada semana importada pode ser lançada: cria a receita bruta e as taxas do iFood como pendentes em Lançamentos e atualiza o painel de rentabilidade. A baixa acontece na conciliação bancária.', tech: 'ifood_payout_postings; ofxSettle.ts.' },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-10-24',
     summary: 'Menu Fábrica & Operações, rotina completa do pedido corporativo até a entrega e painel de fornadas com custo real.',

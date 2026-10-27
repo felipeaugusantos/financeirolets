@@ -60,7 +60,7 @@ export default function Ifood() {
     setBusy(false);
     if (exp.error || link.error) { toast({ title: 'Lançamento incompleto', description: (exp.error ?? link.error)?.message, variant: 'destructive' }); return; }
     toast({ title: 'Repasse lançado no Contas a Receber', description: `Recebimento previsto ${money(lines.net)} em ${dateLabel(due)}` });
-    setPosting(null); void loadPostings();
+    setPosting(null); void loadPostings(); setReload((r) => r + 1);
   };
 
   useEffect(() => { supabase.from('ifood_stores').select('id,name,unit_id').eq('active', true).then(({ data }) => setStores(data ?? [])); }, []);
