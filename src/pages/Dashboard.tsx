@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDashboard } from '@/hooks/useDashboard';
+import { CashForecastCard } from '@/components/dashboard/CashForecastCard';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { parseView, serializeView, variationTone, compactBRL, drilldownUrl, type DashboardView, type PeriodPreset } from '@/lib/dashboardView';
@@ -637,6 +638,8 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      <CashForecastCard />
 
       {/* Charts */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
