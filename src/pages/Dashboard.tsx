@@ -38,12 +38,14 @@ function condenseBars(data: Array<{ name: string; value: number }>) {
 }
 
 function CategoryBars({
-  data, emptyLabel, accent,
+  data, emptyLabel, accent, onSelect,
 }: {
   data: Array<{ name: string; value: number }>;
   emptyLabel: string;
   accent: string;
+  onSelect?: (name: string) => string | undefined;
 }) {
+  const navigate = useNavigate();
   if (data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
@@ -59,8 +61,17 @@ function CategoryBars({
       {items.map((d) => {
         const pct = total > 0 ? (d.value / total) * 100 : 0;
         const width = (d.value / max) * 100;
+        const href = onSelect?.(d.name);
         return (
-          <div key={d.name} className="group">
+          <div
+            key={d.name}
+            className={cn('group rounded-md', href && 'cursor-pointer hover:bg-muted/40 px-1 -mx-1')}
+            {...(href ? {
+              role: 'link', tabIndex: 0, title: 'Ver os lançamentos desta categoria',
+              onClick: () => navigate(href),
+              onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') navigate(href); },
+            } : {})}
+          >
             <div className="flex items-baseline justify-between gap-2 mb-1">
               <span className="text-xs font-medium text-card-foreground truncate" title={d.name}>
                 {d.name}
@@ -191,12 +202,13 @@ function TreemapNode(props: TreemapNodeProps) {
 }
 
 function CategoryChart({
-  data, emptyLabel, accent, mode,
+  data, emptyLabel, accent, mode, onSelect,
 }: {
   data: Array<{ name: string; value: number }>;
   emptyLabel: string;
   accent: string;
   mode: ChartMode;
+  onSelect?: (name: string) => string | undefined;
 }) {
   if (data.length === 0) {
     return (
@@ -209,7 +221,7 @@ function CategoryChart({
   const total = items.reduce((s, d) => s + d.value, 0);
   if (mode === 'stacked') return <StackedBar data={items} total={total} />;
   if (mode === 'treemap') return <TreemapChart data={items} />;
-  return <CategoryBars data={data} emptyLabel={emptyLabel} accent={accent} />;
+  return <CategoryBars data={data} emptyLabel={emptyLabel} accent={accent} onSelect={onSelect} />;
 }
 
 function resolvePeriod(preset: PeriodPreset, custom: { from?: string; to?: string }): { from: string; to: string; label: string; isMonth: boolean } {
@@ -294,6 +306,7 @@ export default function Dashboard() {
 
   const { data: units } = useSupabaseCrud<Tables<'units'>>('units');
   const { data: fronts } = useSupabaseCrud<Tables<'business_fronts'>>('business_fronts');
+  const { data: categories } = useSupabaseCrud<Tables<'categories'>>('categories');
 
   const period = useMemo(
     () => resolvePeriod(periodPreset, { from: customFrom, to: customTo }),
@@ -334,6 +347,13 @@ export default function Dashboard() {
   const canDrill = regime === 'caixa' && !dashFilters.unitId && !dashFilters.frontId;
   const drill = (kind: 'receita' | 'despesa') =>
     canDrill ? drilldownUrl({ kind, from: period.from, to: period.to, includeProvisioned }) : undefined;
+  // Categoria → lançamentos: só quando o nome identifica uma única categoria do mesmo tipo.
+  const drillCategory = (kind: 'receita' | 'despesa', name: string) => {
+    if (!canDrill) return undefined;
+    const matches = (categories ?? []).filter((c) => c.name === name && (!('type' in c) || !c.type || c.type === kind));
+    if (matches.length !== 1) return undefined;
+    return drilldownUrl({ kind, from: period.from, to: period.to, includeProvisioned, categoryId: matches[0].id });
+  };
   const margemPct = receitasTotal > 0 ? `${((margemContribuicao / receitasTotal) * 100).toFixed(1)}% da receita` : '';
 
   const cards: { title: string; value: string; icon: typeof DollarSign; color: string; sub: React.ReactNode; href?: string }[] = [
@@ -656,7 +676,7 @@ export default function Dashboard() {
             <ChartModeToggle value={chartMode} onChange={setChartMode} />
           </CardHeader>
           <CardContent>
-            <CategoryChart mode={chartMode} data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" />
+            <CategoryChart mode={chartMode} data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" onSelect={(n) => drillCategory('despesa', n)} />
           </CardContent>
         </Card>
 
@@ -666,7 +686,7 @@ export default function Dashboard() {
             <ChartModeToggle value={chartMode} onChange={setChartMode} />
           </CardHeader>
           <CardContent>
-            <CategoryChart mode={chartMode} data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" />
+            <CategoryChart mode={chartMode} data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" onSelect={(n) => drillCategory('receita', n)} />
           </CardContent>
         </Card>
       </div>
