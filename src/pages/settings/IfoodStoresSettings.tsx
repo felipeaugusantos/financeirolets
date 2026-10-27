@@ -18,7 +18,7 @@ export default function IfoodStoresSettings({ onBack }: { onBack: () => void }) 
   const columns: ColumnConfig<Store>[] = [
     { key: 'name', label: 'Loja' },
     { key: 'merchant_id', label: 'Merchant ID' },
-    { key: 'unit_id', label: 'Unidade', render: (r: Store) => unitName(r.unit_id) },
+    { key: 'unit_id', label: 'Unidade', render: (v: string | null) => unitName(v) },
   ] as ColumnConfig<Store>[];
 
   const fields: FieldConfig[] = [
