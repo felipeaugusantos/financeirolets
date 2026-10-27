@@ -347,6 +347,13 @@ export default function Dashboard() {
   const canDrill = regime === 'caixa' && !dashFilters.unitId && !dashFilters.frontId;
   const drill = (kind: 'receita' | 'despesa') =>
     canDrill ? drilldownUrl({ kind, from: period.from, to: period.to, includeProvisioned }) : undefined;
+  // Categoria → lançamentos: só quando o nome identifica uma única categoria do mesmo tipo.
+  const drillCategory = (kind: 'receita' | 'despesa', name: string) => {
+    if (!canDrill) return undefined;
+    const matches = (categories ?? []).filter((c) => c.name === name && (!('type' in c) || !c.type || c.type === kind));
+    if (matches.length !== 1) return undefined;
+    return drilldownUrl({ kind, from: period.from, to: period.to, includeProvisioned, categoryId: matches[0].id });
+  };
   const margemPct = receitasTotal > 0 ? `${((margemContribuicao / receitasTotal) * 100).toFixed(1)}% da receita` : '';
 
   const cards: { title: string; value: string; icon: typeof DollarSign; color: string; sub: React.ReactNode; href?: string }[] = [
