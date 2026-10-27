@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { IfoodSheetImport } from '@/components/ifood/IfoodSheetImport';
 import { weekPostingLines, profitIndicators, weeklyStatement, cancelRate, type BankLine, type IfoodOrderRow, type IfoodFinancial, type PayoutStatus } from '@/lib/ifoodProfit';
 
 const money = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -38,6 +39,7 @@ export default function Ifood() {
   const [posting, setPosting] = useState<ReturnType<typeof weeklyStatement>[number] | null>(null);
   const [cat, setCat] = useState({ revenue: '', fees: '', promo: '' });
   const [busy, setBusy] = useState(false);
+  const [reload, setReload] = useState(0);
   const loadPostings = () => supabase.from('ifood_payout_postings').select('store_id,week_start').then(({ data }) => setPostings(data ?? []));
   useEffect(() => { void loadPostings(); supabase.from('categories').select('id,name,type').eq('active', true).order('name').then(({ data }) => setCategories(data ?? [])); }, []);
   const store = stores.find(s => s.id === storeId);
@@ -81,7 +83,7 @@ export default function Ifood() {
       const sum = (re: RegExp) => ((tx ?? []) as unknown as { amount: number | string; categories: { name: string } | null }[]).filter((t) => re.test(t.categories?.name ?? '')).reduce((s, t) => s + Number(t.amount), 0);
       setCosts({ rider: sum(/motob|motoq|entrega/i), product: sum(/mat[eé]ria|embalag/i) });
     })();
-  }, [month, storeId, stores]);
+  }, [month, storeId, stores, reload]);
 
   const ind = useMemo(() => profitIndicators(orders, costs), [orders, costs]);
   const weeks = useMemo(() => weeklyStatement(orders, bank, today), [orders, bank, today]);
@@ -105,6 +107,8 @@ export default function Ifood() {
           <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">Todas as lojas</SelectItem>{stores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
         </Select>
+        {canPost && store && <IfoodSheetImport storeId={store.id} storeName={store.name} onDone={() => setReload((r) => r + 1)} />}
+        {canPost && !store && <p className="self-center text-xs text-muted-foreground">Escolha uma loja para importar a planilha do portal.</p>}
       </div>
       {ind.missingFinancial > 0 && <p className="text-sm text-muted-foreground">{ind.missingFinancial} pedido(s) ainda sem valores financeiros do iFood.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
