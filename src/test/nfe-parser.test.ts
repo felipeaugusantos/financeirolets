@@ -31,3 +31,16 @@ describe('parseNfeXml', () => {
     expect(isValidAccessKey('123')).toBe(false);
   });
 });
+
+import { nfePayables } from '@/lib/nfeParser';
+describe('contas a pagar a partir da NF-e', () => {
+  const base = { accessKey: 'k', model: '55', number: '1', series: '1', issueDate: '2026-10-20', issuerName: 'F', issuerDocument: '1', recipientName: '', recipientDocument: '', itemCount: 1 };
+  it('sem duplicatas gera 1 parcela no total com vencimento na emissão', () => {
+    expect(nfePayables({ ...base, total: 150.5, duplicates: [] })).toEqual([{ number: 1, total: 1, dueDate: '2026-10-20', amount: 150.5 }]);
+  });
+  it('usa as duplicatas e acerta centavo na última', () => {
+    const p = nfePayables({ ...base, total: 100, duplicates: [{ number: '1', dueDate: '2026-11-20', amount: 33.33 }, { number: '2', dueDate: '2026-12-20', amount: 33.33 }, { number: '3', dueDate: '2027-01-20', amount: 33.33 }] });
+    expect(p.map((x) => x.amount)).toEqual([33.33, 33.33, 33.34]);
+    expect(p[2].dueDate).toBe('2027-01-20');
+  });
+});
