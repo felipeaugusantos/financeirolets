@@ -305,6 +305,7 @@ export default function Dashboard() {
 
   const { data: units } = useSupabaseCrud<Tables<'units'>>('units');
   const { data: fronts } = useSupabaseCrud<Tables<'business_fronts'>>('business_fronts');
+  const { data: categories } = useSupabaseCrud<Tables<'categories'>>('categories');
 
   const period = useMemo(
     () => resolvePeriod(periodPreset, { from: customFrom, to: customTo }),
@@ -667,7 +668,7 @@ export default function Dashboard() {
             <ChartModeToggle value={chartMode} onChange={setChartMode} />
           </CardHeader>
           <CardContent>
-            <CategoryChart mode={chartMode} data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" />
+            <CategoryChart mode={chartMode} data={categoryData} emptyLabel="Nenhuma despesa paga neste período" accent="hsl(0, 69%, 50%)" onSelect={(n) => drillCategory('despesa', n)} />
           </CardContent>
         </Card>
 
@@ -677,7 +678,7 @@ export default function Dashboard() {
             <ChartModeToggle value={chartMode} onChange={setChartMode} />
           </CardHeader>
           <CardContent>
-            <CategoryChart mode={chartMode} data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" />
+            <CategoryChart mode={chartMode} data={receitaCategoryData} emptyLabel="Nenhuma receita recebida neste período" accent="hsl(122, 52%, 33%)" onSelect={(n) => drillCategory('receita', n)} />
           </CardContent>
         </Card>
       </div>
