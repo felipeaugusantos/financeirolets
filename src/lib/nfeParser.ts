@@ -60,3 +60,19 @@ export function parseNfeXml(xml: string): ParsedNfe {
 export function isValidAccessKey(key: string): boolean {
   return /^\d{44}$/.test(key);
 }
+
+export interface NfePayable { number: number; total: number; dueDate: string; amount: number }
+
+/** Parcelas da conta a pagar: duplicatas da nota (centavos acertados na última) ou 1 parcela no total. */
+export function nfePayables(nfe: ParsedNfe): NfePayable[] {
+  const fallback = nfe.issueDate ?? new Date().toISOString().slice(0, 10);
+  const dups = nfe.duplicates.filter((d) => d.amount > 0);
+  if (!dups.length) return [{ number: 1, total: 1, dueDate: fallback, amount: Math.round(nfe.total * 100) / 100 }];
+  const list = dups.map((d, i) => ({ number: i + 1, total: dups.length, dueDate: d.dueDate ?? fallback, amount: Math.round(d.amount * 100) / 100 }));
+  const sum = list.reduce((s, p) => s + Math.round(p.amount * 100), 0);
+  const diff = Math.round(nfe.total * 100) - sum;
+  if (nfe.total > 0 && diff !== 0 && Math.abs(diff) <= list.length) list[list.length - 1].amount = (Math.round(list[list.length - 1].amount * 100) + diff) / 100;
+  return list;
+}
+
+export const nfeKeyNote = (key: string) => `Chave NF-e ${key}`;
