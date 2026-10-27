@@ -12,6 +12,8 @@ import {
   Bike, ChefHat,
   Building2,
   Briefcase,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Link, useLocation } from 'react-router-dom';
@@ -67,7 +69,7 @@ const adminNavItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const { signOut, user } = useAuth();
@@ -87,9 +89,29 @@ export function AppSidebar() {
           <div className="flex items-center gap-2">
             <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
             <span className="font-heading text-sm font-bold text-card-foreground">Let's Finance</span>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-sidebar-accent hover:text-primary"
+              aria-label="Recolher menu"
+              title="Recolher menu"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </button>
           </div>
         ) : (
-          <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full mx-auto" />
+          <div className="flex flex-col items-center gap-2">
+            <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="rounded-md p-1 text-muted-foreground hover:bg-sidebar-accent hover:text-primary"
+              aria-label="Expandir menu"
+              title="Expandir menu"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </SidebarHeader>
 
