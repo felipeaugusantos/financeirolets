@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { settleOnLink, reopenOnUnlink } from '@/lib/ofxSettle';
+import { autoLinkIfoodPayouts } from '@/lib/ifoodAutoMatch';
 import { supabase } from '@/integrations/supabase/client';
 import { callRpc } from '@/lib/rpc';
 import { unlinkErrorText, unlinkSummaryText, type UnlinkSummary } from '@/lib/ofxUnlink';
@@ -308,6 +309,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
           ? `${summary.duplicated} linha(s) já existiam e foram ignoradas.`
           : undefined,
       });
+      const autoIfood = await autoLinkIfoodPayouts(targetAccountId, user?.id ?? null);
+      if (autoIfood > 0) toast({ title: `${autoIfood} repasse(s) iFood confirmado(s) automaticamente` });
       await load();
       return summary;
     } catch (err: unknown) {
@@ -377,6 +380,8 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
         if (error) throw error;
       }
 
+      const autoIfood = await autoLinkIfoodPayouts(targetAccountId, user?.id ?? null);
+      if (autoIfood > 0) toast({ title: `${autoIfood} repasse(s) iFood confirmado(s) automaticamente` });
       await loadRules();
       await load();
       toast({
