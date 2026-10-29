@@ -61,16 +61,20 @@ export function parseChatInput(rawBody: string): InputResult {
   if (!Array.isArray(b.messages) || b.messages.length === 0) return bad(400, 'Envie ao menos uma mensagem.');
 
   const messages: SafeMessage[] = [];
-  for (const m of b.messages.slice(-INPUT_LIMITS.maxMessages)) {
+  const window = b.messages.slice(-INPUT_LIMITS.maxMessages);
+  for (let i = 0; i < window.length; i++) {
+    const m = window[i];
+    const isLast = i === window.length - 1;
     const role = (m as { role?: unknown })?.role;
     const content = (m as { content?: unknown })?.content;
     if (role !== 'user' && role !== 'assistant') return bad(400, 'Mensagem inválida.');
     if (typeof content !== 'string') return bad(400, 'Mensagem inválida.');
-    if (role === 'user' && content.length > INPUT_LIMITS.maxUserChars) {
+    // Só a pergunta atual é recusada; perguntas antigas longas são cortadas para não travar a conversa.
+    if (isLast && role === 'user' && content.length > INPUT_LIMITS.maxUserChars) {
       return bad(413, `A pergunta passa de ${INPUT_LIMITS.maxUserChars} caracteres. Resuma e tente de novo.`);
     }
     // Respostas antigas do assistente só servem de contexto: o excesso é cortado, sem recusar a conversa.
-    messages.push({ role, content: role === 'assistant' ? content.slice(0, INPUT_LIMITS.maxAssistantChars) : content });
+    messages.push({ role, content: content.slice(0, role === 'assistant' ? INPUT_LIMITS.maxAssistantChars : INPUT_LIMITS.maxUserChars) });
   }
   if (messages[messages.length - 1].role !== 'user') return bad(400, 'A última mensagem deve ser do usuário.');
 
