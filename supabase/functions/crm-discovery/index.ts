@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { discoverySchema, fromCnpj, fromPlace, type DiscoveredCompany } from './rules.ts';
+import { cnpjFailure, discoverySchema, fromCnpj, fromPlace, mapsFailure, type DiscoveredCompany } from './rules.ts';
 
 const cache = new Map<string, { expires: number; results: DiscoveredCompany[] }>();
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -31,9 +31,10 @@ Deno.serve(async req => {
     if (input.mode === 'cnpj') {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${input.cnpj}`, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) {
-        const details = await response.text();
-        console.error('CNPJ provider failure', response.status, details);
-        return json({ error: response.status === 404 ? 'CNPJ não encontrado' : response.status === 429 ? 'Consulta de CNPJ temporariamente limitada. Tente mais tarde.' : 'Consulta de CNPJ indisponível', status: response.status, details }, response.status);
+        // O corpo do provedor não é devolvido nem registrado: só status e motivo conhecido.
+        const failure = cnpjFailure(response.status);
+        console.error('[crm-discovery] falha do provedor', JSON.stringify(failure.log));
+        return json({ error: failure.error }, failure.status);
       }
       results = [fromCnpj(await response.json())];
     } else {
@@ -46,15 +47,10 @@ Deno.serve(async req => {
         body: JSON.stringify({ textQuery: `${input.segment} em ${input.location}`, pageSize: 20, languageCode: 'pt-BR', regionCode: 'BR' }),
       });
       if (!response.ok) {
-        const details = await response.text();
-        console.error('Maps provider failure', response.status, details);
-        let message = 'Não foi possível buscar empresas no Google Maps';
-        if (response.status === 403) {
-          let reason: string | undefined;
-          try { reason = JSON.parse(details)?.error?.details?.find((d: { reason?: string }) => d.reason)?.reason; } catch { /* Retain provider text below. */ }
-          message = reason === 'API_KEY_HTTP_REFERRER_BLOCKED' ? 'A chave de servidor do Google Maps restringe sites. No Google Cloud, altere a restrição dessa chave para Nenhuma ou Endereços IP.' : reason === 'API_KEY_SERVICE_BLOCKED' ? 'A chave de servidor não permite Places API (New). Habilite essa API na lista de APIs permitidas no Google Cloud.' : 'Google Maps negou a consulta. Confira as permissões da chave de servidor no Google Cloud.';
-        }
-        return json({ error: message, status: response.status, details }, response.status);
+        // O corpo é lido só para reconhecer o motivo (lista fechada); não é devolvido nem registrado.
+        const failure = mapsFailure(response.status, await response.text());
+        console.error('[crm-discovery] falha do provedor', JSON.stringify(failure.log));
+        return json({ error: failure.error }, failure.status);
       }
       const body = await response.json();
       results = (Array.isArray(body.places) ? body.places : []).slice(0, 20).map(fromPlace).filter((p: DiscoveredCompany | null): p is DiscoveredCompany => p !== null);
