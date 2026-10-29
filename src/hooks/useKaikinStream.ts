@@ -36,12 +36,13 @@ export function useKaikinStream() {
       });
 
       if (!resp.ok) {
+        const serverMsg = await resp.json().then((j: { error?: unknown }) => (typeof j?.error === 'string' ? j.error : null)).catch(() => null);
         if (resp.status === 429) {
-          toast({ title: 'Muitas requisições', description: 'Aguarde alguns segundos antes de tentar de novo.', variant: 'destructive' });
+          toast({ title: 'Limite de perguntas', description: serverMsg ?? 'Aguarde alguns segundos antes de tentar de novo.', variant: 'destructive' });
         } else if (resp.status === 402) {
           toast({ title: 'Créditos esgotados', description: 'Adicione créditos em Configurações → Workspace → Uso.', variant: 'destructive' });
         } else {
-          toast({ title: 'Erro ao falar com o Kaikin', description: `HTTP ${resp.status}`, variant: 'destructive' });
+          toast({ title: 'Erro ao falar com o Kaikin', description: serverMsg ?? `HTTP ${resp.status}`, variant: 'destructive' });
         }
         patchLastAssistant('_Desculpe, não consegui responder agora._');
         return;

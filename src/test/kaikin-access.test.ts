@@ -24,7 +24,7 @@ beforeEach(() => {
   aiFetch = vi.fn().mockRejectedValue(new Error('rede/IA não deve ser usada nos testes'));
   globalThis.fetch = aiFetch as unknown as typeof fetch;
   vi.spyOn(console, 'warn').mockImplementation(() => {});
-  deps = { verifyToken, fetchRoles, process: processFn };
+  deps = { verifyToken, fetchRoles, consumeQuota: vi.fn().mockResolvedValue({ allowed: true, retryAfter: 0, limit: null }), process: processFn };
 });
 afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
 
