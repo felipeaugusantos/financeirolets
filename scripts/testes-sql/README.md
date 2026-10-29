@@ -47,3 +47,9 @@ bun run scripts/testes-sql/dashboard-paridade.ts /tmp/pgtest 5544 t 25   # host 
 - `scripts/producao/15-api-bradesco-saldos.sql` (idêntico à migração): `bank_balance_snapshots` (um saldo por conta, dia e origem) e
   `bank_api_sync_runs` (histórico das consultas), só para Admin/Financeiro.
 - `15-api-bradesco-saldos.test.sql`: unicidade, validações, RLS por papel, anônimo e exclusão em cascata.
+
+## Limites do Kaikin (SQL 16)
+
+`16-kaikin-limites.test.sql` só precisa dos stubs e da migração `20261029120000_kaikin_usage_limits.sql` (não depende das demais).
+Cobre contagem por minuto e dia, recusa sem gastar a cota do dia, isolamento entre usuários, limites inválidos, usuário ausente e
+acesso negado à tabela e ao anônimo.

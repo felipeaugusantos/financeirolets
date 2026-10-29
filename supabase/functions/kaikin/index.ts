@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { corsHeaders, handleKaikinRequest, isInvalidTokenError, type KaikinDeps } from './access.ts';
+import { KAIKIN_LIMITS, parseChatInput, parseQuota } from './limits.ts';
 
 // Tipos mínimos do que esta função lê. O client aqui não usa o Database tipado do app
 // (a função é implantada isoladamente), então as linhas são declaradas localmente.
@@ -505,10 +506,14 @@ async function processChat(req: Request, authHeader: string): Promise<Response> 
       });
     }
 
-    const { messages = [], pageContext = null } = (await req.json()) as {
-      messages?: { role?: string; content?: unknown }[];
-      pageContext?: unknown;
-    };
+    const input = parseChatInput(await req.text());
+    if (!input.ok) {
+      return new Response(JSON.stringify({ error: input.error }), {
+        status: input.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { messages, pageContext } = input;
     // Consultas com o token do usuário: o RLS vale (nunca contornar o RLS aqui).
     const supabase = makeClient(authHeader);
 
@@ -524,11 +529,7 @@ async function processChat(req: Request, authHeader: string): Promise<Response> 
         content: `Contexto da tela atual (JSON):\n\`\`\`json\n${JSON.stringify(pageContext, null, 2)}\n\`\`\``,
       });
     }
-    for (const m of messages) {
-      if (m?.role && m?.content !== undefined) {
-        chatMessages.push({ role: m.role, content: m.content });
-      }
-    }
+    for (const m of messages) chatMessages.push({ role: m.role, content: m.content });
 
     // Loop tool calling (até 4 hops). Sempre não-stream — emulamos SSE no final.
     let finalContent = '';
@@ -631,6 +632,14 @@ const deps: KaikinDeps = {
     const { data, error } = await makeClient(`Bearer ${token}`).from('user_roles').select('role').eq('user_id', userId);
     if (error) throw error;
     return ((data ?? []) as { role: string }[]).map((r) => r.role);
+  },
+  async consumeQuota(token) {
+    const { data, error } = await makeClient(`Bearer ${token}`).rpc('kaikin_consume', {
+      p_per_minute: KAIKIN_LIMITS.perMinute,
+      p_per_day: KAIKIN_LIMITS.perDay,
+    });
+    if (error) throw error;
+    return parseQuota(data);
   },
   process: processChat,
 };

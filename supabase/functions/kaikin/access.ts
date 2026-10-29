@@ -9,8 +9,12 @@
  *  - Usuário válido sem nenhum papel em user_roles: 403. É o critério já usado no sistema para "usuário
  *    provisionado" (ex.: política de leitura da Fábrica) e o administrador remove os papéis para desativar alguém.
  *  - Falha ao verificar (Auth ou consulta de papéis fora do ar): bloqueia com 503. Nunca libera por erro.
+ *  - Usuário autorizado que passou da cota (por minuto/dia): 429 com Retry-After. A cota é conferida depois do acesso e
+ *    antes de qualquer consulta ou chamada à IA; falha na conferência também bloqueia (503).
  *  - As consultas das ferramentas continuam sendo feitas com o token do usuário (o RLS vale; nada é contornado).
  */
+
+import { quotaMessage, type QuotaResult } from './limits.ts';
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +38,8 @@ export interface AccessDeps {
 }
 
 export interface KaikinDeps extends AccessDeps {
+  /** Consome 1 pedido da cota do usuário (consulta feita com o token dele). Lança em falha. */
+  consumeQuota(token: string): Promise<QuotaResult>;
   /** Processamento do assistente (consultas e IA). Só é chamado depois da autorização. */
   process(req: Request, authHeader: string): Promise<Response>;
 }
@@ -99,6 +105,22 @@ export async function handleKaikinRequest(req: Request, deps: KaikinDeps): Promi
   if ('error' in decision) {
     console.warn('[kaikin] acesso negado', decision.status);
     return json({ error: decision.error }, decision.status);
+  }
+
+  // Cota por usuário. Se não der para conferir, bloqueia (nunca libera por erro), como no acesso.
+  let quota: QuotaResult;
+  try {
+    quota = await deps.consumeQuota((authHeader as string).replace(/^Bearer\s+/i, ''));
+  } catch (e) {
+    console.error('[kaikin] falha ao conferir a cota', e instanceof Error ? e.message : 'erro');
+    return json({ error: DENY.unavailable.error }, DENY.unavailable.status);
+  }
+  if (!quota.allowed) {
+    console.warn('[kaikin] cota excedida', quota.limit);
+    return new Response(JSON.stringify({ error: quotaMessage(quota) }), {
+      status: 429,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(Math.max(1, quota.retryAfter)) },
+    });
   }
   return deps.process(req, authHeader as string);
 }
