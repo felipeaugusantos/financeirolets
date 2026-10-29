@@ -2,9 +2,9 @@
  * Contrato do xlsx (SheetJS) como a produção o usa: leitura de .xlsx/.xls/.csv por ArrayBuffer e conversão em matriz
  * (src/pages/CardReconciliation.tsx e src/components/ifood/IfoodSheetImport.tsx).
  *
- * Serve para a troca de versão (ver docs/troca-xlsx.md): o MESMO arquivo roda antes e depois. O comportamento
- * correto esperado é um teste normal. Defeitos já conhecidos do xlsx 0.18.5 estão marcados com `it.fails`: passam
- * enquanto o defeito existir e QUEBRAM quando a nova versão o corrigir (aí troque `it.fails` por `it`).
+ * Passou a rodar na versão corrigida do CDN oficial (0.20.3; ver docs/troca-xlsx.md). O comportamento correto esperado
+ * é um teste normal. Defeitos de leitura de CSV que a biblioteca AINDA tem (0.18.5 e 0.20.3) estão marcados com
+ * `it.fails`: passam enquanto o defeito existir e QUEBRAM quando uma versão futura o corrigir (aí troque por `it`).
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -72,11 +72,26 @@ describe('xlsx: datas lidas como Date (cellDates) e o dia do calendário que o a
 
   const zones = ['UTC', 'America/Sao_Paulo', 'America/New_York', 'Asia/Tokyo'];
   it.each(zones)('.xlsx mantém o dia 13/08/2026 em %s', (tz) => { expect(localDay(tz, 'xlsx')).toBe('2026-8-13'); });
-  it.each(['UTC', 'Asia/Tokyo'])('.xls mantém o dia 13/08/2026 em %s', (tz) => { expect(localDay(tz, 'biff8')).toBe('2026-8-13'); });
-  // Defeito do 0.18.5: em America/Sao_Paulo o .xls volta 23:59:32 do dia anterior (vira dia 12).
-  it.fails('.xls mantém o dia 13/08/2026 em America/Sao_Paulo (defeito conhecido do xlsx 0.18.5)', () => {
-    expect(localDay('America/Sao_Paulo', 'biff8')).toBe('2026-8-13');
-  });
+  // No 0.18.5 o .xls em America/Sao_Paulo voltava 23:59:32 do dia anterior (dia 12). Corrigido na 0.20.x.
+  it.each(zones)('.xls mantém o dia 13/08/2026 em %s', (tz) => { expect(localDay(tz, 'biff8')).toBe('2026-8-13'); });
+
+  // Como o Excel grava: data = NÚMERO DE SÉRIE + formato de data (não uma célula do tipo data). A 0.20.0 mudou a
+  // interpretação de datas para UTC ("potencialmente quebrador"); este teste garante que o dia local usado pelo app não muda.
+  const excelDays = (tz: string, bookType: 'xlsx' | 'biff8') => execFileSync(process.execPath, ['-e', `
+    const X = require('xlsx');
+    const serial = (y, m, d, f = 0) => Date.UTC(y, m - 1, d) / 86400000 + 25569 + f;
+    const ws = {};
+    [[2026, 8, 13, 0], [2026, 12, 31, 0], [2026, 1, 1, 0], [2026, 3, 1, 0.5]].forEach(([y, m, d, f], i) => { ws['A' + (i + 1)] = { t: 'n', v: serial(y, m, d, f), z: 'dd/mm/yyyy' }; });
+    ws['!ref'] = 'A1:A4';
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'P');
+    const r = X.read(X.write(wb, { type: 'array', bookType: '${bookType}' }), { cellDates: true });
+    const rows = X.utils.sheet_to_json(r.Sheets.P, { header: 1, defval: '', raw: true });
+    process.stdout.write(rows.map(([d]) => [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-')).join(' '));
+  `], { env: { ...process.env, TZ: tz }, cwd: process.cwd(), encoding: 'utf8' });
+  it.each(zones.flatMap(tz => (['xlsx', 'biff8'] as const).map(t => [tz, t] as const)))(
+    'datas em número de série (como o Excel grava) mantêm o dia local em %s (%s)',
+    (tz, type) => { expect(excelDays(tz, type)).toBe('2026-8-13 2026-12-31 2026-1-1 2026-3-1'); },
+  );
 });
 
 describe('xlsx: CSV (aceito pelas duas telas de importação)', () => {
@@ -87,8 +102,8 @@ describe('xlsx: CSV (aceito pelas duas telas de importação)', () => {
     expect(readCard(utf8(csv, true)).sheets[0][0]).toEqual(['Data', 'Descrição', 'Valor']);
     expect(readCard(latin1(csv)).sheets[0][0]).toEqual(['Data', 'Descrição', 'Valor']);
   });
-  // Defeito do 0.18.5: UTF-8 sem BOM é lido como Latin-1 ("DescriÃ§Ã£o") e a tabela deixa de ser reconhecida.
-  it.fails('UTF-8 SEM BOM preserva os acentos (defeito conhecido do xlsx 0.18.5)', () => {
+  // Defeito (0.18.5 e 0.20.3): UTF-8 sem BOM é lido como Latin-1 ("DescriÃ§Ã£o") e a tabela deixa de ser reconhecida.
+  it.fails('UTF-8 SEM BOM preserva os acentos (defeito conhecido, ainda presente na 0.20.3)', () => {
     expect(readCard(utf8('Data;Descrição;Valor\n13/08/2026;Padaria;10\n')).sheets[0][0]).toEqual(['Data', 'Descrição', 'Valor']);
   });
 
@@ -96,14 +111,14 @@ describe('xlsx: CSV (aceito pelas duas telas de importação)', () => {
     expect(readCard(utf8('Data,Valor\n13/08/2026,1234.56\n', true)).sheets[0]).toEqual([['Data', 'Valor'], ['13/08/2026', 1234.56]]);
   });
 
-  // Defeito do 0.18.5: a vírgula vira separador de milhar e 1234,56 chega como 123456 (100 vezes maior).
-  it.fails('vírgula decimal brasileira não multiplica o valor por 100 (defeito conhecido do xlsx 0.18.5)', () => {
+  // Defeito (0.18.5 e 0.20.3): a vírgula vira separador de milhar e 1234,56 chega como 123456 (100 vezes maior).
+  it.fails('vírgula decimal brasileira não multiplica o valor por 100 (defeito conhecido, ainda presente na 0.20.3)', () => {
     const v = readCard(utf8('Data;Valor\n13/08/2026;1234,56\n', true)).sheets[0][1][1];
     expect([1234.56, '1234,56']).toContain(v);
   });
 
-  // Defeito do 0.18.5 (com cellDates): "05/09/2026" é lido como mm/dd e vira 9 de maio.
-  it.fails('data ambígua dd/mm/aaaa (05/09/2026) não vira mm/dd (defeito conhecido do xlsx 0.18.5)', () => {
+  // Defeito (0.18.5 e 0.20.3, com cellDates): "05/09/2026" é lido como mm/dd e vira 9 de maio.
+  it.fails('data ambígua dd/mm/aaaa (05/09/2026) não vira mm/dd (defeito conhecido, ainda presente na 0.20.3)', () => {
     const v = readCard(utf8('Data,Valor\n05/09/2026,1\n', true)).sheets[0][1][0];
     const iso = v instanceof Date ? `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}` : v;
     expect([ '2026-09-05', '05/09/2026' ]).toContain(iso);
@@ -137,7 +152,12 @@ describe('xlsx: versão instalada e avisos oficiais', () => {
   });
   // GHSA-4r6h-8v6p-xvw6 / CVE-2023-30533 (corrigido na 0.19.3) e GHSA-5pgg-2g8v-p4x9 / CVE-2024-22363 (corrigido na 0.20.2).
   // As correções só existem no CDN oficial do SheetJS (a versão do npm parou na 0.18.5). Ver docs/troca-xlsx.md.
-  it.fails('a versão instalada é >= 0.20.2 (CVE-2023-30533 e CVE-2024-22363) (hoje 0.18.5)', () => {
+  it('a versão instalada é >= 0.20.2 (CVE-2023-30533 e CVE-2024-22363)', () => {
     expect(atLeast(0, 20, 2)).toBe(true);
+  });
+  it('vem do CDN oficial do SheetJS, com versão exata e hash de integridade no bun.lock', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { dependencies?: Record<string, string> };
+    expect(pkg.dependencies?.xlsx).toMatch(/^https:\/\/cdn\.sheetjs\.com\/xlsx-\d+\.\d+\.\d+\/xlsx-\d+\.\d+\.\d+\.tgz$/);
+    expect(readFileSync('bun.lock', 'utf8')).toMatch(/"xlsx": \["xlsx@https:\/\/cdn\.sheetjs\.com\/[^"]+", \{.*\}, "sha512-[A-Za-z0-9+/=]{80,}"\]/);
   });
 });
