@@ -8,6 +8,13 @@ on:
 permissions:
   contents: read
 
+# O .env não é versionado. Os testes de RLS e do CRM usam estas variáveis PÚBLICAS do Supabase
+# (URL, chave publicável e id do projeto), cadastradas em Settings > Secrets and variables > Actions > Variables.
+env:
+  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+  VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+  VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
+
 jobs:
   test-build:
     runs-on: ubuntu-latest
@@ -15,6 +22,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - name: Conferir variáveis públicas do Supabase
+        run: |
+          missing=""
+          [ -z "$VITE_SUPABASE_URL" ] && missing="$missing VITE_SUPABASE_URL"
+          [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ] && missing="$missing VITE_SUPABASE_PUBLISHABLE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Faltam variáveis do repositório:$missing. Cadastre em Settings > Secrets and variables > Actions > Variables (valores públicos, os mesmos do .env local)."
+            exit 1
+          fi
       - name: Testes (vitest)
         run: bun run test
       - name: Build

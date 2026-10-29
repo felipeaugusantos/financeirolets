@@ -1,11 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { corsHeaders, handleKaikinRequest, isInvalidTokenError, type KaikinDeps } from './access.ts';
 
 // Tipos mínimos do que esta função lê. O client aqui não usa o Database tipado do app
 // (a função é implantada isoladamente), então as linhas são declaradas localmente.
@@ -500,9 +494,8 @@ async function runTool(name: string | undefined, args: ToolArgs, supabase: Retur
   }
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-
+/** Processamento do assistente. Só é chamado depois de authorizeKaikin (ver access.ts). */
+async function processChat(req: Request, authHeader: string): Promise<Response> {
   try {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -516,7 +509,8 @@ Deno.serve(async (req) => {
       messages?: { role?: string; content?: unknown }[];
       pageContext?: unknown;
     };
-    const supabase = makeClient(req.headers.get('Authorization'));
+    // Consultas com o token do usuário: o RLS vale (nunca contornar o RLS aqui).
+    const supabase = makeClient(authHeader);
 
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -621,4 +615,24 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}
+
+const deps: KaikinDeps = {
+  async verifyToken(token) {
+    // Valida o JWT no Supabase Auth (a chave pública/anon não é um usuário e volta como inválida).
+    const { data, error } = await makeClient(`Bearer ${token}`).auth.getUser(token);
+    if (error) {
+      if (isInvalidTokenError(error)) return null;
+      throw error;
+    }
+    return data.user ? { id: data.user.id } : null;
+  },
+  async fetchRoles(token, userId) {
+    const { data, error } = await makeClient(`Bearer ${token}`).from('user_roles').select('role').eq('user_id', userId);
+    if (error) throw error;
+    return ((data ?? []) as { role: string }[]).map((r) => r.role);
+  },
+  process: processChat,
+};
+
+Deno.serve((req) => handleKaikinRequest(req, deps));
