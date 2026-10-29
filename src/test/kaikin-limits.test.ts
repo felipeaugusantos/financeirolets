@@ -175,3 +175,16 @@ describe('ligação com a função e o banco', () => {
     expect(mig).not.toMatch(/CREATE TABLE (?!IF NOT EXISTS)/);
   });
 });
+
+describe('long question in history', () => {
+  it('does not block later short questions', async () => {
+    const { parseChatInput } = await import('../../supabase/functions/kaikin/limits');
+    const r = parseChatInput(JSON.stringify({ messages: [
+      { role: 'user', content: 'x'.repeat(5000) },
+      { role: 'assistant', content: 'erro' },
+      { role: 'user', content: 'oi' },
+    ] }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.messages[0].content.length).toBe(4000);
+  });
+});
