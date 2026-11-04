@@ -58,13 +58,17 @@ export function validateHelpdeskImages(files: { type: string; size: number }[]):
 
 /** Envia as imagens e devolve os links para irem na descrição do chamado. */
 export async function uploadHelpdeskImages(userId: string, files: File[]): Promise<string[]> {
+  const validation = validateHelpdeskImages(files);
+  if (validation) throw new Error(validation);
   const links: string[] = [];
   for (const file of files) {
     const safe = file.name.replace(/[^\w.-]+/g, '_').slice(-80);
-    const path = `${userId}/chamados/${Date.now()}_${safe}`;
+    const path = `${userId}/chamados/${crypto.randomUUID()}_${safe}`;
     const { error } = await supabase.storage.from('attachments').upload(path, file, { contentType: file.type });
     if (error) throw new Error(`Não foi possível enviar a imagem ${file.name}`);
-    links.push(supabase.storage.from('attachments').getPublicUrl(path).data.publicUrl);
+    const { data, error: linkError } = await supabase.storage.from('attachments').createSignedUrl(path, 7 * 24 * 60 * 60);
+    if (linkError || !data?.signedUrl) throw new Error('Não foi possível gerar o acesso à imagem');
+    links.push(data.signedUrl);
   }
   return links;
 }
@@ -90,8 +94,25 @@ export async function reportFailureTicket(assunto: string, erro: string, detalhe
   } catch { /* chamado automático nunca interrompe o fluxo */ }
 }
 
-export async function replyHelpdeskTicket(numero: string, mensagem: string): Promise<{ ok?: boolean; aviso?: string }> {
-  const { data, error } = await supabase.functions.invoke('helpdesk-ticket', { body: { acao: 'responder', numero, mensagem } });
+export function buildHelpdeskReply(mensagem: string, links: string[]): string {
+  const text = mensagem.trim();
+  if (text.length < 2) throw new Error('Escreva a resposta (mínimo 2 letras)');
+  const reply = links.length ? `${text}\n\nImagens anexadas (acesso por 7 dias):\n${links.join('\n')}` : text;
+  if (reply.length > 15000) throw new Error('Reduza o texto da resposta para incluir as imagens');
+  return reply;
+}
+
+export async function replyHelpdeskTicket(numero: string, mensagem: string, images: File[] = []): Promise<{ ok?: boolean; aviso?: string }> {
+  buildHelpdeskReply(mensagem, []);
+  const validation = validateHelpdeskImages(images);
+  if (validation) throw new Error(validation);
+  let links: string[] = [];
+  if (images.length) {
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError || !data.user) throw new Error('Entre novamente para anexar imagens');
+    links = await uploadHelpdeskImages(data.user.id, images);
+  }
+  const { data, error } = await supabase.functions.invoke('helpdesk-ticket', { body: { acao: 'responder', numero, mensagem: buildHelpdeskReply(mensagem, links) } });
   if (error) throw new Error('Não foi possível enviar a resposta');
   return (data ?? {}) as { ok?: boolean; aviso?: string };
 }
