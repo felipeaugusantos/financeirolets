@@ -27,7 +27,21 @@ Deno.serve(async (req) => {
     const client = createClient(url, anon, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
     const { data: userData, error } = await client.auth.getUser(auth.slice(7));
     if (error || !userData.user?.email) return json({ error: 'Sessão expirada. Entre novamente.' }, 401);
-    const parsed = schema.safeParse(await req.json().catch(() => null));
+    const raw = await req.json().catch(() => null);
+    if (raw && typeof raw === 'object' && (raw as { acao?: string }).acao === 'listar') {
+      const res = await fetch(HELPDESK_URL, {
+        method: 'GET', signal: AbortSignal.timeout(15000),
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 404 || res.status === 405) return json({ error: 'A central ainda não permite consultar chamados' }, 501);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(body?.chamados)) {
+        console.error('[helpdesk-ticket] listar', res.status);
+        return json({ error: 'Não foi possível consultar a central' }, 502);
+      }
+      return json({ chamados: body.chamados.slice(0, 500) });
+    }
+    const parsed = schema.safeParse(raw);
     if (!parsed.success) return json({ error: 'Preencha assunto e descrição (mínimo 3 letras)' }, 400);
     const { data: profile } = await client.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
     const email = userData.user.email;
