@@ -19,6 +19,31 @@ export async function openHelpdeskTicket(ticket: HelpdeskTicket): Promise<string
   return (data as { numero: string }).numero;
 }
 
+export interface HelpdeskListItem {
+  numero: string;
+  assunto: string;
+  status: string;
+  prioridade: string;
+  solicitante?: string | null;
+  responsavel?: string | null;
+  criado_em: string;
+  atualizado_em?: string | null;
+  ultima_resposta?: string | null;
+}
+
+export const HELPDESK_CLOSED = ['resolvido', 'fechado', 'cancelado', 'encerrado'];
+export const isHelpdeskOpen = (status: string) => !HELPDESK_CLOSED.includes(status.toLowerCase());
+
+export async function listHelpdeskTickets(): Promise<HelpdeskListItem[]> {
+  const { data, error } = await supabase.functions.invoke('helpdesk-ticket', { body: { acao: 'listar' } });
+  if (error) {
+    let msg = 'Não foi possível consultar os chamados';
+    try { msg = (await (error as { context?: Response }).context?.json())?.error ?? msg; } catch { /* mantém */ }
+    throw new Error(msg);
+  }
+  return (data as { chamados: HelpdeskListItem[] }).chamados;
+}
+
 export const HELPDESK_MAX_IMAGES = 3;
 export const HELPDESK_MAX_BYTES = 5 * 1024 * 1024;
 

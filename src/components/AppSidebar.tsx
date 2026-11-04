@@ -48,6 +48,7 @@ const navItems = [
   { title: 'iFood', url: '/ifood', icon: Bike },
   { title: 'Fábrica & Operações', url: '/fabrica', icon: ChefHat },
   { title: 'CRM', url: '/crm/agenda', icon: Building2 },
+  { title: 'Chamados', url: '/chamados', icon: LifeBuoy },
 ];
 
 const managementItems = [
