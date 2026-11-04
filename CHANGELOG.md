@@ -3,6 +3,15 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.7.0 — 2026-11-04
+- Conexão pública preservada na publicação para o acesso à base atual e à tela de login.
+- Central de chamados: abertura, acompanhamento, respostas e até 3 imagens de 5 MB com acesso temporário privado.
+- Avisos de indisponibilidade da central e motivos de recusa nas respostas; chamados automáticos para falhas de importação integradas.
+- Dashboard: resultado por unidade, previsão de caixa vencido/7/15/30 dias com atualização periódica; menu recolhível.
+- OFX reconhece repasses iFood já lançados com correspondência única de valor líquido e data.
+- Kaikin: pergunta longa antiga não bloqueia perguntas curtas posteriores.
+- Esta atualização não cria nem altera dados financeiros de produção.
+
 ## 1.6.0 — 2026-10-27
 Lojas iFood nas Configurações; importação da planilha do Portal; botão Lançar dos repasses semanais.
 
