@@ -19,7 +19,7 @@ export default function Helpdesk() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    try { setItems(await listHelpdeskTickets()); }
+    try { const r = await listHelpdeskTickets(); setItems(r.chamados); if (r.aviso) setError(r.aviso); }
     catch (e) { setError(e instanceof Error ? e.message : 'Erro'); }
     finally { setLoading(false); }
   }, []);

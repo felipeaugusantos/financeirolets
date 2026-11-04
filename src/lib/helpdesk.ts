@@ -34,14 +34,15 @@ export interface HelpdeskListItem {
 export const HELPDESK_CLOSED = ['resolvido', 'fechado', 'cancelado', 'encerrado'];
 export const isHelpdeskOpen = (status: string) => !HELPDESK_CLOSED.includes(status.toLowerCase());
 
-export async function listHelpdeskTickets(): Promise<HelpdeskListItem[]> {
+export async function listHelpdeskTickets(): Promise<{ chamados: HelpdeskListItem[]; aviso?: string }> {
   const { data, error } = await supabase.functions.invoke('helpdesk-ticket', { body: { acao: 'listar' } });
   if (error) {
     let msg = 'Não foi possível consultar os chamados';
     try { msg = (await (error as { context?: Response }).context?.json())?.error ?? msg; } catch { /* mantém */ }
     throw new Error(msg);
   }
-  return (data as { chamados: HelpdeskListItem[] }).chamados;
+  const d = (data ?? {}) as { chamados?: HelpdeskListItem[]; aviso?: string };
+  return { chamados: Array.isArray(d.chamados) ? d.chamados : [], aviso: d.aviso };
 }
 
 export const HELPDESK_MAX_IMAGES = 3;

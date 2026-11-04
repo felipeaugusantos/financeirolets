@@ -33,11 +33,13 @@ Deno.serve(async (req) => {
         method: 'GET', signal: AbortSignal.timeout(15000),
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 404 || res.status === 405) return json({ error: 'A central ainda não permite consultar chamados' }, 501);
+      // Sem consulta na central, o endereço devolve a página do site (HTML) com 200.
+      const isJson = res.headers.get('content-type')?.includes('application/json');
+      if (res.status === 404 || res.status === 405 || (res.ok && !isJson)) return json({ chamados: [], aviso: 'A central ainda não permite consultar chamados' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !Array.isArray(body?.chamados)) {
         console.error('[helpdesk-ticket] listar', res.status);
-        return json({ error: 'Não foi possível consultar a central' }, 502);
+        return json({ chamados: [], aviso: 'Não foi possível consultar a central agora. Tente atualizar em instantes.' });
       }
       return json({ chamados: body.chamados.slice(0, 500) });
     }
