@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, LifeBuoy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HelpdeskDialog } from '@/components/HelpdeskDialog';
-import { listHelpdeskTickets, isHelpdeskOpen, type HelpdeskListItem } from '@/lib/helpdesk';
+import { replyHelpdeskTicket, listHelpdeskTickets, isHelpdeskOpen, type HelpdeskListItem } from '@/lib/helpdesk';
 
 const fmt = (d?: string | null) => (d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 const priorityVariant = (p: string) => (p === 'critica' || p === 'alta' ? 'destructive' : 'secondary') as 'destructive' | 'secondary';
@@ -16,6 +18,18 @@ export default function Helpdesk() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'abertos' | 'todos'>('abertos');
   const [open, setOpen] = useState(false);
+  const [replying, setReplying] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const send = async (numero: string) => {
+    setSending(true);
+    try {
+      const r = await replyHelpdeskTicket(numero, text);
+      if (r.aviso) toast.error(r.aviso);
+      else { toast.success('Resposta enviada ao suporte'); setReplying(null); setText(''); void load(); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Erro'); }
+    finally { setSending(false); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -61,6 +75,17 @@ export default function Helpdesk() {
                 {t.responsavel ? ` · Responsável: ${t.responsavel}` : ''}
               </p>
               {t.ultima_resposta && <p className="text-sm border-l-2 border-border pl-2">{t.ultima_resposta}</p>}
+              {replying === t.numero ? (
+                <div className="space-y-2 pt-2">
+                  <Textarea value={text} onChange={e => setText(e.target.value)} placeholder="Escreva sua resposta ao suporte" rows={3} maxLength={15000} />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => send(t.numero)} disabled={sending || text.trim().length < 2}>{sending ? 'Enviando…' : 'Enviar resposta'}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setReplying(null); setText(''); }}>Cancelar</Button>
+                  </div>
+                </div>
+              ) : isHelpdeskOpen(t.status) && (
+                <Button size="sm" variant="outline" className="mt-1" onClick={() => { setReplying(t.numero); setText(''); }}>Responder</Button>
+              )}
             </CardContent>
           </Card>
         ))}

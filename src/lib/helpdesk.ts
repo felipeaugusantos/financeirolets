@@ -89,3 +89,9 @@ export async function reportFailureTicket(assunto: string, erro: string, detalhe
     });
   } catch { /* chamado automático nunca interrompe o fluxo */ }
 }
+
+export async function replyHelpdeskTicket(numero: string, mensagem: string): Promise<{ ok?: boolean; aviso?: string }> {
+  const { data, error } = await supabase.functions.invoke('helpdesk-ticket', { body: { acao: 'responder', numero, mensagem } });
+  if (error) throw new Error('Não foi possível enviar a resposta');
+  return (data ?? {}) as { ok?: boolean; aviso?: string };
+}

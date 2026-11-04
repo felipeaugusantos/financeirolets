@@ -41,7 +41,30 @@ Deno.serve(async (req) => {
         console.error('[helpdesk-ticket] listar', res.status);
         return json({ chamados: [], aviso: 'Não foi possível consultar a central agora. Tente atualizar em instantes.' });
       }
-      return json({ chamados: body.chamados.slice(0, 500) });
+      // A central pode devolver campos em inglês; normaliza para o formato da tela.
+      const chamados = body.chamados.slice(0, 500).map((c: Record<string, unknown>) => ({
+        numero: c.numero ?? c.number, assunto: c.assunto ?? c.subject, status: c.status ?? '',
+        prioridade: c.prioridade ?? c.priority ?? '', solicitante: c.solicitante ?? c.applicant ?? c.requester ?? null,
+        responsavel: c.responsavel ?? c.assignee ?? null, criado_em: c.criado_em ?? c.created_at,
+        atualizado_em: c.atualizado_em ?? c.updated_at ?? null, ultima_resposta: c.ultima_resposta ?? null,
+      }));
+      return json({ chamados });
+    }
+    if (raw && typeof raw === 'object' && (raw as { acao?: string }).acao === 'responder') {
+      const r = z.object({ acao: z.literal('responder'), numero: z.union([z.string(), z.number()]).transform(String).pipe(z.string().min(1).max(40)), mensagem: z.string().trim().min(2).max(15000) }).strict().safeParse(raw);
+      if (!r.success) return json({ error: 'Escreva a resposta (mínimo 2 letras)' }, 400);
+      const { data: prof } = await client.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
+      const email = userData.user.email;
+      const nome = ((prof as { full_name?: string } | null)?.full_name || email.split('@')[0]).slice(0, 120);
+      const res = await fetch(`${HELPDESK_URL}/responder`, {
+        method: 'POST', signal: AbortSignal.timeout(15000),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numero: r.data.numero, mensagem: r.data.mensagem, nome, email }),
+      });
+      const isJson = res.headers.get('content-type')?.includes('application/json');
+      if (res.status === 404 || res.status === 405 || (res.ok && !isJson)) return json({ aviso: 'A central ainda não permite responder chamados por aqui' });
+      if (!res.ok) { console.error('[helpdesk-ticket] responder', res.status); return json({ aviso: 'A central não aceitou a resposta. Tente de novo.' }); }
+      return json({ ok: true });
     }
     const parsed = schema.safeParse(raw);
     if (!parsed.success) return json({ error: 'Preencha assunto e descrição (mínimo 3 letras)' }, 400);
