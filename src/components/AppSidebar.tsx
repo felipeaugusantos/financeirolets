@@ -89,10 +89,10 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 group-data-[collapsible=icon]:px-2">
         {!collapsed ? (
           <div className="flex items-center gap-2">
-            <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
+            <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 shrink-0 rounded-full object-contain" />
             <span className="font-heading text-sm font-bold text-card-foreground">Let's Finance</span>
             <button
               type="button"
@@ -106,7 +106,7 @@ export function AppSidebar() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
+            <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 shrink-0 rounded-full object-contain" />
             <button
               type="button"
               onClick={toggleSidebar}
