@@ -14,7 +14,10 @@ import {
   Briefcase,
   ChevronsLeft,
   ChevronsRight,
+  LifeBuoy,
 } from 'lucide-react';
+import { useState } from 'react';
+import { HelpdeskDialog } from '@/components/HelpdeskDialog';
 import { NavLink } from '@/components/NavLink';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,6 +76,7 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const { signOut, user } = useAuth();
+  const [helpOpen, setHelpOpen] = useState(false);
   const { isAdmin } = useCurrentUserRoles();
   const items = isAdmin ? [...navItems] : [...navItems];
   const tailItems = isAdmin
@@ -234,7 +238,14 @@ export function AppSidebar() {
             {user.email}
           </p>
         )}
+        <HelpdeskDialog open={helpOpen} onOpenChange={setHelpOpen} />
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setHelpOpen(true)}>
+              <LifeBuoy className="h-4 w-4" />
+              {!collapsed && <span>Abrir chamado</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={signOut} className="text-destructive hover:bg-destructive/10">
               <LogOut className="h-4 w-4" />

@@ -18,6 +18,7 @@ import {
 } from '@/lib/cardSheet';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { errorMessage, todayLocalISO } from '@/lib/utils';
+import { reportFailureTicket } from '@/lib/helpdesk';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const br = (iso: string) => String(iso).slice(0, 10).split('-').reverse().join('/');
@@ -306,6 +307,7 @@ export default function CardReconciliation() {
       await load(accountId);
     } catch (err: unknown) {
       toast({ title: 'Erro ao importar planilha', description: errorMessage(err), variant: 'destructive' });
+      void reportFailureTicket('Falha na importação de fatura de cartão', errorMessage(err));
     } finally {
       setBusy(false);
       setProgress(null);

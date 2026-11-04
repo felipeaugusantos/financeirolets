@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { settleOnLink, reopenOnUnlink } from '@/lib/ofxSettle';
 import { autoLinkIfoodPayouts } from '@/lib/ifoodAutoMatch';
+import { reportFailureTicket } from '@/lib/helpdesk';
 import { supabase } from '@/integrations/supabase/client';
 import { callRpc } from '@/lib/rpc';
 import { dropRowsAlreadyFromApi } from '@/lib/bankApiImport';
@@ -318,6 +319,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       return summary;
     } catch (err: unknown) {
       toast({ title: 'Erro ao importar OFX', description: errorMessage(err), variant: 'destructive' });
+      void reportFailureTicket('Falha na importação de extrato OFX', errorMessage(err));
       return null;
     } finally {
       setImporting(false);
@@ -396,6 +398,7 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
       return { refreshed, inserted: toInsert.length, statements };
     } catch (err: unknown) {
       toast({ title: 'Erro ao reprocessar OFX', description: errorMessage(err), variant: 'destructive' });
+      void reportFailureTicket('Falha ao reprocessar extrato OFX', errorMessage(err));
       return null;
     } finally {
       setImporting(false);
