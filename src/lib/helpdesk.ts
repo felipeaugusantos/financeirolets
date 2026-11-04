@@ -19,6 +19,30 @@ export async function openHelpdeskTicket(ticket: HelpdeskTicket): Promise<string
   return (data as { numero: string }).numero;
 }
 
+export const HELPDESK_MAX_IMAGES = 3;
+export const HELPDESK_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Valida imagens do chamado; devolve mensagem de erro ou null. */
+export function validateHelpdeskImages(files: { type: string; size: number }[]): string | null {
+  if (files.length > HELPDESK_MAX_IMAGES) return `Anexe no máximo ${HELPDESK_MAX_IMAGES} imagens`;
+  if (files.some(f => !f.type.startsWith('image/'))) return 'Só é possível anexar imagens';
+  if (files.some(f => f.size > HELPDESK_MAX_BYTES)) return 'Cada imagem pode ter até 5 MB';
+  return null;
+}
+
+/** Envia as imagens e devolve os links para irem na descrição do chamado. */
+export async function uploadHelpdeskImages(userId: string, files: File[]): Promise<string[]> {
+  const links: string[] = [];
+  for (const file of files) {
+    const safe = file.name.replace(/[^\w.-]+/g, '_').slice(-80);
+    const path = `${userId}/chamados/${Date.now()}_${safe}`;
+    const { error } = await supabase.storage.from('attachments').upload(path, file, { contentType: file.type });
+    if (error) throw new Error(`Não foi possível enviar a imagem ${file.name}`);
+    links.push(supabase.storage.from('attachments').getPublicUrl(path).data.publicUrl);
+  }
+  return links;
+}
+
 /** Chave de deduplicação: mesmo assunto+erro abre só um chamado automático por dia. */
 export function autoTicketKey(assunto: string, erro: string, day = new Date()): string {
   return `helpdesk:auto:${day.toISOString().slice(0, 10)}:${assunto}:${erro.slice(0, 120)}`;
