@@ -1,4 +1,5 @@
 # Tasks
+- [x] Schedule publication of version 1.7.0 with updated release notes; current connection values present and public /login verified with email/password fields and no page errors, without financial writes. Deployment completion is not confirmed.
 - [x] Resolve the legacy migration replay conflict without touching financial data; original history retained intact and additive CRM migrations applied.
 - [x] CRM phase 1: companies, contacts, agenda, opportunities, coffee-break briefing and isolated permissions; 29 targeted tests pass.
 - [x] CRM phase 2: CNPJ and location discovery, review and company import implemented; Google Maps linked, function deployed, 35 targeted tests passed; financial records untouched.

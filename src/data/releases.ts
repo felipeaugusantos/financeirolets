@@ -45,6 +45,23 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.7.0',
+    date: '2026-11-04',
+    summary: 'Chamados com respostas e imagens, melhorias no Dashboard e conexão de acesso preservada na publicação.',
+    items: [
+      { area: 'Acessos', kind: 'correcao', title: 'Conexão preservada ao publicar', detail: 'A publicação mantém a conexão com a base atual para evitar a tela em branco ao abrir o login.', tech: 'Valores públicos de conexão disponíveis na configuração de publicação; credenciais privadas não são incluídas.' },
+      { area: 'Geral', kind: 'novidade', title: 'Central de chamados dentro do sistema', detail: 'Abra chamados pelo menu e acompanhe número, situação, responsável e última resposta sem sair do Let’s Finance.' },
+      { area: 'Geral', kind: 'novidade', title: 'Imagens na abertura e nas respostas', detail: 'Anexe até 3 imagens de até 5 MB ao abrir ou responder um chamado, com prévia e opção de remover antes de enviar.', tech: 'Bucket privado attachments com links temporários; validação compartilhada de imagens.' },
+      { area: 'Geral', kind: 'melhoria', title: 'Avisos quando a central não responde', detail: 'A tela de chamados mostra avisos de indisponibilidade e o motivo de uma resposta recusada, sem deixar a página em branco.' },
+      { area: 'Geral', kind: 'novidade', title: 'Chamados automáticos em falhas de importação', detail: 'Falhas nas importações integradas ao suporte podem abrir um chamado automaticamente, evitando repetir o mesmo erro no mesmo dia.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'Resultado por unidade no Dashboard', detail: 'Compare receitas, despesas, resultado e margem de cada unidade no período escolhido.' },
+      { area: 'Relatórios', kind: 'novidade', title: 'Previsão de caixa', detail: 'Veja contas vencidas e entradas, saídas e saldo previstos para os próximos 7, 15 e 30 dias. A previsão se atualiza periodicamente e ao retornar à tela.' },
+      { area: 'Geral', kind: 'melhoria', title: 'Menu recolhível', detail: 'Recolha o menu para deixar só os ícones e expanda novamente quando precisar.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Reconhecimento automático de repasses iFood', detail: 'Ao importar ou reprocessar o extrato, um crédito identificado como iFood pode confirmar o repasse já lançado quando valor e data correspondem e existe uma única opção. Casos ambíguos continuam para conferência.', tech: 'ifoodAutoMatch: líquido com tolerância de R$ 0,01, janela de até 21 dias e correspondência única; baixa conjunta de receita e despesas.' },
+      { area: 'Geral', kind: 'correcao', title: 'Perguntas longas não bloqueiam o Kaikin', detail: 'Uma pergunta acima de 4.000 caracteres é recusada, mas não impede o envio das próximas perguntas curtas.' },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-10-27',
     summary: 'Cadastro de lojas iFood, importação da planilha do Portal e lançamento semanal dos repasses.',
