@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       if (!r.success) return json({ error: 'Escreva a resposta (mínimo 2 letras)' }, 400);
       const { data: prof } = await client.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
       const email = userData.user.email;
-      const nome = ((prof as { full_name?: string } | null)?.full_name || email.split('@')[0]).slice(0, 120);
+      const nome = ((prof as { full_name?: string } | null)?.full_name || email.split('@')[0]).slice(0, 120).padEnd(2, '.');
       const res = await fetch(`${HELPDESK_URL}/responder`, {
         method: 'POST', signal: AbortSignal.timeout(15000),
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -63,7 +63,16 @@ Deno.serve(async (req) => {
       });
       const isJson = res.headers.get('content-type')?.includes('application/json');
       if (res.status === 404 || res.status === 405 || (res.ok && !isJson)) return json({ aviso: 'A central ainda não permite responder chamados por aqui' });
-      if (!res.ok) { console.error('[helpdesk-ticket] responder', res.status); return json({ aviso: 'A central não aceitou a resposta. Tente de novo.' }); }
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        console.error('[helpdesk-ticket] responder', res.status, b?.erro ?? '');
+        const msgs: Record<string, string> = {
+          solicitante_nao_encontrado: `Seu e-mail (${email}) não está cadastrado como usuário na central de chamados. Peça ao suporte para cadastrá-lo.`,
+          chamado_nao_encontrado: 'Chamado não encontrado na central.',
+          dados_invalidos: 'A central recusou o formato da resposta.',
+        };
+        return json({ aviso: msgs[b?.erro] ?? 'A central não aceitou a resposta. Tente de novo.' });
+      }
       return json({ ok: true });
     }
     const parsed = schema.safeParse(raw);
