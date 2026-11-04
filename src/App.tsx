@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import AccountingTransactions from "./pages/AccountingTransactions";
 import Crm from "./pages/Crm";
+import Helpdesk from "./pages/Helpdesk";
 import Accounts from "./pages/Accounts";
 import FiscalInvoices from "./pages/FiscalInvoices";
 import Reports from "./pages/Reports";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
               <Route path="/lancamentos-contabeis" element={<ProtectedRoute><AccountingTransactions /></ProtectedRoute>} />
+              <Route path="/chamados" element={<ProtectedRoute><Helpdesk /></ProtectedRoute>} />
               <Route path="/crm" element={<Navigate to="/crm/agenda" replace />} />
               <Route path="/crm/agenda" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
               <Route path="/crm/buscar" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
