@@ -20,6 +20,7 @@ import { OptionList } from '@/components/ofx/OfxRulesPanel';
 import DuplicatePairingPanel from '@/components/ofx/DuplicatePairingPanel';
 import OfxPeriodReport from '@/components/ofx/OfxPeriodReport';
 import BulkCreateDialog, { type BulkCreatePatch } from '@/components/ofx/BulkCreateDialog';
+import OfxAllocationEditor, { resolveOfxSplit, type OfxSplitRow } from '@/components/ofx/OfxAllocationEditor';
 import ClassicReconciliation from '@/components/ofx/ClassicReconciliation';
 import InternalTransfersPanel from '@/components/ofx/InternalTransfersPanel';
 import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
@@ -89,6 +90,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const [options, setOptions] = useState<OptionList>({ categories: [], units: [], fronts: [], partners: [] });
   const [createFor, setCreateFor] = useState<EnrichedEntry | null>(null);
   const [createForm, setCreateForm] = useState<Partial<TransactionPatch>>({});
+  const [createSplit, setCreateSplit] = useState(false);
+  const [createSplitRows, setCreateSplitRows] = useState<OfxSplitRow[]>([]);
+  const manualSplit = resolveOfxSplit(createSplitRows);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [ignoreOpen, setIgnoreOpen] = useState(false);
   const [ignoreReason, setIgnoreReason] = useState('');
@@ -580,6 +584,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
   const openCreate = (item: EnrichedEntry) => {
     setCreateFor(item);
+    setCreateSplit(false);
+    setCreateSplitRows(item.ruleAllocations?.length
+      ? item.ruleAllocations.map(a => ({ unit_id: a.unit_id, front_id: a.front_id, pct: String(a.value) }))
+      : [{ unit_id: null, front_id: null, pct: '' }]);
     setCreateForm({
       description: item.entry.memo || '',
       category_id: item.ruleCategoryId ?? null,
@@ -590,13 +598,15 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   };
 
   const confirmCreate = async () => {
-    if (!createFor) return;
+    if (!createFor || batchRunning || (createSplit && !manualSplit.valid)) return;
     // Mantém o rateio da regra, a menos que o usuário tenha escolhido uma unidade na tela.
     const keepRuleSplit = !createForm.unit_id && (createFor.ruleAllocations?.length ?? 0) > 0;
     const ok = await createFromEntry(createFor.entry as StatementEntry, {
       ...createForm,
-      useRuleAllocations: keepRuleSplit,
-      allocations: keepRuleSplit ? createFor.ruleAllocations : undefined,
+      unit_id: createSplit ? null : createForm.unit_id,
+      front_id: createSplit ? null : createForm.front_id,
+      useRuleAllocations: !createSplit && keepRuleSplit,
+      allocations: createSplit ? manualSplit.allocations : keepRuleSplit ? createFor.ruleAllocations ?? undefined : undefined,
     } as TransactionPatch);
     if (ok) setCreateFor(null);
   };
@@ -1238,7 +1248,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-heading">Criar lançamento a partir do extrato</DialogTitle></DialogHeader>
           {createFor && (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
               <div className="rounded-xl bg-muted/40 p-3 text-xs space-y-0.5">
                 <p><strong>Extrato:</strong> {br(createFor.entry.posted_at)} · {brl(createFor.entry.amount)}</p>
                 <p className="text-muted-foreground">{createFor.entry.memo}</p>
@@ -1271,11 +1281,11 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   Campos pré-preenchidos pela regra de conciliação "<strong>{createFor.ruleLabel}</strong>". Revise e salve.
                 </p>
               )}
-              {(createFor.ruleAllocations?.length ?? 0) > 0 && (
+              {!createSplit && (createFor.ruleAllocations?.length ?? 0) > 0 && (
                 <p className="text-xs rounded-lg border border-border bg-muted/50 p-2">
                   {createForm.unit_id
                     ? 'Unidade escolhida: o rateio da regra não será aplicado.'
-                    : `Será aplicado o rateio da regra entre ${createFor.ruleAllocations!.map(a => `${options.units.find(u => u.id === a.unit_id)?.name ?? '—'} ${a.value ?? ''}%`).join(', ')}. Escolha uma unidade só se quiser lançar tudo nela.`}
+                    : `Será aplicado o rateio da regra entre ${createFor.ruleAllocations?.map(a => `${options.units.find(u => u.id === a.unit_id)?.name ?? '—'} ${a.value ?? ''}%`).join(', ')}. Escolha uma unidade só se quiser lançar tudo nela.`}
                 </p>
               )}
               <div className="space-y-1.5">
@@ -1293,6 +1303,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   <Label>{label}</Label>
                   <Select
                     value={(createForm[key] as string | null | undefined) ?? NONE}
+                    disabled={createSplit && (key === 'unit_id' || key === 'front_id')}
                     onValueChange={v => setCreateForm((f) => ({ ...f, [key]: v === NONE ? null : v }))}
                   >
                     <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
@@ -1303,11 +1314,14 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                   </Select>
                 </div>
               ))}
+              <OfxAllocationEditor enabled={createSplit} onEnabledChange={setCreateSplit}
+                rows={createSplitRows} onRowsChange={setCreateSplitRows}
+                units={options.units} fronts={options.fronts} />
             </div>
           )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCreateFor(null)}>Cancelar</Button>
-            <Button onClick={confirmCreate}>Criar e vincular</Button>
+            <Button onClick={confirmCreate} disabled={batchRunning || (createSplit && !manualSplit.valid)}>Criar e vincular</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
