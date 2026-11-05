@@ -40,17 +40,20 @@ export default function OfxAllocationEditor({ enabled, onEnabledChange, rows, on
         Ratear entre unidades e frentes
       </label>
       {enabled && <div className="space-y-2">
-        {rows.map((row, index) => <div key={index} className="grid grid-cols-[1fr_1fr_5rem_2rem] items-center gap-2">
+        {rows.map((row, index) => <div key={index} className="grid min-w-0 grid-cols-1 gap-2 border-b border-border pb-3 sm:grid-cols-2">
           <Select value={row.unit_id ?? NONE} onValueChange={v => update(index, { unit_id: v === NONE ? null : v })}>
-            <SelectTrigger className="min-w-0" aria-label={`Unidade do rateio ${index + 1}`}><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-auto min-h-10 min-w-0 text-left [&>span]:whitespace-normal [&>span]:break-words" aria-label={`Unidade do rateio ${index + 1}`}><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value={NONE}>Sem unidade</SelectItem>{units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={row.front_id ?? NONE} onValueChange={v => update(index, { front_id: v === NONE ? null : v })}>
-            <SelectTrigger className="min-w-0" aria-label={`Frente do rateio ${index + 1}`}><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-auto min-h-10 min-w-0 text-left [&>span]:whitespace-normal [&>span]:break-words" aria-label={`Frente do rateio ${index + 1}`}><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value={NONE}>Sem frente</SelectItem>{fronts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
           </Select>
-          <Input inputMode="decimal" placeholder="%" aria-label={`Percentual do rateio ${index + 1}`} value={row.pct} onChange={e => update(index, { pct: e.target.value })} />
-          <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Remover rateio ${index + 1}`} onClick={() => onRowsChange(rows.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <Input className="w-28" inputMode="decimal" placeholder="%" aria-label={`Percentual do rateio ${index + 1}`} value={row.pct} onChange={e => update(index, { pct: e.target.value })} />
+            <span className="text-sm text-muted-foreground">%</span>
+            <Button size="icon" variant="ghost" className="ml-auto h-10 w-10 shrink-0" title={`Remover rateio ${index + 1}`} aria-label={`Remover rateio ${index + 1}`} onClick={() => onRowsChange(rows.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button>
+          </div>
         </div>)}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button size="sm" variant="outline" className="gap-1" onClick={() => onRowsChange([...rows, { unit_id: null, front_id: null, pct: '' }])}><Plus className="h-4 w-4" />Adicionar linha</Button>

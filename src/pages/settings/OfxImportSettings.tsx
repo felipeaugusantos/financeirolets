@@ -1245,10 +1245,10 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
 
       <Dialog open={!!createFor} onOpenChange={o => !o && setCreateFor(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Criar lançamento a partir do extrato</DialogTitle></DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden p-4 sm:p-6">
+          <DialogHeader className="shrink-0 pr-6"><DialogTitle className="font-heading">Criar lançamento a partir do extrato</DialogTitle></DialogHeader>
           {createFor && (
-            <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+            <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto pr-2">
               <div className="rounded-xl bg-muted/40 p-3 text-xs space-y-0.5">
                 <p><strong>Extrato:</strong> {br(createFor.entry.posted_at)} · {brl(createFor.entry.amount)}</p>
                 <p className="text-muted-foreground">{createFor.entry.memo}</p>
@@ -1319,7 +1319,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
                 units={options.units} fronts={options.fronts} />
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="shrink-0 gap-2">
             <Button variant="ghost" onClick={() => setCreateFor(null)}>Cancelar</Button>
             <Button onClick={confirmCreate} disabled={batchRunning || (createSplit && !manualSplit.valid)}>Criar e vincular</Button>
           </DialogFooter>
