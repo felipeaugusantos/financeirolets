@@ -27,6 +27,7 @@ jobs:
           missing=""
           [ -z "$VITE_SUPABASE_URL" ] && missing="$missing VITE_SUPABASE_URL"
           [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ] && missing="$missing VITE_SUPABASE_PUBLISHABLE_KEY"
+          [ -z "$VITE_SUPABASE_PROJECT_ID" ] && missing="$missing VITE_SUPABASE_PROJECT_ID"
           if [ -n "$missing" ]; then
             echo "::error::Faltam variáveis do repositório:$missing. Cadastre em Settings > Secrets and variables > Actions > Variables (valores públicos, os mesmos do .env local)."
             exit 1
