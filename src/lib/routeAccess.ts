@@ -14,8 +14,10 @@ const RESTRICTED_PREFIXES: { prefix: string; roles: AppRole[] }[] = [
 ];
 
 export function rolesRequiredForPath(pathname: string): AppRole[] | null {
+  // O React Router casa rotas sem diferenciar maiúsculas; a checagem precisa fazer o mesmo.
+  const path = pathname.toLowerCase();
   const hit = RESTRICTED_PREFIXES.find(
-    ({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    ({ prefix }) => path === prefix || path.startsWith(`${prefix}/`),
   );
   return hit ? hit.roles : null;
 }

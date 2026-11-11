@@ -15,6 +15,11 @@ describe('routeAccess', () => {
     expect(canAccessPath('/auditoria', ['admin'])).toBe(true);
     expect(canAccessPath('/auditoria', ['financeiro'])).toBe(false);
   });
+  it('ignora maiúsculas, como o React Router', () => {
+    expect(canAccessPath('/CONCILIACAO/conciliar', ['operador'])).toBe(false);
+    expect(canAccessPath('/Conciliacao', ['financeiro'])).toBe(true);
+    expect(canAccessPath('/AUDITORIA', ['financeiro'])).toBe(false);
+  });
   it('não casa prefixos parecidos e deixa as demais rotas abertas', () => {
     expect(rolesRequiredForPath('/conciliacaoX')).toBeNull();
     expect(canAccessPath('/', [])).toBe(true);
