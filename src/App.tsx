@@ -2,48 +2,58 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppLayout } from "@/components/AppLayout";
+import { RoleRoute } from "@/components/RoleRoute";
 import { KaikinProvider } from "@/components/kaikin/KaikinProvider";
 import { KaikinFab } from "@/components/kaikin/KaikinFab";
 import { KaikinSheet } from "@/components/kaikin/KaikinSheet";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import Transactions from "./pages/Transactions";
-import AccountingTransactions from "./pages/AccountingTransactions";
-import Crm from "./pages/Crm";
-import Helpdesk from "./pages/Helpdesk";
-import Accounts from "./pages/Accounts";
-import FiscalInvoices from "./pages/FiscalInvoices";
-import Reports from "./pages/Reports";
-import SettingsPage from "./pages/SettingsPage";
-import AuditPage from "./pages/AuditPage";
-import BankRegistration from "./pages/BankRegistration";
-import BankReconciliation from "./pages/BankReconciliation";
-import ReconciliationRules from "./pages/ReconciliationRules";
-import CardReconciliation from "./pages/CardReconciliation";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Transactions = lazy(() => import("./pages/Transactions"));
+const AccountingTransactions = lazy(() => import("./pages/AccountingTransactions"));
+const Crm = lazy(() => import("./pages/Crm"));
+const Helpdesk = lazy(() => import("./pages/Helpdesk"));
+const Accounts = lazy(() => import("./pages/Accounts"));
+const FiscalInvoices = lazy(() => import("./pages/FiscalInvoices"));
+const Reports = lazy(() => import("./pages/Reports"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const AuditPage = lazy(() => import("./pages/AuditPage"));
+const BankRegistration = lazy(() => import("./pages/BankRegistration"));
+const BankReconciliation = lazy(() => import("./pages/BankReconciliation"));
+const ReconciliationRules = lazy(() => import("./pages/ReconciliationRules"));
+const CardReconciliation = lazy(() => import("./pages/CardReconciliation"));
 
-import Ifood from "./pages/Ifood";
-import Factory from "./pages/Factory";
-import Releases from "./pages/Releases";
+const Ifood = lazy(() => import("./pages/Ifood"));
+const Factory = lazy(() => import("./pages/Factory"));
+const Releases = lazy(() => import("./pages/Releases"));
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function PageFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <img src="/logo-circle.jpg" alt="Carregando" className="h-12 w-12 rounded-full animate-pulse" />
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <img src="/logo-circle.jpg" alt="Loading" className="h-12 w-12 rounded-full animate-pulse" />
-      </div>
-    );
-  }
+  if (loading) return <PageFallback />;
   if (!user) return <Navigate to="/login" replace />;
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <AppLayout>
+      <RoleRoute>
+        <Suspense fallback={<p className="p-8 text-center text-muted-foreground">Carregando…</p>}>{children}</Suspense>
+      </RoleRoute>
+    </AppLayout>
+  );
 }
 
 const App = () => (

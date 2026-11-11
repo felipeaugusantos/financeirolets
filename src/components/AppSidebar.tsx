@@ -22,6 +22,7 @@ import { NavLink } from '@/components/NavLink';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
+import { canAccessPath } from '@/lib/routeAccess';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Sidebar,
@@ -78,7 +79,8 @@ export function AppSidebar() {
   const location = useLocation();
   const { signOut, user } = useAuth();
   const [helpOpen, setHelpOpen] = useState(false);
-  const { isAdmin } = useCurrentUserRoles();
+  const { isAdmin, roles } = useCurrentUserRoles();
+  const canReconcile = canAccessPath('/conciliacao', roles);
   const items = isAdmin ? [...navItems] : [...navItems];
   const tailItems = isAdmin
     ? [settingsItem, releasesItem, ...adminNavItems]
@@ -178,7 +180,8 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               </Collapsible>
 
-              <Collapsible defaultOpen={reconciliationActive} className="group/collapsible">
+              {canReconcile && (
+<Collapsible defaultOpen={reconciliationActive} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton isActive={reconciliationActive} className="hover:bg-sidebar-accent/50">
@@ -212,6 +215,7 @@ export function AppSidebar() {
                   )}
                 </SidebarMenuItem>
               </Collapsible>
+              )}
 
               {tailItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
