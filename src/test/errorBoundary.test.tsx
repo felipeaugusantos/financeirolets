@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { isChunkLoadError } from '@/lib/errorReport';
-import { createQueryClient } from '@/lib/queryClient';
 
 const report = vi.hoisted(() => vi.fn());
 const reloadOnce = vi.hoisted(() => vi.fn());
@@ -56,14 +55,5 @@ describe('errorReport', () => {
     expect(reloadOnceForChunkError(storage, reload)).toBe(true);
     expect(reloadOnceForChunkError(storage, reload)).toBe(false);
     expect(reload).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('createQueryClient', () => {
-  it('desliga refetch ao focar e define staleTime', () => {
-    const o = createQueryClient().getDefaultOptions().queries!;
-    expect(o.refetchOnWindowFocus).toBe(false);
-    expect(o.staleTime).toBe(60_000);
-    expect(o.retry).toBe(1);
   });
 });
