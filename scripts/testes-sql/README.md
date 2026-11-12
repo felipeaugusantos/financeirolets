@@ -3,6 +3,8 @@
 Esses testes não rodam no CI nem tocam o banco do Supabase: usam um Postgres local com as
 migrações do repositório e um stub mínimo do Supabase (`auth.uid()`, papéis `anon`/`authenticated`).
 
+Para só conferir que as migrações aplicam em banco vazio (é o que o CI faz): `scripts/testes-sql/replay-migrations.sh -h /tmp/pgtest -p 5544 -U postgres`.
+
 ```bash
 # Postgres 16 local (exemplo; ajuste caminhos e porta)
 initdb -D /tmp/pgtest/data -A trust && pg_ctl -D /tmp/pgtest/data -o '-p 5544 -k /tmp/pgtest' -w start

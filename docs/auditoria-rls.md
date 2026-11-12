@@ -25,4 +25,4 @@ Escrita de `bank_statement_entries`, `card_statement_entries` e `ofx_import_rule
 ## Pendente
 - Verificar o storage bucket `attachments` (existe policy "Anyone can read attachments" em migration antiga; checar se foi substituída).
 - Ampliar `rls.test.ts` com testes por papel (exige usuários de teste em homologação, não produção).
-- `scripts/producao/*.sql` e `drizzle/` duplicam o schema; unificar em `supabase/migrations`.
+- `scripts/producao/*.sql` e `drizzle/` duplicam parte do schema e há tabelas só em script manual: ver `docs/migracoes.md` (inventário, verificações no CI e plano de unificação).
