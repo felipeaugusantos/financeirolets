@@ -64,7 +64,7 @@ export default function Transactions({ accountingCategory }: { accountingCategor
       const popped = history.popUndo();
       // If the popped one isn't the same (e.g. user clicked an older entry),
       // we still want the chosen entry to flow into redo.
-      if (popped && popped.row?.id !== entry.row?.id) {
+      if (popped && entry.row && popped.row?.id !== entry.row.id) {
         // restore order: put popped back and remove the target one manually
         // (rare path — fallback: just clear redo and rebuild)
         history.removeFromUndo(entry.row.id);
@@ -81,6 +81,7 @@ export default function Transactions({ accountingCategory }: { accountingCategor
   };
 
   const handleRedoEntry = async (entry: DeletedCapture) => {
+    if (!entry.row) return;
     const recaptured = await remove(entry.row.id, { action: 'REDO_DELETE' });
     if (recaptured) {
       // Consume from redo stack and re-push to undo (persisted)

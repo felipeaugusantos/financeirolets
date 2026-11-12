@@ -74,7 +74,7 @@ export default function PartnersSettings({ onBack }: { onBack: () => void }) {
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Editar Parceiro' : 'Novo Parceiro'}
         fields={fields}
-        initialData={editing}
+        initialData={editing ?? undefined}
         onSave={handleSave}
       />
     </div>

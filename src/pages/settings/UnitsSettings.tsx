@@ -42,7 +42,7 @@ export default function UnitsSettings({ onBack }: { onBack: () => void }) {
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Editar Unidade' : 'Nova Unidade'}
         fields={fields}
-        initialData={editing}
+        initialData={editing ?? undefined}
         onSave={data => editing ? update(editing.id, data) : create(data)}
       />
     </div>

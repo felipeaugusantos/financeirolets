@@ -718,7 +718,7 @@ export default function CardReconciliation() {
                           <td className="py-1.5 px-2 whitespace-nowrap">{br(d.row.posted_at)}</td>
                           <td className="py-1.5 px-2">
                             <span className="block truncate max-w-[260px]">{d.row.description}</span>
-                            <span className="text-[10px] text-muted-foreground">{cardText(d.row.card)}</span>
+                            <span className="text-[10px] text-muted-foreground">{cardText(d.row.card ?? '')}</span>
                           </td>
                           <td className={`py-1.5 px-2 text-right font-medium whitespace-nowrap ${d.row.amount >= 0 ? 'text-secondary' : 'text-destructive'}`}>
                             {brl(d.row.amount)}

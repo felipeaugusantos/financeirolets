@@ -111,6 +111,7 @@ export function useCashFlowProjected() {
       (realized ?? []).forEach((tx) => {
         const v = valueForUnit(tx);
         if (v === 0) return;
+        if (!tx.payment_date) return;
         const k = tx.payment_date.substring(0, 7);
         const m = ensure(k, labelOf(k));
         if (tx.type === 'receita') m.receitasRealizadas += v;
@@ -120,6 +121,7 @@ export function useCashFlowProjected() {
       (projected ?? []).forEach((tx) => {
         const v = valueForUnit(tx);
         if (v === 0) return;
+        if (!tx.due_date) return;
         const k = tx.due_date.substring(0, 7);
         const m = ensure(k, labelOf(k));
         if (tx.type === 'receita') m.receitasProjetadas += v;

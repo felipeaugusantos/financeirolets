@@ -1,11 +1,16 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { corsFor } from '../_shared/cors.ts';
+import { createRateLimiter, tooManyRequests } from '../_shared/rate-limit.ts';
 import { cnpjFailure, discoverySchema, fromCnpj, fromPlace, mapsFailure, type DiscoveredCompany } from './rules.ts';
 
 const cache = new Map<string, { expires: number; results: DiscoveredCompany[] }>();
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+// Buscas externas (Google Maps/BrasilAPI) custam dinheiro e cota: freio por usuário contra laço ou abuso.
+const limiter = createRateLimiter({ max: 20, windowMs: 60_000 });
+const jsonWith = (cors: Record<string, string>) => (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 Deno.serve(async req => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsFor(req);
+  const json = jsonWith(cors);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
   try {
     const auth = req.headers.get('Authorization');
@@ -27,6 +32,9 @@ Deno.serve(async req => {
     const key = `${userData.user.id}:${JSON.stringify(input)}`;
     const hit = cache.get(key);
     if (hit && hit.expires > Date.now()) return json({ results: hit.results });
+    // Só consultas que chegam ao provedor contam (resposta do cache é grátis).
+    const rate = limiter.check(userData.user.id);
+    if (!rate.allowed) return tooManyRequests(rate.retryAfter, cors, 'Muitas buscas em pouco tempo. Aguarde um instante e tente novamente.');
     let results: DiscoveredCompany[];
     if (input.mode === 'cnpj') {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${input.cnpj}`, { signal: AbortSignal.timeout(15000) });

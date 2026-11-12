@@ -48,7 +48,7 @@ export default function IfoodStoresSettings({ onBack }: { onBack: () => void }) 
         onClose={() => setOpen(false)}
         title={editing ? 'Editar loja iFood' : 'Nova loja iFood'}
         fields={fields}
-        initialData={editing}
+        initialData={editing ?? undefined}
         onSave={d => editing ? update(editing.id, d) : create(d)}
       />
     </div>

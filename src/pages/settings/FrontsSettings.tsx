@@ -42,7 +42,7 @@ export default function FrontsSettings({ onBack }: { onBack: () => void }) {
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Editar Frente' : 'Nova Frente'}
         fields={fields}
-        initialData={editing}
+        initialData={editing ?? undefined}
         onSave={data => editing ? update(editing.id, data) : create(data)}
       />
     </div>

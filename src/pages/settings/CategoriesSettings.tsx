@@ -116,7 +116,7 @@ export default function CategoriesSettings({ onBack }: { onBack: () => void }) {
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Editar Categoria' : 'Nova Categoria'}
         fields={fields}
-        initialData={editing}
+        initialData={editing ?? undefined}
         onSave={handleSave}
       />
     </div>

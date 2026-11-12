@@ -27,6 +27,7 @@ jobs:
           missing=""
           [ -z "$VITE_SUPABASE_URL" ] && missing="$missing VITE_SUPABASE_URL"
           [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ] && missing="$missing VITE_SUPABASE_PUBLISHABLE_KEY"
+          [ -z "$VITE_SUPABASE_PROJECT_ID" ] && missing="$missing VITE_SUPABASE_PROJECT_ID"
           if [ -n "$missing" ]; then
             echo "::error::Faltam variáveis do repositório:$missing. Cadastre em Settings > Secrets and variables > Actions > Variables (valores públicos, os mesmos do .env local)."
             exit 1
@@ -48,3 +49,24 @@ jobs:
       - run: bunx tsc -p tsconfig.app.json --noEmit
       - name: Typecheck da edge function kaikin (strict, sem Deno)
         run: bunx tsc -p supabase/functions/_check/tsconfig.json
+
+  # Garante que supabase/migrations reproduz o schema num banco vazio (pega migração quebrada ou fora de ordem).
+  migrations-replay:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/testes-sql/replay-migrations.sh -h localhost -U postgres
