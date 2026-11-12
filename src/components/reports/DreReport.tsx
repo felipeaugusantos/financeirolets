@@ -350,6 +350,34 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
         </CardContent>
       </Card>
 
+      {generated && lines.length > 0 && (() => {
+        const v = (c: string) => lines.find(l => l.code === c)?.value;
+        const receita = v('1') ?? 0;
+        const custos = Math.abs(v('2') ?? 0) + Math.abs(v('4') ?? 0);
+        const margem = v('3') ?? 0;
+        const resultado = v('8') ?? v('5') ?? 0;
+        const pct = (x: number) => receita ? `${((x / receita) * 100).toFixed(1)}% da receita` : '—';
+        const items = [
+          { label: 'Receita Bruta', value: receita, hint: 'Total de receitas' },
+          { label: 'Custos', value: -custos, hint: pct(custos) },
+          { label: 'Margem de Contribuição', value: margem, hint: pct(margem) },
+          { label: 'Resultado Líquido', value: resultado, hint: pct(resultado) },
+        ];
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {items.map(it => (
+              <Card key={it.label}>
+                <CardContent className="p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground">{it.label}</p>
+                  <p className={cn('text-lg font-bold tabular-nums', it.value > 0 && 'text-emerald-600', it.value < 0 && 'text-red-500')}>{fmt(it.value)}</p>
+                  <p className="text-xs text-muted-foreground">{it.hint}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        );
+      })()}
+
       {generated && filters.unit_id && unallocatedCount > 0 && dreSec.isOn('showAlertSemUnidade') && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm">
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
