@@ -1,13 +1,15 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppLayout } from "@/components/AppLayout";
 import { RoleRoute } from "@/components/RoleRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { createQueryClient } from "@/lib/queryClient";
 import { KaikinProvider } from "@/components/kaikin/KaikinProvider";
 import { KaikinFab } from "@/components/kaikin/KaikinFab";
 import { KaikinSheet } from "@/components/kaikin/KaikinSheet";
@@ -33,7 +35,7 @@ const Factory = lazy(() => import("./pages/Factory"));
 const Releases = lazy(() => import("./pages/Releases"));
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = createQueryClient();
 
 function PageFallback() {
   return (
@@ -45,12 +47,15 @@ function PageFallback() {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { pathname } = useLocation();
   if (loading) return <PageFallback />;
   if (!user) return <Navigate to="/login" replace />;
   return (
     <AppLayout>
       <RoleRoute>
-        <Suspense fallback={<p className="p-8 text-center text-muted-foreground">Carregando…</p>}>{children}</Suspense>
+        <ErrorBoundary resetKey={pathname}>
+          <Suspense fallback={<p className="p-8 text-center text-muted-foreground">Carregando…</p>}>{children}</Suspense>
+        </ErrorBoundary>
       </RoleRoute>
     </AppLayout>
   );
