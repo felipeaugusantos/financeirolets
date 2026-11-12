@@ -539,7 +539,7 @@ export default function Dashboard() {
         const chips = [
           overdueBills.length > 0 && { label: `${overdueBills.length} vencida${overdueBills.length > 1 ? 's' : ''}`, tone: 'border-destructive/50 bg-destructive/10 text-destructive', href: '/contas' },
           dueTodayBills.length > 0 && { label: `${dueTodayBills.length} vence${dueTodayBills.length > 1 ? 'm' : ''} hoje`, tone: 'border-warning/50 bg-warning/10 text-warning', href: '/contas' },
-          semCategoria?.count > 0 && { label: `${semCategoria.count} sem categoria`, tone: 'border-border bg-muted text-muted-foreground', href: '/lancamentos' },
+          semCategoria > 0 && { label: `${semCategoria} sem categoria`, tone: 'border-border bg-muted text-muted-foreground', href: '/lancamentos' },
         ].filter(Boolean) as Array<{ label: string; tone: string; href: string }>;
         return (
           <Card className={cn('rounded-2xl shadow-card border-2', positivo ? 'border-success/40 bg-success/5' : 'border-destructive/40 bg-destructive/5')}>
