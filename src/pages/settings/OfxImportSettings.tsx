@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { reconciledPercent, matchesEntrySearch } from '@/lib/entrySearch';
 import { createdFromStatement } from '@/lib/ofxUnlink';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
+import { buildRuleFromEntry } from '@/lib/ruleFromEntry';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
 import OfxControlsCard from '@/components/ofx/OfxControlsCard';
 import { LastImportAlert, StatsCards, PendingAlert, DescriptionLinkAlert } from '@/components/ofx/OfxSummary';
@@ -570,7 +571,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     });
   };
 
-  const confirmCreate = async () => {
+  const confirmCreate = async (rulePattern: string | null = null) => {
     if (!createFor || batchRunning || (createSplit && !manualSplit.valid)) return;
     // Mantém o rateio da regra, a menos que o usuário tenha escolhido uma unidade na tela.
     const keepRuleSplit = !createForm.unit_id && (createFor.ruleAllocations?.length ?? 0) > 0;
@@ -581,7 +582,29 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
       useRuleAllocations: !createSplit && keepRuleSplit,
       allocations: createSplit ? manualSplit.allocations : keepRuleSplit ? createFor.ruleAllocations ?? undefined : undefined,
     } as TransactionPatch);
-    if (ok) setCreateFor(null);
+    if (!ok) return;
+    const entry = createFor.entry;
+    setCreateFor(null);
+    if (!rulePattern) return;
+    const rule = buildRuleFromEntry({
+      pattern: rulePattern,
+      amount: Number(entry.amount),
+      accountId: accountId || null,
+      categoryId: createForm.category_id ?? null,
+      unitId: createSplit ? null : createForm.unit_id ?? null,
+      frontId: createSplit ? null : createForm.front_id ?? null,
+      partnerId: createForm.partner_id ?? null,
+      allocations: createSplit ? manualSplit.allocations : keepRuleSplit ? createFor.ruleAllocations : null,
+      userId: user?.id ?? null,
+    });
+    if (!rule) return;
+    const { error } = await supabase.from('ofx_import_rules').insert(rule);
+    if (error) {
+      toast({ title: 'Lançamento criado, mas a regra não foi salva', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Regra salva', description: `"${rule.pattern}" será usada nos próximos extratos.` });
+    await reapplyRules();
   };
 
   const handleIgnore = async (item: EnrichedEntry) => {
@@ -877,6 +900,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         manualSplitValid={manualSplit.valid}
         busy={batchRunning}
         onConfirm={confirmCreate}
+        canSaveRule={canAutoPost}
       />
     </div>
   );

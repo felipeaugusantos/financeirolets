@@ -41,7 +41,7 @@ export function buildRuleFromEntry(i: RuleFromEntryInput): TablesInsert<'ofx_imp
     unit_id: split.length ? null : i.unitId,
     front_id: split.length ? null : i.frontId,
     partner_id: i.partnerId,
-    allocations: split.length ? split.map(a => ({ unit_id: a.unit_id, front_id: a.front_id, value: Number(a.value) })) : null,
+    allocations: split.length ? split.map(a => ({ unit_id: a.unit_id, front_id: a.front_id, percentage: Number(a.value) })) : null,
     use_statement_unit: !split.length && !i.unitId,
     priority: 40,
     active: true,

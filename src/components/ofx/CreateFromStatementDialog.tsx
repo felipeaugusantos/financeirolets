@@ -1,4 +1,6 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { suggestRulePattern } from '@/lib/ruleFromEntry';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -23,13 +25,23 @@ interface Props {
   onSplitRowsChange: (rows: OfxSplitRow[]) => void;
   manualSplitValid: boolean;
   busy: boolean;
-  onConfirm: () => void;
+  /** Recebe o termo da regra a salvar, ou null quando o operador não pediu regra. */
+  onConfirm: (rulePattern: string | null) => void;
+  /** Mostra a opção de salvar regra (só perfis que editam regras). */
+  canSaveRule?: boolean;
 }
 
 export default function CreateFromStatementDialog({
   createFor, onClose, accountName, duplicateIds, options, form, onFormChange, split, onSplitChange,
-  splitRows, onSplitRowsChange, manualSplitValid, busy, onConfirm,
+  splitRows, onSplitRowsChange, manualSplitValid, busy, onConfirm, canSaveRule = false,
 }: Props) {
+  const [saveRule, setSaveRule] = useState(false);
+  const [pattern, setPattern] = useState('');
+  useEffect(() => {
+    setSaveRule(false);
+    setPattern(suggestRulePattern(createFor?.entry.memo));
+  }, [createFor]);
+  const ruleInvalid = saveRule && (pattern.trim().length < 3 || !form.category_id);
   return (
     <Dialog open={!!createFor} onOpenChange={o => !o && onClose()}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden p-4 sm:p-6">
@@ -104,11 +116,32 @@ export default function CreateFromStatementDialog({
             <OfxAllocationEditor enabled={split} onEnabledChange={onSplitChange}
               rows={splitRows} onRowsChange={onSplitRowsChange}
               units={options.units} fronts={options.fronts} />
+            {canSaveRule && (
+              <div className="space-y-2 rounded-xl border border-border p-3">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Checkbox checked={saveRule} onCheckedChange={v => setSaveRule(v === true)} aria-label="Salvar como regra" />
+                  Salvar como regra para os próximos extratos
+                </label>
+                {saveRule && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="rule-pattern">Quando o texto do extrato contiver</Label>
+                    <Input id="rule-pattern" value={pattern} onChange={ev => setPattern(ev.target.value)} />
+                    <p className="text-xs text-muted-foreground">
+                      {!form.category_id
+                        ? 'Escolha a categoria para salvar a regra.'
+                        : pattern.trim().length < 3
+                          ? 'Use pelo menos 3 letras.'
+                          : `Vale só para ${createFor.entry.amount >= 0 ? 'entradas' : 'saídas'} desta conta, com a categoria, unidade${split ? ', rateio' : ''} e parceiro escolhidos. As outras linhas pendentes são reclassificadas na hora.`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         <DialogFooter className="shrink-0 gap-2">
           <Button variant="ghost" onClick={() => onClose()}>Cancelar</Button>
-          <Button onClick={onConfirm} disabled={busy || (split && !manualSplitValid)}>Criar e vincular</Button>
+          <Button onClick={() => onConfirm(saveRule ? pattern.trim() : null)} disabled={busy || ruleInvalid || (split && !manualSplitValid)}>Criar e vincular</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
