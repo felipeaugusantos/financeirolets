@@ -468,7 +468,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                 Nenhuma linha DRE configurada ou sem dados no período.
               </div>
             ) : (
-              <Table className={cn(compact && '[&_td]:py-1.5 [&_th]:py-2')}>
+              <Table wrapperClassName="overflow-visible" className={cn(compact && '[&_td]:py-1.5 [&_th]:py-2')}>
                 <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                   <TableRow>
                     {showCode && <TableHead className="w-16 bg-card">#</TableHead>}
