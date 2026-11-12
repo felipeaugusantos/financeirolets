@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { act } from 'react';
 
 // Teste de caracterização da tela de Conferência: fixa o comportamento atual antes de qualquer divisão.
 const h = vi.hoisted(() => ({
@@ -25,7 +26,9 @@ vi.mock('@/hooks/useFinanceSnapshot', () => ({ useFinanceSnapshot: () => ({ snap
 vi.mock('@/lib/exportCsv', async (orig) => ({ ...(await orig<typeof import('@/lib/exportCsv')>()), exportToCsv: h.exportToCsv }));
 vi.mock('@/components/quality/PixTriagePanel', () => ({ default: () => <div data-testid="pix-panel" /> }));
 vi.mock('@/components/quality/DreTransfersPanel', () => ({ default: () => <div data-testid="dre-panel" /> }));
-vi.mock('@/components/quality/AllocationAssistant', () => ({ default: () => null }));
+vi.mock('@/components/quality/AllocationAssistant', () => ({
+  default: ({ target }: { target: { description: string } | null }) => (target ? <div data-testid="alloc">{target.description}</div> : null),
+}));
 vi.mock('@/components/quality/ConfirmChangeDialog', () => ({
   default: ({ payload }: { payload: { title: string; confirmLabel: string; onConfirm: () => void; rows: unknown[] } | null }) =>
     payload ? (
@@ -171,5 +174,102 @@ describe('tela Conferência de qualidade dos dados', () => {
     fireEvent.click(screen.getByRole('button', { name: /Atualizar/ }));
     expect(h.reloadQuality).toHaveBeenCalled();
     expect(h.reloadReviews).toHaveBeenCalled();
+  });
+});
+
+
+describe('seções extraídas (estado compartilhado fica na tela)', () => {
+  it('pagos sem data: o botão só habilita com a data e aplica o patch confirmado', async () => {
+    render(<DataQualitySettings onBack={() => {}} />);
+    open('Pagos sem data de pagamento');
+    const save = screen.getByRole('button', { name: 'Salvar data informada' });
+    expect(save).toBeDisabled();
+    const row = screen.getByText('Lançamento t4').closest('.p-3') as HTMLElement;
+    fireEvent.change(row.querySelector('input[type="date"]') as HTMLInputElement, { target: { value: '2026-10-20' } });
+    expect(screen.getByRole('button', { name: 'Salvar data informada' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar data informada' }));
+    expect(screen.getByText('Informar data de pagamento')).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId('confirm')).getByRole('button', { name: 'Salvar data' }));
+    await waitFor(() => expect(h.applyPatch).toHaveBeenCalledWith(['t4'], { payment_date: '2026-10-20' }, 'Data de pagamento informada'));
+  });
+
+  it('sem unidade: filtros por descrição e valor mínimo, e seleção habilita a atribuição só com unidade escolhida', () => {
+    h.quality = {
+      ...baseQuality(),
+      semUnidade: [tx('s1', { description: 'Padaria Central', net_amount: 50 }), tx('s2', { description: 'Mercado Norte', net_amount: 500 })],
+      units: [{ id: 'u1', name: 'Café' }],
+    };
+    render(<DataQualitySettings onBack={() => {}} />);
+    open('Sem unidade e sem rateio');
+    expect(screen.getByText('Padaria Central')).toBeInTheDocument();
+    expect(screen.getByText('Mercado Norte')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Descrição'), { target: { value: 'merc' } });
+    expect(screen.queryByText('Padaria Central')).toBeNull();
+    expect(screen.getByText('Mercado Norte')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Descrição'), { target: { value: '' } });
+    fireEvent.change(screen.getByPlaceholderText('Valor mínimo'), { target: { value: '100' } });
+    expect(screen.queryByText('Padaria Central')).toBeNull();
+    const row = screen.getByText('Mercado Norte').closest('.p-3') as HTMLElement;
+    fireEvent.click(within(row).getByRole('checkbox'));
+    expect(screen.getByRole('button', { name: 'Atribuir aos selecionados (1)' })).toBeDisabled(); // falta escolher a unidade
+  });
+
+  it('os filtros de "sem unidade" sobrevivem a recarregar a análise (estado fica na tela)', () => {
+    h.quality = { ...baseQuality(), semUnidade: [tx('s1', { description: 'Padaria Central' }), tx('s2', { description: 'Mercado Norte' })] };
+    const { rerender } = render(<DataQualitySettings onBack={() => {}} />);
+    open('Sem unidade e sem rateio');
+    fireEvent.change(screen.getByPlaceholderText('Descrição'), { target: { value: 'merc' } });
+    // recarga: a análise passa por "carregando" e volta; as seções são remontadas
+    const loaded = h.quality;
+    h.quality = { ...baseQuality(), loading: true };
+    rerender(<DataQualitySettings onBack={() => {}} />);
+    h.quality = loaded;
+    rerender(<DataQualitySettings onBack={() => {}} />);
+    open('Sem unidade e sem rateio');
+    expect(screen.getByPlaceholderText('Descrição')).toHaveValue('merc');
+    expect(screen.queryByText('Padaria Central')).toBeNull();
+  });
+
+  it('duplicidades: mostra o grupo, marca "manter ambos" e abre cancelamento e rateio', () => {
+    const a = tx('d1', { description: 'Aluguel loja', net_amount: 2000 });
+    const b = tx('d2', { description: 'Aluguel loja', net_amount: 2000 });
+    h.quality = { ...baseQuality(), duplicates: [{ key: 'k1', items: [a, b] }] };
+    render(<DataQualitySettings onBack={() => {}} />);
+    open('Possíveis duplicidades');
+    expect(screen.getByText('2 lançamentos')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Manter ambos (legítimo)' }));
+    expect(h.setReviewStatus).toHaveBeenCalledTimes(2);
+    expect(h.setReviewStatus).toHaveBeenCalledWith('d1', 'revisado');
+    expect(h.setReviewStatus).toHaveBeenCalledWith('d2', 'revisado');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Usar rateio' })[0]);
+    expect(screen.getByTestId('alloc')).toHaveTextContent('Aluguel loja');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar' })[0]);
+    expect(within(screen.getByTestId('confirm')).getAllByText('Cancelar lançamento')).toHaveLength(2); // título e botão
+  });
+
+  it('categorias sem linha de DRE e sem categoria listam os lançamentos ao abrir', () => {
+    h.quality = {
+      ...baseQuality(),
+      orphanCategoryGroups: [{ categoryId: 'c1', categoryName: 'Categoria órfã', items: [tx('o1', { description: 'Compra órfã' })] }],
+      semCategoria: [tx('c9', { description: 'Compra sem categoria' })],
+    };
+    render(<DataQualitySettings onBack={() => {}} />);
+    open('Categorias sem linha de DRE');
+    expect(screen.getByText('Compra órfã')).toBeInTheDocument();
+    open('Sem categoria');
+    expect(screen.getByText('Compra sem categoria')).toBeInTheDocument();
+  });
+
+  it('seções somente leitura exportam CSV e rateio que não fecha abre o assistente', async () => {
+    h.quality = {
+      ...baseQuality(),
+      foraDoDre: [tx('f1')],
+      allocationIssues: [{ tx: tx('r1', { description: 'Rateio quebrado', net_amount: 300 }), residual: 50, allocated: 250 }],
+    };
+    render(<DataQualitySettings onBack={() => {}} />);
+    fireEvent.click(within(card('Fora do DRE (affects_dre = false)')).getByText('CSV'));
+    expect(h.exportToCsv).toHaveBeenCalledTimes(1);
+    open('Rateio que não fecha');
+    expect(screen.getByText('Rateio quebrado')).toBeInTheDocument();
   });
 });
