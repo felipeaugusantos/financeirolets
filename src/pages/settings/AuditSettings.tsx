@@ -66,8 +66,8 @@ type AuditData = Record<string, unknown> | null;
 
 function diffFields(oldData: AuditData, newData: AuditData): { key: string; old: unknown; new: unknown }[] {
   if (!oldData && !newData) return [];
-  if (!oldData) return Object.entries(newData).map(([key, value]) => ({ key, old: undefined, new: value }));
-  if (!newData) return Object.entries(oldData).map(([key, value]) => ({ key, old: value, new: undefined }));
+  if (!oldData) return Object.entries(newData ?? {}).map(([key, value]) => ({ key, old: undefined, new: value }));
+  if (!newData) return Object.entries(oldData ?? {}).map(([key, value]) => ({ key, old: value, new: undefined }));
   const keys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)]));
   return keys
     .filter((k) => JSON.stringify(oldData[k]) !== JSON.stringify(newData[k]))
@@ -122,7 +122,7 @@ export default function AuditSettings({ onBack }: Props) {
         setRows([]);
       } else {
         setRows((data ?? []) as AuditRow[]);
-        const userIds = Array.from(new Set((data ?? []).map((r) => r.user_id).filter(Boolean)));
+        const userIds = Array.from(new Set((data ?? []).map((r) => r.user_id).filter((id): id is string => Boolean(id))));
         if (userIds.length > 0) {
           const { data: profs } = await supabase
             .from('profiles')

@@ -77,6 +77,7 @@ export function useCashFlowReport() {
       (rows ?? []).forEach((tx) => {
         // Movimento até a data-base do saldo inicial já está embutido nele.
         if (!isAfterOpening(tx, openingMap)) return;
+        if (!tx.payment_date) return;
         const m = tx.payment_date.substring(0, 7);
         const entry = monthMap.get(m) || { receitas: 0, despesas: 0 };
         void txValue(tx);

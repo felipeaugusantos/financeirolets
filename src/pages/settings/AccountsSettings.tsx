@@ -93,7 +93,7 @@ export default function AccountsSettings({ onBack }: { onBack?: () => void }) {
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Editar Conta' : 'Nova Conta'}
         fields={buildFields(units)}
-        initialData={editing}
+        initialData={editing ?? undefined}
         onSave={data => {
           // Data-base vazia precisa virar nulo (string vazia não é data válida).
           const payload = {
