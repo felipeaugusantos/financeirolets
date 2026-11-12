@@ -5,11 +5,13 @@ import { componentTagger } from "lovable-tagger";
 
 const REQUIRED_ENV = ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PROJECT_ID"] as const;
 
-// Validate after Cloud has injected its public values, without embedding a production fallback.
+// Managed Cloud builds provide their own connection config; local/CI builds use Vite env.
 export function requireSupabaseEnv(): Plugin {
   return {
     name: "require-supabase-env",
     configResolved(config) {
+      const configFile = config.configFile?.replace(/\\/g, "/");
+      if (configFile?.endsWith("/.lovable/preview-supabase.config.ts")) return;
       const missing = REQUIRED_ENV.filter((key) => {
         const defined = config.define?.[`import.meta.env.${key}`];
         // Vite's define values are JavaScript expressions (normally JSON strings).
