@@ -17,6 +17,7 @@ vi.mock('@/integrations/supabase/client', () => {
   const builder = (table: string) => {
     const b: Record<string, unknown> = {};
     for (const m of ['select', 'eq', 'order', 'or', 'gte', 'lte', 'neq', 'limit', 'in', 'is']) b[m] = () => b;
+    b.maybeSingle = () => Promise.resolve({ data: null, error: null });
     b.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: h.tables[table] ?? [], error: null }).then(res);
     return b;
   };
@@ -38,9 +39,16 @@ vi.mock('@/components/ofx/ClassicReconciliation', () => ({
     </div>
   ),
 }));
-for (const f of ['DuplicatePairingPanel', 'OfxPeriodReport', 'InternalTransfersPanel', 'PatternGroupsPanel', 'ClosingPanel', 'SuggestedRulesPanel', 'QuickRuleDialog', 'BulkCreateDialog', 'BankApiImportDialog']) {
-  vi.doMock(`@/components/ofx/${f}`, () => ({ default: () => null }));
-}
+// Painéis e diálogos pesados: fora do foco destes testes (vi.mock é içado; vi.doMock em laço não seria).
+vi.mock('@/components/ofx/DuplicatePairingPanel', () => ({ default: () => null }));
+vi.mock('@/components/ofx/OfxPeriodReport', () => ({ default: () => null }));
+vi.mock('@/components/ofx/InternalTransfersPanel', () => ({ default: () => null }));
+vi.mock('@/components/ofx/PatternGroupsPanel', () => ({ default: () => null }));
+vi.mock('@/components/ofx/ClosingPanel', () => ({ default: () => null }));
+vi.mock('@/components/ofx/SuggestedRulesPanel', () => ({ default: () => null }));
+vi.mock('@/components/ofx/QuickRuleDialog', () => ({ default: () => null }));
+vi.mock('@/components/ofx/BulkCreateDialog', () => ({ default: () => null }));
+vi.mock('@/components/ofx/BankApiImportDialog', () => ({ default: () => null }));
 vi.mock('@/components/ofx/AutoPostDialog', () => ({
   default: ({ open, items }: { open: boolean; items: unknown[] }) => (open ? <div data-testid="autopost">{items.length}</div> : null),
 }));
