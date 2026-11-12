@@ -11,11 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDataQuality, QualityTx } from '@/hooks/useDataQuality';
-import { useReviewActions, useReviewStatus, ReviewStatus, ReviewEntry } from '@/hooks/useReviewActions';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { useReviewActions, useReviewStatus, ReviewStatus } from '@/hooks/useReviewActions';
 import ConfirmChangeDialog, { ConfirmChangePayload } from '@/components/quality/ConfirmChangeDialog';
 import AllocationAssistant, { AllocationTarget } from '@/components/quality/AllocationAssistant';
 import PixTriagePanel from '@/components/quality/PixTriagePanel';
@@ -26,113 +23,10 @@ import {
 } from '@/lib/reviewSuggestions';
 import { exportToCsv, csvNumber, csvDate, CsvCell } from '@/lib/exportCsv';
 import { toLocalISODate, todayLocalISO } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
-
-const fmt = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const fmtDate = (d?: string | null) => (d ? d.split('-').reverse().join('/') : '—');
-const openTx = (t: QualityTx) =>
-  window.open(`/lancamentos?q=${encodeURIComponent(t.description)}`, '_blank', 'noopener');
-
-const REVIEW_LABEL: Record<ReviewStatus, string> = {
-  pendente: 'Pendente',
-  revisado: 'Revisado',
-  corrigido: 'Corrigido',
-  ignorado: 'Ignorado conscientemente',
-};
-
-function ReviewBadge({
-  id, value, note, onChange,
-}: {
-  id: string; value: ReviewStatus; note?: string | null;
-  onChange: (id: string, s: ReviewStatus, note?: string | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [pending, setPending] = useState<ReviewStatus>(value);
-
-  const openNote = (status: ReviewStatus) => {
-    setPending(status);
-    setDraft(note ?? '');
-    setOpen(true);
-  };
-
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <Select
-        value={value}
-        onValueChange={(v: ReviewStatus) => (v === 'ignorado' ? openNote(v) : onChange(id, v))}
-      >
-        <SelectTrigger className="h-7 w-[190px] text-xs"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          {(Object.keys(REVIEW_LABEL) as ReviewStatus[]).map((s) => (
-            <SelectItem key={s} value={s} className="text-xs">{REVIEW_LABEL[s]}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openNote(value)}>
-        {note ? 'Nota ✓' : 'Nota'}
-      </Button>
-      {note && <span className="text-[11px] text-muted-foreground truncate max-w-[220px]" title={note}>{note}</span>}
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base">Nota da conferência</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground">
-            {pending === 'ignorado'
-              ? 'Explique por que este alerta será ignorado (recomendado).'
-              : 'Registro opcional, ex.: "Conferido com extrato em 14/08/2026".'}
-          </p>
-          <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button
-              onClick={() => {
-                onChange(id, pending, draft.trim() || null);
-                setOpen(false);
-              }}
-            >
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function Section({
-  icon: Icon, title, hint, count, children, onExport, tone = 'warning',
-}: {
-  icon: LucideIcon; title: string; hint: string; count: number;
-  children: React.ReactNode; onExport?: () => void; tone?: 'warning' | 'destructive' | 'muted';
-}) {
-  const [open, setOpen] = useState(false);
-  const bg = tone === 'destructive' ? 'bg-destructive/10' : tone === 'muted' ? 'bg-muted' : 'bg-warning/10';
-  const fg = tone === 'destructive' ? 'text-destructive' : tone === 'muted' ? 'text-muted-foreground' : 'text-warning';
-  return (
-    <Card className="shadow-card rounded-2xl border-border">
-      <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={`p-2 rounded-xl shrink-0 ${bg}`}><Icon className={`h-5 w-5 ${fg}`} /></div>
-          <div className="min-w-0">
-            <CardTitle className="text-sm font-heading flex items-center gap-2">
-              {title}
-              <Badge variant={count > 0 ? 'destructive' : 'secondary'}>{count}</Badge>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">{hint}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {onExport && count > 0 && <Button variant="outline" size="sm" onClick={onExport}>CSV</Button>}
-          <Button variant="ghost" size="sm" onClick={() => setOpen((o) => !o)}>{open ? 'Ocultar' : 'Ver'}</Button>
-        </div>
-      </CardHeader>
-      {open && <CardContent className="p-0 border-t border-border">{children}</CardContent>}
-    </Card>
-  );
-}
+import { fmt, fmtDate, openTx, REVIEW_LABEL } from '@/components/quality/qualityFormat';
+import { ReviewBadge } from '@/components/quality/ReviewBadge';
+import { QualitySection as Section } from '@/components/quality/QualitySection';
+import { SimpleTable } from '@/components/quality/SimpleTable';
 
 export default function DataQualitySettings({ onBack }: { onBack: () => void }) {
   const [range, setRange] = useState({
@@ -1000,41 +894,6 @@ export default function DataQualitySettings({ onBack }: { onBack: () => void }) 
         onClose={() => setAllocTarget(null)}
         onSave={saveAllocations}
       />
-    </div>
-  );
-}
-
-function SimpleTable({ items, limit = 50 }: { items: QualityTx[]; limit?: number }) {
-  if (items.length === 0) return <p className="p-4 text-sm text-muted-foreground">Nenhum lançamento nesta condição.</p>;
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Competência</TableHead>
-            <TableHead>Descrição</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-            <TableHead className="text-[10px]">ID</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.slice(0, limit).map((t) => (
-            <TableRow key={t.id}>
-              <TableCell className="whitespace-nowrap">{fmtDate(t.competence_date)}</TableCell>
-              <TableCell className="max-w-[280px] truncate">{t.description}</TableCell>
-              <TableCell>{t.type}</TableCell>
-              <TableCell>{t.status}</TableCell>
-              <TableCell className="text-right">{fmt(t.net_amount)}</TableCell>
-              <TableCell className="text-[10px] text-muted-foreground">{t.id.slice(0, 8)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {items.length > limit && (
-        <p className="p-3 text-xs text-muted-foreground">Mostrando {limit} de {items.length}. Use o CSV para a lista completa.</p>
-      )}
     </div>
   );
 }

@@ -7,10 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOfxImport, EnrichedEntry, StatementEntry, TransactionPatch } from '@/hooks/useOfxImport';
@@ -20,7 +18,7 @@ import { OptionList } from '@/components/ofx/OfxRulesPanel';
 import DuplicatePairingPanel from '@/components/ofx/DuplicatePairingPanel';
 import OfxPeriodReport from '@/components/ofx/OfxPeriodReport';
 import BulkCreateDialog, { type BulkCreatePatch } from '@/components/ofx/BulkCreateDialog';
-import OfxAllocationEditor, { resolveOfxSplit, type OfxSplitRow } from '@/components/ofx/OfxAllocationEditor';
+import { resolveOfxSplit, type OfxSplitRow } from '@/components/ofx/OfxAllocationEditor';
 import ClassicReconciliation from '@/components/ofx/ClassicReconciliation';
 import InternalTransfersPanel from '@/components/ofx/InternalTransfersPanel';
 import PatternGroupsPanel from '@/components/ofx/PatternGroupsPanel';
@@ -34,34 +32,15 @@ import { createdFromStatement } from '@/lib/ofxUnlink';
 import { Progress } from '@/components/ui/progress';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
+import UnlinkDialog from '@/components/ofx/UnlinkDialog';
+import DeleteAllLinksDialog from '@/components/ofx/DeleteAllLinksDialog';
+import IgnoreEntriesDialog from '@/components/ofx/IgnoreEntriesDialog';
+import CreateFromStatementDialog from '@/components/ofx/CreateFromStatementDialog';
 import { suggestPaymentMethod } from '@/lib/paymentMethod';
 
 import { parseOfx, readOfxFile } from '@/lib/ofx';
 import { todayLocalISO } from '@/lib/utils';
-
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const br = (iso: string) => iso.split('-').reverse().join('/');
-const NONE = '__none__';
-
-function firstDayOfMonth(): string {
-  const t = todayLocalISO();
-  return `${t.slice(0, 7)}-01`;
-}
-
-const confidenceStyle: Record<string, string> = {
-  alta: 'bg-secondary/15 text-secondary border-secondary/30',
-  media: 'bg-accent/15 text-accent border-accent/30',
-  baixa: 'bg-muted text-muted-foreground border-border',
-};
-
-const basisLabel: Record<string, string> = {
-  exato: 'valor exato',
-  liquido: 'líquido/impostos',
-  taxa: 'taxa de adquirente',
-  juros: 'juros ou multa',
-  aproximado: 'arredondamento',
-  bruto: 'valor bruto',
-};
+import { brl, br, NONE, firstDayOfMonth, confidenceStyle, basisLabel } from '@/components/ofx/ofxFormat';
 
 // Quadro "Nomes repetidos sem regra" oculto a pedido do cliente (item 15).
 const SHOW_SUGGESTED_RULES = false;
@@ -1111,95 +1090,31 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
 
 
-      <Dialog open={!!deleteTarget} onOpenChange={o => !o && setDeleteTarget(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Desvincular conciliação</DialogTitle></DialogHeader>
-          {deleteTarget && (
-            <div className="space-y-2 text-xs">
-              <p className="text-muted-foreground">
-                {br(deleteTarget.posted_at)} · {brl(Number(deleteTarget.amount))} · {deleteTarget.memo}
-              </p>
-              <p>
-                A linha voltará para <strong>pendente</strong>. Em mês fechado a exclusão é recusada e nada é alterado.
-              </p>
-              {createdFromStatement(deleteTarget) ? (
-                <p className="text-destructive">
-                  Este lançamento foi criado a partir da linha: "Desvincular e excluir" o exclui (com rateio e anexos).
-                  Se outras linhas do extrato estiverem ligadas a ele, ele é mantido até a última ser desvinculada.
-                </p>
-              ) : (
-                <p>
-                  Este lançamento já existia antes da conciliação. "Desvincular e excluir" o exclui também;
-                  "Só desvincular" o mantém.
-                </p>
-              )}
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button variant="outline" disabled={batchRunning} onClick={confirmDeleteLink}>Só desvincular</Button>
-            <Button variant="destructive" disabled={batchRunning} onClick={confirmUnlinkAndDelete}>
-              Desvincular e excluir lançamento
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <UnlinkDialog
+        target={deleteTarget}
+        busy={batchRunning}
+        onClose={() => setDeleteTarget(null)}
+        onUnlinkOnly={confirmDeleteLink}
+        onUnlinkAndDelete={confirmUnlinkAndDelete}
+      />
 
-      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Excluir todas as conciliações do período</DialogTitle></DialogHeader>
-          <p className="text-xs">
-            {entries.filter(e => e.status === 'vinculado').length} linha(s) vinculada(s) voltarão para pendente.
-            Nenhum lançamento é excluído.
-          </p>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteAllOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" disabled={batchRunning} onClick={confirmDeleteAllLinks}>Excluir conciliações</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteAllLinksDialog
+        open={deleteAllOpen}
+        onOpenChange={setDeleteAllOpen}
+        linkedCount={entries.filter(e => e.status === 'vinculado').length}
+        busy={batchRunning}
+        onConfirm={confirmDeleteAllLinks}
+      />
 
-      <Dialog open={ignoreOpen} onOpenChange={o => { setIgnoreOpen(o); if (!o) setIgnoreReason(''); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-heading">Ignorar {selectedItems.length} linha(s)</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-xl bg-muted/40 p-3 text-xs space-y-1 max-h-40 overflow-auto">
-              {selectedItems.slice(0, 8).map(v => (
-                <p key={v.entry.id} className="truncate">
-                  {br(v.entry.posted_at)} · {brl(v.entry.amount)} · {v.entry.memo}
-                </p>
-              ))}
-              {selectedItems.length > 8 && <p>... e mais {selectedItems.length - 8}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Justificativa (obrigatória)</Label>
-              <Textarea
-                value={ignoreReason}
-                onChange={ev => setIgnoreReason(ev.target.value)}
-                placeholder="Ex.: transferência entre contas próprias, já registrada na conta de destino."
-                rows={3}
-              />
-              <p className="text-xs text-muted-foreground">
-                A mesma justificativa é gravada em cada linha, junto com seu usuário e a data/hora.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {['Transferência entre contas próprias', 'Estorno/duplicidade do banco', 'Movimento não financeiro'].map(s => (
-                <Button key={s} size="sm" variant="outline" className="rounded-xl h-7 text-xs" onClick={() => setIgnoreReason(s)}>
-                  {s}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIgnoreOpen(false)}>Cancelar</Button>
-            <Button onClick={runIgnoreSelected} disabled={!ignoreReason.trim() || batchRunning}>
-              Ignorar com justificativa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <IgnoreEntriesDialog
+        open={ignoreOpen}
+        onOpenChange={o => { setIgnoreOpen(o); if (!o) setIgnoreReason(''); }}
+        items={selectedItems}
+        reason={ignoreReason}
+        onReasonChange={setIgnoreReason}
+        busy={batchRunning}
+        onConfirm={runIgnoreSelected}
+      />
 
       <BulkCreateDialog
         open={bulkOpen}
@@ -1244,87 +1159,22 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
 
 
 
-      <Dialog open={!!createFor} onOpenChange={o => !o && setCreateFor(null)}>
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden p-4 sm:p-6">
-          <DialogHeader className="shrink-0 pr-6"><DialogTitle className="font-heading">Criar lançamento a partir do extrato</DialogTitle></DialogHeader>
-          {createFor && (
-            <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto pr-2">
-              <div className="rounded-xl bg-muted/40 p-3 text-xs space-y-0.5">
-                <p><strong>Extrato:</strong> {br(createFor.entry.posted_at)} · {brl(createFor.entry.amount)}</p>
-                <p className="text-muted-foreground">{createFor.entry.memo}</p>
-                <p className="text-muted-foreground">
-                  Será criado como <strong>{createFor.entry.amount >= 0 ? 'receita recebida' : 'despesa paga'}</strong> na conta selecionada,
-                  com data de pagamento igual à do extrato.
-                </p>
-              </div>
-              {duplicateIds.has(createFor.entry.id) && (
-                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
-                  Já existe um lançamento com esta mesma descrição no período. Confirme se não é duplicidade antes de criar.
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-xl border border-border p-2">
-                  <p className="text-muted-foreground">Valor</p>
-                  <p className="font-medium">{brl(Math.abs(createFor.entry.amount))}</p>
-                </div>
-                <div className="rounded-xl border border-border p-2">
-                  <p className="text-muted-foreground">Data</p>
-                  <p className="font-medium">{br(createFor.entry.posted_at)}</p>
-                </div>
-                <div className="rounded-xl border border-border p-2">
-                  <p className="text-muted-foreground">Conta</p>
-                  <p className="font-medium truncate">{account?.name ?? '—'}</p>
-                </div>
-              </div>
-              {createFor.ruleLabel && (
-                <p className="text-xs text-muted-foreground">
-                  Campos pré-preenchidos pela regra de conciliação "<strong>{createFor.ruleLabel}</strong>". Revise e salve.
-                </p>
-              )}
-              {!createSplit && (createFor.ruleAllocations?.length ?? 0) > 0 && (
-                <p className="text-xs rounded-lg border border-border bg-muted/50 p-2">
-                  {createForm.unit_id
-                    ? 'Unidade escolhida: o rateio da regra não será aplicado.'
-                    : `Será aplicado o rateio da regra entre ${createFor.ruleAllocations?.map(a => `${options.units.find(u => u.id === a.unit_id)?.name ?? '—'} ${a.value ?? ''}%`).join(', ')}. Escolha uma unidade só se quiser lançar tudo nela.`}
-                </p>
-              )}
-              <div className="space-y-1.5">
-                <Label>Descrição</Label>
-                <Input value={createForm.description ?? ''} onChange={ev => setCreateForm((f) => ({ ...f, description: ev.target.value }))} />
-              </div>
-              {([
-                ['category_id', 'Categoria', options.categories.filter(c =>
-                  createFor.entry.amount >= 0 ? c.type === 'receita' : c.type === 'despesa')],
-                ['unit_id', 'Unidade', options.units],
-                ['front_id', 'Frente de negócio', options.fronts],
-                ['partner_id', 'Parceiro', options.partners],
-              ] as const).map(([key, label, list]) => (
-                <div key={key} className="space-y-1.5">
-                  <Label>{label}</Label>
-                  <Select
-                    value={(createForm[key] as string | null | undefined) ?? NONE}
-                    disabled={createSplit && (key === 'unit_id' || key === 'front_id')}
-                    onValueChange={v => setCreateForm((f) => ({ ...f, [key]: v === NONE ? null : v }))}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
-                    <SelectContent className="max-h-64">
-                      <SelectItem value={NONE}>Nenhuma</SelectItem>
-                      {list.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-              <OfxAllocationEditor enabled={createSplit} onEnabledChange={setCreateSplit}
-                rows={createSplitRows} onRowsChange={setCreateSplitRows}
-                units={options.units} fronts={options.fronts} />
-            </div>
-          )}
-          <DialogFooter className="shrink-0 gap-2">
-            <Button variant="ghost" onClick={() => setCreateFor(null)}>Cancelar</Button>
-            <Button onClick={confirmCreate} disabled={batchRunning || (createSplit && !manualSplit.valid)}>Criar e vincular</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateFromStatementDialog
+        createFor={createFor}
+        onClose={() => setCreateFor(null)}
+        accountName={account?.name}
+        duplicateIds={duplicateIds}
+        options={options}
+        form={createForm}
+        onFormChange={setCreateForm}
+        split={createSplit}
+        onSplitChange={setCreateSplit}
+        splitRows={createSplitRows}
+        onSplitRowsChange={setCreateSplitRows}
+        manualSplitValid={manualSplit.valid}
+        busy={batchRunning}
+        onConfirm={confirmCreate}
+      />
     </div>
   );
 }
