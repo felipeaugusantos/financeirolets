@@ -71,6 +71,13 @@
       "when": 1792866522613,
       "tag": "0009_factory_batches",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794495442996,
+      "tag": "0010_realtime_transactions",
+      "breakpoints": true
     }
   ]
 }

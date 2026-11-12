@@ -249,8 +249,8 @@ export function useDreReport() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const generate = useCallback(async (filters: DreFilters) => {
-    setLoading(true);
+  const generate = useCallback(async (filters: DreFilters, opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const { data: dreLines, error: dreErr } = await supabase
         .from('dre_lines')
