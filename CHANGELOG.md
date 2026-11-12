@@ -3,6 +3,12 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.7.1 — 2026-11-12
+- Dashboard: resultado do período e margem em destaque, com cores para resultado positivo ou negativo.
+- Atalhos para contas vencidas, contas que vencem hoje e lançamentos sem categoria.
+- DRE: cabeçalho fixo na rolagem vertical e coluna dos nomes fixa na rolagem horizontal.
+- Melhorias apenas visuais, sem alterar dados financeiros ou fórmulas.
+
 ## 1.7.0 — 2026-11-04
 - Conexão pública preservada na publicação para o acesso à base atual e à tela de login.
 - Central de chamados: abertura, acompanhamento, respostas e até 3 imagens de 5 MB com acesso temporário privado.
