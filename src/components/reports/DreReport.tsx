@@ -395,17 +395,17 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
 
       {generated && (
         <Card className="shadow-card rounded-2xl border-border">
-          <CardContent className="p-0 overflow-x-auto" ref={reportRef}>
+          <CardContent className="p-0 overflow-auto max-h-[75vh]" ref={reportRef}>
             {lines.length === 0 && !loading ? (
               <div className="p-8 text-center text-muted-foreground text-sm">
                 Nenhuma linha DRE configurada ou sem dados no período.
               </div>
             ) : (
               <Table className={cn(compact && '[&_td]:py-1.5 [&_th]:py-2')}>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                   <TableRow>
-                    {showCode && <TableHead className="w-16">#</TableHead>}
-                    <TableHead>Linha</TableHead>
+                    {showCode && <TableHead className="w-16 bg-card">#</TableHead>}
+                    <TableHead className="sticky left-0 z-30 bg-card min-w-[200px]">Linha</TableHead>
                     <TableHead className="text-right w-36">Realizado</TableHead>
                     <TableHead className="w-8"><span className="sr-only">Lançamentos</span></TableHead>
                     {showAV && <TableHead className="text-right w-20">AV %</TableHead>}
@@ -450,7 +450,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
                         )}
                         <TableCell
                           style={{ paddingLeft: `${(line.depth * 1.5) + 1}rem` }}
-                          className={cn(line.is_subtotal ? 'font-semibold' : 'text-sm')}
+                          className={cn('sticky left-0 z-10 min-w-[200px]', line.is_subtotal ? 'font-semibold bg-muted' : 'text-sm bg-card')}
                         >
                           {line.name}
                         </TableCell>
