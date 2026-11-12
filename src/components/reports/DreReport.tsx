@@ -145,9 +145,31 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
 
   const handleGenerate = async (f: DreFilters = filters) => {
     try { localStorage.setItem(LAST_FILTERS_KEY, JSON.stringify(f)); } catch { /* ignore */ }
+    appliedRef.current = f;
     await generate(f);
     setGenerated(true);
   };
+
+  // Atualiza em tempo real quando um lançamento é salvo (sem spinner)
+  const filtersRef = useRef(filters);
+  const appliedRef = useRef<DreFilters | null>(null);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (appliedRef.current) generate(appliedRef.current, { silent: true });
+      }, 800);
+    };
+    const channel = supabase
+      .channel(`dre-live-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaction_allocations' }, refresh)
+      .subscribe();
+    return () => { clearTimeout(timer); supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  filtersRef.current = filters;
 
   // Abre já gerado com o último filtro usado pelo operador
   useEffect(() => {
