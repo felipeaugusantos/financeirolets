@@ -5,7 +5,8 @@ import type { Tables } from '@/integrations/supabase/types';
 import { CrmOrders } from '@/components/crm/CrmOrders';
 import { CrmProducts } from '@/components/crm/CrmProducts';
 import { FactoryBatches } from '@/components/factory/FactoryBatches';
-import { ChefHat, Plus, Trash2 } from 'lucide-react';
+import { ChefHat, FileDown, Plus, Trash2 } from 'lucide-react';
+import { buildRomaneioPdf } from '@/lib/romaneioPdf';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -83,6 +84,15 @@ export default function Factory() {
     const ids = demandOrders.filter(o => o.status === 'pendente').map(o => o.id);
     if (!ids.length) return;
     if (fail((await supabase.from('crm_orders').update({ status: 'em_producao' }).in('id', ids)).error)) { toast({ title: `${ids.length} pedido(s) em produção` }); void loadDemand(); }
+  };
+  const printRomaneio = async () => {
+    const { data, error } = await supabase.from('crm_orders').select('id,unit_id,company_id,delivery_date,crm_order_items(product_id,packages,cookies_per_package)')
+      .eq('active', true).in('status', ['pendente', 'em_producao', 'enviado']).eq('delivery_date', date);
+    if (!fail(error)) return;
+    const rows = (data ?? []) as { id: string; unit_id: string; company_id: string; delivery_date: string | null; crm_order_items: { product_id: string; packages: number; cookies_per_package: number }[] }[];
+    if (!rows.length) { toast({ title: 'Nenhum pedido com entrega nesse dia' }); return; }
+    buildRomaneioPdf(date, rows.map(o => ({ id: o.id, unit: units.find(u => u.id === o.unit_id)?.name ?? 'Sem unidade', customer: companies.data.find(c => c.id === o.company_id)?.name ?? '—', deliveryDate: o.delivery_date,
+      items: o.crm_order_items.map(it => ({ product: productName(it.product_id), packages: Number(it.packages), cookiesPerPackage: Number(it.cookies_per_package) })) }))).save(`romaneio-${date}.pdf`);
   };
   const loadForecasts = useCallback(async () => {
     const { data } = await supabase.from('factory_forecasts').select('id,unit_id,product_id,quantity').eq('production_date', date);
@@ -177,7 +187,7 @@ export default function Factory() {
         <TabsContent value="producao" className="space-y-4">
           <div><Label>Dia da produção</Label><Input type="date" className="w-44" value={date} onChange={e => setDate(e.target.value)} /></div>
           <Card className="rounded-2xl"><CardHeader className="flex flex-row items-center justify-between gap-2 pb-2"><CardTitle className="text-base">Pedidos com entrega até {horizon.split('-').reverse().join('/')}</CardTitle>
-            {demandOrders.some(o => o.status === 'pendente') && <Button size="sm" onClick={() => void startProduction()}>Iniciar produção</Button>}</CardHeader>
+            <div className="flex gap-2"><Button size="sm" variant="outline" className="gap-1" onClick={() => void printRomaneio()}><FileDown className="h-4 w-4" />Romaneio do dia</Button>{demandOrders.some(o => o.status === 'pendente') && <Button size="sm" onClick={() => void startProduction()}>Iniciar produção</Button>}</div></CardHeader>
             <CardContent>{!demandOrders.length ? <p className="text-sm text-muted-foreground">Nenhum pedido pendente para esta fornada.</p> : <Table>
               <TableHeader><TableRow><TableHead>Entrega</TableHead><TableHead>Unidade</TableHead><TableHead>Produtos</TableHead><TableHead>Situação</TableHead></TableRow></TableHeader>
               <TableBody>{demandOrders.map(o => <TableRow key={o.id}><TableCell>{(o.delivery_date ?? '').split('-').reverse().join('/')}</TableCell><TableCell>{units.find(u => u.id === o.unit_id)?.name ?? '—'}</TableCell>
