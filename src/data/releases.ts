@@ -45,6 +45,15 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.7.3',
+    date: '2026-11-12',
+    summary: 'Romaneio de entrega em PDF na Fábrica e batimento de saldo no DRE.',
+    items: [
+      { area: 'Geral', kind: 'novidade', title: 'Romaneio de entrega em PDF', detail: 'Em Fábrica › Sugestão de produção, o botão "Romaneio do dia" gera um PDF com os pedidos do dia escolhido, uma página por unidade ou loja, com produtos, caixas, cookies, campo de conferência, totais e assinaturas de expedição, motorista e recebimento.', tech: 'src/lib/romaneioPdf.ts (groupRomaneio + jsPDF/autoTable); pedidos pendente/em_producao/enviado com delivery_date do dia; somente leitura.' },
+      { area: 'Relatórios', kind: 'novidade', title: 'Batimento de saldo no DRE', detail: 'O DRE mostra um card comparando o saldo do extrato com o resultado do período e indica a diferença. Quando faltam saldos bancários exatos, o card avisa em vez de apontar desvio.', tech: 'DreBalanceCard + dreBalanceCheck.ts.' },
+    ],
+  },
+  {
     version: '1.7.2',
     date: '2026-11-12',
     summary: 'Criação de regras diretamente na conciliação bancária para agilizar os próximos extratos.',

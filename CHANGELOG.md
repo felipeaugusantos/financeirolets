@@ -3,6 +3,10 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.7.3 — 2026-11-12
+- Fábrica: romaneio de entrega em PDF por unidade/loja, com conferência e assinaturas.
+- DRE: card de batimento de saldo entre extrato e resultado do período.
+
 ## 1.7.2 — 2026-11-12
 - Conciliação bancária: opção de salvar como regra ao criar um lançamento individual, disponível para Administrador e Financeiro após escolher a categoria.
 - Texto sugerido editável; regra preserva categoria, unidade ou rateio e parceiro, limitada à conta e à direção da movimentação.
