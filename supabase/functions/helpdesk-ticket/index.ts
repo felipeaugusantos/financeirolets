@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsFor } from '../_shared/cors.ts';
 import { createRateLimiter, tooManyRequests } from '../_shared/rate-limit.ts';
-import { z } from 'npm:zod@3';
+import { ticketSchema, replySchema } from './schemas.ts';
 
 const HELPDESK_URL = 'https://helpzetech.lovable.app/api/public/lets-finance/tickets';
 // Freio por usuário: criar/responder chamados é mais restrito que apenas listar.
@@ -10,13 +10,6 @@ const readLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
 const jsonWith = (cors: Record<string, string>) => (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-const schema = z.object({
-  assunto: z.string().trim().min(3).max(200),
-  descricao: z.string().trim().min(3).max(15000),
-  prioridade: z.enum(['baixa', 'normal', 'alta', 'critica']),
-  tela: z.string().trim().min(1).max(200),
-  origem: z.enum(['manual', 'automatico']),
-}).strict();
 
 Deno.serve(async (req) => {
   const cors = corsFor(req);
@@ -60,7 +53,7 @@ Deno.serve(async (req) => {
       return json({ chamados });
     }
     if (raw && typeof raw === 'object' && (raw as { acao?: string }).acao === 'responder') {
-      const r = z.object({ acao: z.literal('responder'), numero: z.union([z.string(), z.number()]).transform(String).pipe(z.string().min(1).max(40)), mensagem: z.string().trim().min(2).max(15000) }).strict().safeParse(raw);
+      const r = replySchema.safeParse(raw);
       if (!r.success) return json({ error: 'Escreva a resposta (mínimo 2 letras)' }, 400);
       const { data: prof } = await client.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
       const email = userData.user.email;
@@ -84,7 +77,7 @@ Deno.serve(async (req) => {
       }
       return json({ ok: true });
     }
-    const parsed = schema.safeParse(raw);
+    const parsed = ticketSchema.safeParse(raw);
     if (!parsed.success) return json({ error: 'Preencha assunto e descrição (mínimo 3 letras)' }, 400);
     const { data: profile } = await client.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
     const email = userData.user.email;
