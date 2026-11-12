@@ -15,13 +15,9 @@
  */
 
 import { quotaMessage, type QuotaResult } from './limits.ts';
+import { corsFor } from '../_shared/cors.ts';
 
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+export { corsFor };
 
 /** Papéis existentes no sistema (enum app_role) que podem usar o assistente. Qualquer um deles basta. */
 export const KAIKIN_ALLOWED_ROLES = ['admin', 'financeiro', 'gerente_unidade', 'operador', 'vendedor'] as const;
@@ -88,23 +84,24 @@ export async function authorizeKaikin(authHeader: string | null, deps: AccessDep
   return { ok: true, userId: user.id, roles: allowed };
 }
 
-const json = (body: unknown, status: number) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+const json = (body: unknown, status: number, cors: Record<string, string>) =>
+  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 /**
  * Porta de entrada da função: preflight (CORS) → método → autorização → processamento.
  * O preflight não exige login (o navegador não envia credenciais nele).
  */
 export async function handleKaikinRequest(req: Request, deps: KaikinDeps): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
+  const cors = corsFor(req);
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405, cors);
 
   const authHeader = req.headers.get('Authorization');
   const decision = await authorizeKaikin(authHeader, deps);
   // 'error' in decision estreita a união também com o tsconfig do app (sem strictNullChecks).
   if ('error' in decision) {
     console.warn('[kaikin] acesso negado', decision.status);
-    return json({ error: decision.error }, decision.status);
+    return json({ error: decision.error }, decision.status, cors);
   }
 
   // Cota por usuário. Se não der para conferir, bloqueia (nunca libera por erro), como no acesso.
@@ -113,13 +110,13 @@ export async function handleKaikinRequest(req: Request, deps: KaikinDeps): Promi
     quota = await deps.consumeQuota((authHeader as string).replace(/^Bearer\s+/i, ''));
   } catch (e) {
     console.error('[kaikin] falha ao conferir a cota', e instanceof Error ? e.message : 'erro');
-    return json({ error: DENY.unavailable.error }, DENY.unavailable.status);
+    return json({ error: DENY.unavailable.error }, DENY.unavailable.status, cors);
   }
   if (!quota.allowed) {
     console.warn('[kaikin] cota excedida', quota.limit);
     return new Response(JSON.stringify({ error: quotaMessage(quota) }), {
       status: 429,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(Math.max(1, quota.retryAfter)) },
+      headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': String(Math.max(1, quota.retryAfter)) },
     });
   }
   return deps.process(req, authHeader as string);

@@ -1,10 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { corsFor } from '../_shared/cors.ts';
+import { createRateLimiter, tooManyRequests } from '../_shared/rate-limit.ts';
 import { z } from 'npm:zod@3';
 
 const HELPDESK_URL = 'https://helpzetech.lovable.app/api/public/lets-finance/tickets';
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+// Freio por usuário: criar/responder chamados é mais restrito que apenas listar.
+const writeLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
+const readLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
+const jsonWith = (cors: Record<string, string>) => (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 const schema = z.object({
   assunto: z.string().trim().min(3).max(200),
@@ -15,7 +19,9 @@ const schema = z.object({
 }).strict();
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsFor(req);
+  const json = jsonWith(cors);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
   try {
     const auth = req.headers.get('Authorization');
@@ -28,6 +34,9 @@ Deno.serve(async (req) => {
     const { data: userData, error } = await client.auth.getUser(auth.slice(7));
     if (error || !userData.user?.email) return json({ error: 'Sessão expirada. Entre novamente.' }, 401);
     const raw = await req.json().catch(() => null);
+    const isList = !!raw && typeof raw === 'object' && (raw as { acao?: string }).acao === 'listar';
+    const rate = (isList ? readLimiter : writeLimiter).check(userData.user.id);
+    if (!rate.allowed) return tooManyRequests(rate.retryAfter, cors);
     if (raw && typeof raw === 'object' && (raw as { acao?: string }).acao === 'listar') {
       const res = await fetch(HELPDESK_URL, {
         method: 'GET', signal: AbortSignal.timeout(15000),

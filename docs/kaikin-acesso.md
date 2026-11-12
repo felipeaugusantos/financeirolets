@@ -5,7 +5,7 @@ A função `supabase/functions/kaikin` só consulta dados ou chama a IA depois d
 
 | Situação | Resposta |
 |---|---|
-| Preflight (`OPTIONS`) | 200 com CORS, sem exigir login |
+| Preflight (`OPTIONS`) | 200 com CORS (só para origens permitidas, ver abaixo), sem exigir login |
 | Método diferente de `POST` | 405 |
 | Sem `Authorization: Bearer`, cabeçalho malformado, token inválido/expirado ou chave pública (anon) | 401 |
 | Usuário válido sem nenhum papel em `user_roles` | 403 |
@@ -13,6 +13,15 @@ A função `supabase/functions/kaikin` só consulta dados ou chama a IA depois d
 | Usuário autorizado acima da cota (por minuto ou por dia) | 429 com `Retry-After` |
 | Falha ao conferir a cota (banco fora do ar) | 503 (bloqueia; nunca libera por erro) |
 | Usuário válido com ao menos um papel, dentro da cota | processa; consultas com o token do usuário (o RLS vale) |
+
+## CORS e limite das demais funções
+- `supabase/functions/_shared/cors.ts` (usado por `kaikin`, `helpdesk-ticket` e `crm-discovery`) devolve `Access-Control-Allow-Origin`
+  só para o site publicado e previews (`*.lovable.app`, `*.lovableproject.com`), `localhost`/`127.0.0.1` e origens extras da variável
+  de ambiente da função `ALLOWED_ORIGINS` (lista separada por vírgula; **defina-a se o sistema passar a usar domínio próprio**).
+  Outra origem não recebe o cabeçalho e o navegador bloqueia a resposta. O CORS não substitui o login: todas as funções exigem JWT.
+- `_shared/rate-limit.ts`: freio por usuário, em memória de cada instância (não é cota exata, ver o comentário do arquivo):
+  `crm-discovery` 20 buscas/min (só as que chegam ao provedor; resposta do cache não conta), `helpdesk-ticket` 10 criações ou respostas/min
+  e 30 listagens/min. Acima disso, 429 com `Retry-After`. O Kaikin segue com a cota exata no banco (abaixo).
 
 ## Limite por usuário (cota)
 - Padrão em `supabase/functions/kaikin/limits.ts` (`KAIKIN_LIMITS`): **8 perguntas por minuto e 150 por dia** por usuário.

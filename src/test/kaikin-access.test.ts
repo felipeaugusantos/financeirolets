@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  KAIKIN_ALLOWED_ROLES, authorizeKaikin, handleKaikinRequest, isInvalidTokenError, corsHeaders, type KaikinDeps,
+  KAIKIN_ALLOWED_ROLES, authorizeKaikin, handleKaikinRequest, isInvalidTokenError, corsFor, type KaikinDeps,
 } from '../../supabase/functions/kaikin/access';
 
 const USER = { id: 'u-1' };
 const post = (headers: Record<string, string> = {}, method = 'POST') =>
   new Request('https://x.test/functions/v1/kaikin', { method, headers, body: method === 'POST' ? '{"messages":[]}' : undefined });
 const bearer = (t = 'tok') => ({ Authorization: `Bearer ${t}` });
+const ORIGIN = { Origin: 'https://financeirolets.lovable.app' };
 
 let verifyToken: ReturnType<typeof vi.fn>;
 let fetchRoles: ReturnType<typeof vi.fn>;
@@ -123,9 +124,9 @@ describe('kaikin: usuário autorizado', () => {
 
 describe('kaikin: CORS e método', () => {
   it('preflight (OPTIONS) responde sem login e sem verificar nada', async () => {
-    const res = await handleKaikinRequest(post({}, 'OPTIONS'), deps);
+    const res = await handleKaikinRequest(post(ORIGIN, 'OPTIONS'), deps);
     expect(res.status).toBe(200);
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN.Origin);
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('authorization');
     expect(res.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS');
     expect(verifyToken).not.toHaveBeenCalled();
@@ -133,8 +134,9 @@ describe('kaikin: CORS e método', () => {
   });
 
   it('as negativas também levam os cabeçalhos CORS (o navegador precisa ler o 401/403)', async () => {
-    const res = await handleKaikinRequest(post(), deps);
-    for (const [k, v] of Object.entries(corsHeaders)) expect(res.headers.get(k)).toBe(v);
+    const req = post(ORIGIN);
+    const res = await handleKaikinRequest(req, deps);
+    for (const [k, v] of Object.entries(corsFor(req))) expect(res.headers.get(k)).toBe(v);
     expect(res.headers.get('Content-Type')).toBe('application/json');
   });
 

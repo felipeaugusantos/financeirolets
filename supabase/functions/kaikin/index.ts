@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { corsHeaders, handleKaikinRequest, isInvalidTokenError, type KaikinDeps } from './access.ts';
+import { corsFor, handleKaikinRequest, isInvalidTokenError, type KaikinDeps } from './access.ts';
 import { KAIKIN_LIMITS, parseChatInput, parseQuota } from './limits.ts';
 
 // Tipos mínimos do que esta função lê. O client aqui não usa o Database tipado do app
@@ -497,12 +497,13 @@ async function runTool(name: string | undefined, args: ToolArgs, supabase: Retur
 
 /** Processamento do assistente. Só é chamado depois de authorizeKaikin (ver access.ts). */
 async function processChat(req: Request, authHeader: string): Promise<Response> {
+  const cors = corsFor(req);
   try {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY não configurada' }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
 
@@ -510,7 +511,7 @@ async function processChat(req: Request, authHeader: string): Promise<Response> 
     if (!input.ok) {
       return new Response(JSON.stringify({ error: input.error }), {
         status: input.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
     const { messages, pageContext } = input;
@@ -553,14 +554,14 @@ async function processChat(req: Request, authHeader: string): Promise<Response> 
         if (resp.status === 429 || resp.status === 402) {
           return new Response(JSON.stringify({ error: resp.status === 429 ? 'Rate limit excedido' : 'Créditos esgotados' }), {
             status: resp.status,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...cors, 'Content-Type': 'application/json' },
           });
         }
         const t = await resp.text();
         console.error('AI gateway error', resp.status, t);
         return new Response(JSON.stringify({ error: 'AI gateway error' }), {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
       const payload = await resp.json();
@@ -607,13 +608,13 @@ async function processChat(req: Request, authHeader: string): Promise<Response> 
     });
 
     return new Response(stream, {
-      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
+      headers: { ...cors, 'Content-Type': 'text/event-stream' },
     });
   } catch (e: unknown) {
     console.error('kaikin fatal', e);
     return new Response(JSON.stringify({ error: errorMessage(e, 'erro') }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 }
