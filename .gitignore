@@ -23,7 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Variáveis de ambiente locais: não versionar. Use .env.example como modelo.
-.env
+# O .env gerado pela Lovable Cloud contém só valores PÚBLICOS (URL, chave publicável, id) e
+# precisa ser versionado: a publicação compila a partir do repositório e falha sem ele.
+# Nunca coloque segredos no .env; overrides locais vão em .env.local (ignorado).
 .env.*
 !.env.example
