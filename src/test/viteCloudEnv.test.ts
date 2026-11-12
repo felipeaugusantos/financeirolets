@@ -9,13 +9,22 @@ const values = {
   VITE_SUPABASE_PROJECT_ID: "test-project",
 };
 
-function validate(env: Record<string, string>, define: Record<string, string> = {}) {
+function validate(env: Record<string, string>, define: Record<string, string> = {}, configFile?: string) {
   const hook = requireSupabaseEnv().configResolved;
   if (typeof hook !== "function") throw new Error("Missing resolved configuration validator");
-  return hook.call({} as never, { env, define } as ResolvedConfig);
+  return hook.call({} as never, { env, define, configFile } as ResolvedConfig);
 }
 
 describe("Cloud build connection validation", () => {
+  it("delegates connection configuration to the managed Cloud build", () => {
+    expect(() => validate({}, {}, "/dev-server/.lovable/preview-supabase.config.ts")).not.toThrow();
+  });
+
+  it("still rejects missing values in ordinary development and production configs", () => {
+    expect(() => validate({}, {}, "/dev-server/vite.config.ts")).toThrow("Variáveis ausentes");
+    expect(() => validate({}, {}, "/dev-server/.lovable/vite.config.ts")).toThrow("Variáveis ausentes");
+  });
+
   it("accepts values injected through define without a local env file", () => {
     const define = Object.fromEntries(Object.entries(values).map(([key, value]) => [
       `import.meta.env.${key}`, JSON.stringify(value),
