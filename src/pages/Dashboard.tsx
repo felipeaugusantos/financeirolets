@@ -531,6 +531,43 @@ export default function Dashboard() {
         </Alert>
       )}
 
+      {/* Destaque do resultado + atalhos de atenção */}
+      {(() => {
+        const resultado = receitasMes - despesasMes;
+        const positivo = resultado >= 0;
+        const margem = receitasMes > 0 ? (resultado / receitasMes) * 100 : 0;
+        const chips = [
+          overdueBills.length > 0 && { label: `${overdueBills.length} vencida${overdueBills.length > 1 ? 's' : ''}`, tone: 'border-destructive/50 bg-destructive/10 text-destructive', href: '/contas' },
+          dueTodayBills.length > 0 && { label: `${dueTodayBills.length} vence${dueTodayBills.length > 1 ? 'm' : ''} hoje`, tone: 'border-warning/50 bg-warning/10 text-warning', href: '/contas' },
+          semCategoria > 0 && { label: `${semCategoria} sem categoria`, tone: 'border-border bg-muted text-muted-foreground', href: '/lancamentos' },
+        ].filter(Boolean) as Array<{ label: string; tone: string; href: string }>;
+        return (
+          <Card className={cn('rounded-2xl shadow-card border-2', positivo ? 'border-success/40 bg-success/5' : 'border-destructive/40 bg-destructive/5')}>
+            <CardContent className="p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resultado do período</p>
+                <p className={cn('font-heading font-bold text-2xl md:text-3xl tabular-nums', positivo ? 'text-success' : 'text-destructive')}>
+                  {fmt(resultado)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {positivo ? 'Superávit' : 'Déficit'} · margem {margem.toFixed(1).replace('.', ',')}% sobre receitas
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {chips.length === 0 ? (
+                  <span className="rounded-full border border-success/40 bg-success/10 px-3 py-1.5 text-xs font-medium text-success">Nenhuma pendência urgente</span>
+                ) : chips.map((c) => (
+                  <button key={c.label} type="button" onClick={() => navigate(c.href)}
+                    className={cn('rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring', c.tone)}>
+                    {c.label} →
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* KPI Cards */}
       <div className={cn('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 transition-opacity', refreshing && 'opacity-60')}>
         {cards.map((card) => (
