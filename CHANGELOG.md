@@ -3,6 +3,11 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.7.2 — 2026-11-12
+- Conciliação bancária: opção de salvar como regra ao criar um lançamento individual, disponível para Administrador e Financeiro após escolher a categoria.
+- Texto sugerido editável; regra preserva categoria, unidade ou rateio e parceiro, limitada à conta e à direção da movimentação.
+- Reaplicação às linhas pendentes do extrato aberto, sem alterar lançamentos antigos; criação em lote ainda não oferece essa opção.
+
 ## 1.7.1 — 2026-11-12
 - Dashboard: resultado do período e margem em destaque, com cores para resultado positivo ou negativo.
 - Atalhos para contas vencidas, contas que vencem hoje e lançamentos sem categoria.

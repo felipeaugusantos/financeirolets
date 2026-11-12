@@ -45,6 +45,16 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.7.2',
+    date: '2026-11-12',
+    summary: 'Criação de regras diretamente na conciliação bancária para agilizar os próximos extratos.',
+    items: [
+      { area: 'Conciliação Bancária', kind: 'novidade', title: 'Salvar como regra na conciliação', detail: 'Ao criar um lançamento individual a partir do extrato, Administrador e Financeiro podem marcar "Salvar como regra para os próximos extratos" depois de escolher a categoria. A opção ainda não está disponível na criação em lote.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Texto sugerido e classificação reaproveitada', detail: 'O texto da regra é sugerido a partir da descrição do extrato e pode ser editado. A regra guarda categoria, unidade ou rateio e parceiro escolhidos, respeitando a conta e o tipo de movimentação: entrada ou saída.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Regras aplicadas às linhas pendentes', detail: 'Depois de salvar a regra, as linhas pendentes do extrato aberto são reclassificadas. Lançamentos antigos não são alterados.', tech: 'CreateFromStatementDialog e ruleFromEntry: criação de regra no fluxo individual, seguida de reaplicação às entradas pendentes; sem alteração retroativa de transações.' },
+    ],
+  },
+  {
     version: '1.7.1',
     date: '2026-11-12',
     summary: 'Dashboard com resultado em destaque e atalhos de atenção; DRE com leitura mais fácil durante a rolagem.',
