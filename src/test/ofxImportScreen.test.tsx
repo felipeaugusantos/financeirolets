@@ -170,4 +170,64 @@ describe('tela Conciliação bancária (OFX)', () => {
     fireEvent.click(within(dlg).getByRole('button', { name: 'Só desvincular' }));
     await waitFor(() => expect(h.fns.unlinkEntry).toHaveBeenCalled());
   });
+
+  describe('visão em lista: "Linhas do extrato" (card extraído)', () => {
+    const suggestion = {
+      transaction: { id: 'tx1', description: 'Fornecedor ABC', amount: -100 },
+      confidence: 'alta', dayGap: 0, amountGap: 0, basis: 'exato', score: 95, reasons: ['mesmo valor', 'mesma data'],
+    };
+
+    const openLines = async () => {
+      mount();
+      await waitFor(() => expect(screen.getByTestId('classic')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'Visão em lista' }));
+      expect(screen.queryByText('Linhas do extrato')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Ver detalhes e sugestões das linhas' }));
+      await screen.findByText('Linhas do extrato');
+    };
+
+    it('mostra as linhas, a sugestão compatível e o botão Vincular com o motivo', async () => {
+      const e1 = stmt('e1');
+      h.ofx = { ...h.ofx, enriched: [{ ...enrichedOf(e1), suggestions: [suggestion] }, enrichedOf(stmt('e2', { status: 'vinculado', transaction_id: 't9', match_note: 'vínculo manual' }))], entries: [e1, stmt('e2', { status: 'vinculado' })] };
+      await openLines();
+      expect(screen.getByText('Lançamentos compatíveis:')).toBeInTheDocument();
+      expect(screen.getByText(/Fornecedor ABC/)).toBeInTheDocument();
+      expect(screen.getByText(/valor exato · confiança alta/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Vincular$/ }));
+      expect(h.fns.linkEntry).toHaveBeenCalledWith('e1', 'tx1', 'mesmo valor; mesma data');
+    });
+
+    it('linha sem sugestão mostra o aviso; criar abre o diálogo e Reabrir abre o desvínculo', async () => {
+      await openLines();
+      expect(screen.getByText(/Nenhum lançamento compatível encontrado/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Criar lançamento$/ }));
+      expect(await screen.findByText('Criar lançamento a partir do extrato')).toBeInTheDocument();
+    });
+
+    it('linha já vinculada oferece Reabrir, que abre o diálogo de desvincular', async () => {
+      await openLines();
+      fireEvent.click(screen.getByRole('button', { name: 'vinculado' })); // o filtro padrão mostra só pendentes
+      fireEvent.click(await screen.findByRole('button', { name: /Reabrir/ }));
+      const dlg = await screen.findByRole('dialog');
+      expect(within(dlg).getByText('Desvincular conciliação')).toBeInTheDocument();
+    });
+
+    it('selecionar pendentes habilita as ações em lote e Ignorar selecionadas abre a justificativa', async () => {
+      await openLines();
+      expect(screen.queryByText('1 selecionada(s)')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar pendentes (1)' }));
+      expect(await screen.findByText('1 selecionada(s)')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Limpar seleção' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Ignorar selecionadas' }));
+      expect(await screen.findByText('Ignorar 1 linha(s)')).toBeInTheDocument();
+    });
+
+    it('sem linhas no filtro: oferece "Ver o ano todo"', async () => {
+      h.ofx = { ...h.ofx, enriched: [], entries: [], stats: { total: 0, pendentes: 0, vinculados: 0, ignorados: 0, entradas: 0, saidas: 0, pendenteValor: 0 } };
+      await openLines();
+      expect(screen.getByText('Nenhuma linha nesse filtro.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Ver o ano todo' }));
+      await waitFor(() => expect(JSON.parse(localStorage.getItem('ofx-conciliacao-filtros:u1') ?? '{}').from).toMatch(/^\d{4}-01-01$/));
+    });
+  });
 });
