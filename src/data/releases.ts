@@ -45,6 +45,17 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.7.1',
+    date: '2026-11-12',
+    summary: 'Dashboard com resultado em destaque e atalhos de atenção; DRE com leitura mais fácil durante a rolagem.',
+    items: [
+      { area: 'Relatórios', kind: 'melhoria', title: 'Resultado do período em destaque', detail: 'O topo do Dashboard destaca o resultado do período e a margem, com cores diferentes para resultado positivo ou negativo.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'Atalhos para pendências', detail: 'No Dashboard, acesse rapidamente as contas vencidas, as contas que vencem hoje e os lançamentos sem categoria quando houver pendências.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'DRE com cabeçalho e nomes das linhas fixos', detail: 'No DRE, os títulos das colunas permanecem visíveis durante a rolagem vertical, e os nomes das linhas ficam visíveis ao deslocar os valores para os lados.', tech: 'DreReport: cabeçalho sticky e primeira coluna fixa, com fundo próprio nas linhas e subtotais; cálculos inalterados.' },
+      { area: 'Relatórios', kind: 'melhoria', title: 'Valores financeiros preservados', detail: 'Os ajustes são apenas de apresentação: não alteram lançamentos, classificações nem as fórmulas dos relatórios.' },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-11-04',
     summary: 'Chamados com respostas e imagens, melhorias no Dashboard e conexão de acesso preservada na publicação.',
