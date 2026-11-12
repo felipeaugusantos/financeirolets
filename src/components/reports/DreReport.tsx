@@ -16,6 +16,7 @@ import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
+import DreBalanceCard from './DreBalanceCard';
 
 const LAST_FILTERS_KEY = 'dre.lastFilters.v1';
 
@@ -74,6 +75,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     return base;
   });
   const [generated, setGenerated] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<DreFilters | null>(null);
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -147,6 +149,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     try { localStorage.setItem(LAST_FILTERS_KEY, JSON.stringify(f)); } catch { /* ignore */ }
     appliedRef.current = f;
     await generate(f);
+    setAppliedFilters({ ...f });
     setGenerated(true);
   };
 
@@ -399,6 +402,8 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
           </div>
         );
       })()}
+
+      {generated && appliedFilters && lines.length > 0 && <DreBalanceCard filters={appliedFilters} lines={lines} />}
 
       {generated && filters.unit_id && unallocatedCount > 0 && dreSec.isOn('showAlertSemUnidade') && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-3 text-sm">
