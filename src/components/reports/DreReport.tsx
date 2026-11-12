@@ -17,6 +17,8 @@ import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/expor
 import { FilterPresets } from './FilterPresets';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
 
+const LAST_FILTERS_KEY = 'dre.lastFilters.v1';
+
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -56,13 +58,20 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
   }, [outOfDreItems, unallocatedItems]);
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [filters, setFilters] = useState<DreFilters>({
-    dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
-    dateTo: todayLocalISO(),
-    regime: 'competencia',
-    includeBudget: false,
-    includePrevious: false,
-    onlyRealized: false,
+  const [filters, setFilters] = useState<DreFilters>(() => {
+    const base: DreFilters = {
+      dateFrom: toLocalISODate(new Date(new Date().getFullYear(), 0, 1)),
+      dateTo: todayLocalISO(),
+      regime: 'competencia',
+      includeBudget: false,
+      includePrevious: false,
+      onlyRealized: false,
+    };
+    try {
+      const raw = localStorage.getItem(LAST_FILTERS_KEY);
+      if (raw) return { ...base, ...JSON.parse(raw) };
+    } catch { /* ignore */ }
+    return base;
   });
   const [generated, setGenerated] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -121,6 +130,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
 
   const handleClearFilters = () => {
     setFilters(defaultFilters);
+    try { localStorage.removeItem(LAST_FILTERS_KEY); } catch { /* ignore */ }
     dreSec.reset();
   };
 
@@ -133,10 +143,17 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     });
   }, []);
 
-  const handleGenerate = async () => {
-    await generate(filters);
+  const handleGenerate = async (f: DreFilters = filters) => {
+    try { localStorage.setItem(LAST_FILTERS_KEY, JSON.stringify(f)); } catch { /* ignore */ }
+    await generate(f);
     setGenerated(true);
   };
+
+  // Abre já gerado com o último filtro usado pelo operador
+  useEffect(() => {
+    handleGenerate(filters);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Find revenue base for AV (Group 1: Receita Bruta or similar)
   const revenueBase = lines.find(l => l.code === '1')?.value ?? 0;
@@ -265,7 +282,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
               </Select>
             </div>
             <div className="flex items-end gap-2">
-              <Button onClick={handleGenerate} disabled={loading} className="flex-1">
+              <Button onClick={() => handleGenerate()} disabled={loading} className="flex-1">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gerar'}
               </Button>
               <Button variant="outline" size="icon" onClick={handleClearFilters} title="Limpar filtros">
