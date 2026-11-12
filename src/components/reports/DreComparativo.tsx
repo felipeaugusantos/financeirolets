@@ -335,17 +335,17 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
 
       {generated && (
         <Card className="shadow-card rounded-2xl border-border">
-          <CardContent className="p-0 overflow-x-auto" ref={reportRef}>
+          <CardContent className="p-0 overflow-auto max-h-[75vh]" ref={reportRef}>
             {lines.length === 0 && !loading ? (
               <div className="p-8 text-center text-muted-foreground text-sm">
                 Nenhuma linha DRE configurada ou sem dados no período.
               </div>
             ) : (
-              <Table className={cn(dcSec.isOn('compact') && '[&_td]:py-1.5 [&_th]:py-2')}>
-                <TableHeader>
+              <Table wrapperClassName="overflow-visible" className={cn(dcSec.isOn('compact') && '[&_td]:py-1.5 [&_th]:py-2')}>
+                <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
                   <TableRow>
-                    <TableHead className="w-12 sticky left-0 bg-background z-10">#</TableHead>
-                    <TableHead className="min-w-[200px] sticky left-12 bg-background z-10">Linha</TableHead>
+                    <TableHead className="w-12 sticky left-0 bg-background z-30">#</TableHead>
+                    <TableHead className="min-w-[200px] sticky left-12 bg-background z-30">Linha</TableHead>
                     {visibleCols.map(col => (
                       <TableHead key={col.id} className={cn(
                         'text-right min-w-[120px]',

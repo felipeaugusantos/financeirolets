@@ -233,11 +233,11 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
 
         <TabsContent value="lado">
           <Card className="rounded-2xl">
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0 overflow-auto max-h-[75vh]">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-20 bg-card shadow-sm">
                   <tr className="border-b border-border">
-                    <th className="p-2 text-left sticky left-0 bg-card min-w-48">Categoria</th>
+                    <th className="p-2 text-left sticky left-0 z-30 bg-card min-w-48">Categoria</th>
                     {columns.map(c => <th key={c.key} className="p-2 text-right whitespace-nowrap">{c.name}</th>)}
                     <th className="p-2 text-right">Total</th>
                   </tr>
@@ -272,9 +272,9 @@ export default function CashFlowByUnit({ onBack }: { onBack: () => void }) {
                 </SelectContent>
               </Select>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0 overflow-auto max-h-[75vh]">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-20 bg-card shadow-sm">
                   <tr className="border-b border-border text-right">
                     <th className="p-2 text-left">Mês</th>
                     {mode !== 'previsto' && <th className="p-2">Receitas realizadas</th>}

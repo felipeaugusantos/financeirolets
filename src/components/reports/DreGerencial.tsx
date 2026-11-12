@@ -354,11 +354,11 @@ export default function DreGerencial({ onBack }: { onBack: () => void }) {
           })()}
 
           <Card className="shadow-card rounded-2xl border-border">
-            <CardContent className="p-0 overflow-x-auto" ref={reportRef}>
-              <Table>
-                <TableHeader>
+            <CardContent className="p-0 overflow-auto max-h-[75vh]" ref={reportRef}>
+              <Table wrapperClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                   <TableRow>
-                    <TableHead>Conta</TableHead>
+                    <TableHead className="sticky left-0 z-30 bg-card min-w-[200px]">Conta</TableHead>
                     <TableHead className="text-right w-36">Valor</TableHead>
                     <TableHead className="text-right w-24">% Receita</TableHead>
                     {hasComparison && <TableHead className="text-right w-36 hidden md:table-cell">Comparado</TableHead>}
@@ -380,7 +380,7 @@ export default function DreGerencial({ onBack }: { onBack: () => void }) {
                           isResult && 'border-t-2 border-border font-bold text-base'
                         )}
                       >
-                        <TableCell style={{ paddingLeft: `${12 + l.depth * 18}px` }}>{l.name}</TableCell>
+                        <TableCell style={{ paddingLeft: `${12 + l.depth * 18}px` }} className={cn('sticky left-0 z-10 min-w-[200px]', l.is_subtotal ? 'bg-muted' : 'bg-card')}>{l.name}</TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(l.value)}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {fmtPct(pctOf(l.value))}

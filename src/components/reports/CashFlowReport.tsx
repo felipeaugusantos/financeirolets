@@ -342,11 +342,11 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
 
               {cfSec.isOn('showTable') && (
               <Card className="shadow-card rounded-2xl border-border">
-                <CardContent className="p-0 overflow-x-auto">
-                  <Table>
-                    <TableHeader>
+                <CardContent className="p-0 overflow-auto max-h-[75vh]">
+                  <Table wrapperClassName="overflow-visible">
+                    <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                       <TableRow>
-                        <TableHead>Mês</TableHead>
+                        <TableHead className="sticky left-0 z-30 bg-card">Mês</TableHead>
                         {cfSec.isOn('colReceitas') && <TableHead className="text-right">Receitas</TableHead>}
                         {cfSec.isOn('colDespesas') && <TableHead className="text-right">Despesas</TableHead>}
                         {cfSec.isOn('colSaldo') && <TableHead className="text-right">Saldo</TableHead>}
@@ -358,7 +358,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
                         .filter(row => !hideZero || row.receitas !== 0 || row.despesas !== 0)
                         .map(row => (
                         <TableRow key={row.month}>
-                          <TableCell className="font-medium">{row.label}</TableCell>
+                          <TableCell className="font-medium sticky left-0 z-10 bg-card">{row.label}</TableCell>
                           {cfSec.isOn('colReceitas') && <TableCell className="text-right text-emerald-600 tabular-nums">{fmt(row.receitas)}</TableCell>}
                           {cfSec.isOn('colDespesas') && <TableCell className="text-right text-red-500 tabular-nums">{fmt(row.despesas)}</TableCell>}
                           {cfSec.isOn('colSaldo') && <TableCell className={cn('text-right tabular-nums font-medium', row.saldo >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.saldo)}</TableCell>}
@@ -423,11 +423,11 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
 
               {cfSec.isOn('showTable') && (
               <Card className="shadow-card rounded-2xl border-border">
-                <CardContent className="p-0 overflow-x-auto">
-                  <Table>
-                    <TableHeader>
+                <CardContent className="p-0 overflow-auto max-h-[75vh]">
+                  <Table wrapperClassName="overflow-visible">
+                    <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                       <TableRow>
-                        <TableHead>Mês</TableHead>
+                        <TableHead className="sticky left-0 z-30 bg-card">Mês</TableHead>
                         {cfSec.isOn('colReceitas') && <TableHead className="text-right">Receitas Realiz.</TableHead>}
                         {cfSec.isOn('colReceitasProj') && <TableHead className="text-right">Receitas Proj.</TableHead>}
                         {cfSec.isOn('colDespesas') && <TableHead className="text-right">Despesas Realiz.</TableHead>}
@@ -441,7 +441,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
                         .filter(row => !hideZero || row.receitasRealizadas !== 0 || row.despesasRealizadas !== 0 || row.receitasProjetadas !== 0 || row.despesasProjetadas !== 0)
                         .map(row => (
                         <TableRow key={row.month}>
-                          <TableCell className="font-medium">{row.label}</TableCell>
+                          <TableCell className="font-medium sticky left-0 z-10 bg-card">{row.label}</TableCell>
                           {cfSec.isOn('colReceitas') && <TableCell className="text-right tabular-nums text-emerald-600">{fmt(row.receitasRealizadas)}</TableCell>}
                           {cfSec.isOn('colReceitasProj') && <TableCell className="text-right tabular-nums text-emerald-600/70">{fmt(row.receitasProjetadas)}</TableCell>}
                           {cfSec.isOn('colDespesas') && <TableCell className="text-right tabular-nums text-red-500">{fmt(row.despesasRealizadas)}</TableCell>}
@@ -480,11 +480,11 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
 
               {cfSec.isOn('showTable') && (
               <Card className="shadow-card rounded-2xl border-border">
-                <CardContent className="p-0 overflow-x-auto">
-                  <Table>
-                    <TableHeader>
+                <CardContent className="p-0 overflow-auto max-h-[75vh]">
+                  <Table wrapperClassName="overflow-visible">
+                    <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                       <TableRow>
-                        <TableHead>Mês</TableHead>
+                        <TableHead className="sticky left-0 z-30 bg-card">Mês</TableHead>
                         <TableHead className="text-right">Saldo Realizado</TableHead>
                         <TableHead className="text-right">Saldo Projetado</TableHead>
                         <TableHead className="text-right">Diferença</TableHead>
@@ -497,7 +497,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
                         const diff = row.projetado - row.realizado;
                         return (
                           <TableRow key={row.month}>
-                            <TableCell className="font-medium">{row.label}</TableCell>
+                            <TableCell className="font-medium sticky left-0 z-10 bg-card">{row.label}</TableCell>
                             <TableCell className={cn('text-right tabular-nums', row.realizado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.realizado)}</TableCell>
                             <TableCell className={cn('text-right tabular-nums', row.projetado >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(row.projetado)}</TableCell>
                             <TableCell className={cn('text-right tabular-nums font-medium', diff >= 0 ? 'text-emerald-600' : 'text-red-500')}>{fmt(diff)}</TableCell>
