@@ -438,6 +438,16 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
   }, [updateEntry, decisionStamp, load, toast]);
 
   const unlinkEntry = useCallback(async (entryId: string) => {
+    const transfer = await supabase.rpc('undo_internal_transfer', { p_entry_id: entryId });
+    if (transfer.error) {
+      toast({ title: 'Conciliação mantida', description: transfer.error.message, variant: 'destructive' });
+      return false;
+    }
+    if (transfer.data) {
+      await load();
+      toast({ title: 'Transferência desfeita', description: 'As duas movimentações foram canceladas e os extratos voltaram para pendente.' });
+      return true;
+    }
     const { data: prev } = await supabase.from('bank_statement_entries').select('transaction_id').eq('id', entryId).maybeSingle();
     const err = await updateEntry(entryId, {
       transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),
@@ -462,6 +472,12 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
     transactionId: string,
     opts: { createdFromExtract: boolean; matchNote: string | null },
   ) => {
+    const transfer = await supabase.rpc('undo_internal_transfer', { p_entry_id: entryId });
+    if (transfer.error) {
+      toast({ title: 'Conciliação mantida', description: transfer.error.message, variant: 'destructive' });
+      return false;
+    }
+    if (transfer.data) { await load(); return true; }
     if (opts.createdFromExtract) {
       const { data, error } = await callRpc<UnlinkSummary>('unlink_statement_entries', { p_entry_ids: [entryId] });
       if (error || !data) {
@@ -742,6 +758,9 @@ export function useOfxImport(accountId: string | null, from: string, to: string)
    */
   const unlinkMany = useCallback((entryIds: string[]) =>
     runBatch('Conciliações excluídas', entryIds.map(id => async () => {
+      const transfer = await supabase.rpc('undo_internal_transfer', { p_entry_id: id });
+      if (transfer.error) return transfer.error.message;
+      if (transfer.data) return null;
       const { data: prev } = await supabase.from('bank_statement_entries').select('transaction_id').eq('id', id).maybeSingle();
       const err = await updateEntry(id, {
         transaction_id: null, status: 'pendente', match_note: null, ignore_reason: null, ...decisionStamp(),

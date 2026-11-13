@@ -2069,6 +2069,7 @@ export type Database = {
           installment_group_id: string | null
           installment_number: number | null
           installment_total: number | null
+          internal_transfer_group_id: string | null
           is_recurring: boolean
           is_reversal: boolean
           last_recurrence_generated_at: string | null
@@ -2105,6 +2106,7 @@ export type Database = {
           installment_group_id?: string | null
           installment_number?: number | null
           installment_total?: number | null
+          internal_transfer_group_id?: string | null
           is_recurring?: boolean
           is_reversal?: boolean
           last_recurrence_generated_at?: string | null
@@ -2141,6 +2143,7 @@ export type Database = {
           installment_group_id?: string | null
           installment_number?: number | null
           installment_total?: number | null
+          internal_transfer_group_id?: string | null
           is_recurring?: boolean
           is_reversal?: boolean
           last_recurrence_generated_at?: string | null
@@ -2479,6 +2482,11 @@ export type Database = {
         }
         Returns: string
       }
+      register_internal_transfer: {
+        Args: { p_in_entry: string; p_out_entry: string }
+        Returns: string
+      }
+      undo_internal_transfer: { Args: { p_entry_id: string }; Returns: boolean }
       unlink_statement_entries: {
         Args: { p_entry_ids: string[] }
         Returns: Json

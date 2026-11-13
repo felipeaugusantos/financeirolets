@@ -13,6 +13,7 @@ interface Props {
 }
 
 export default function UnlinkDialog({ target, busy, onClose, onUnlinkOnly, onUnlinkAndDelete }: Props) {
+  const internal = target?.match_note?.startsWith('Transferência interna entre contas próprias');
   return (
     <Dialog open={!!target} onOpenChange={o => !o && onClose()}>
       <DialogContent className="max-w-md">
@@ -25,7 +26,9 @@ export default function UnlinkDialog({ target, busy, onClose, onUnlinkOnly, onUn
             <p>
               A linha voltará para <strong>pendente</strong>. Em mês fechado a exclusão é recusada e nada é alterado.
             </p>
-            {createdFromStatement(target) ? (
+            {internal ? (
+              <p>As duas linhas da transferência voltarão para pendente e as duas movimentações serão canceladas juntas, mantendo o histórico. Meses fechados impedem a operação.</p>
+            ) : createdFromStatement(target) ? (
               <p className="text-destructive">
                 Este lançamento foi criado a partir da linha: "Desvincular e excluir" o exclui (com rateio e anexos).
                 Se outras linhas do extrato estiverem ligadas a ele, ele é mantido até a última ser desvinculada.
@@ -40,10 +43,10 @@ export default function UnlinkDialog({ target, busy, onClose, onUnlinkOnly, onUn
         )}
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={() => onClose()}>Cancelar</Button>
-          <Button variant="outline" disabled={busy} onClick={onUnlinkOnly}>Só desvincular</Button>
-          <Button variant="destructive" disabled={busy} onClick={onUnlinkAndDelete}>
+          <Button variant="outline" disabled={busy} onClick={onUnlinkOnly}>{internal ? 'Desfazer transferência' : 'Só desvincular'}</Button>
+          {!internal && <Button variant="destructive" disabled={busy} onClick={onUnlinkAndDelete}>
             Desvincular e excluir lançamento
-          </Button>
+          </Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

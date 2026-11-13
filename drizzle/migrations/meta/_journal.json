@@ -78,6 +78,13 @@
       "when": 1794495442996,
       "tag": "0010_realtime_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794579877958,
+      "tag": "0011_atomic_own_account_transfers",
+      "breakpoints": true
     }
   ]
 }

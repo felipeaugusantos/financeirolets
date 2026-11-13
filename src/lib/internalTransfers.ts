@@ -35,7 +35,8 @@ function days(a: string, b: string): number {
 
 /**
  * Pareia saídas com entradas de mesmo valor em contas diferentes, dentro de
- * uma janela de dias. Cada linha entra em no máximo um par (1:1).
+ * uma janela de dias. Apenas correspondências únicas nos dois sentidos são
+ * sugeridas; valores repetidos não podem escolher uma conta arbitrariamente.
  */
 export function findInternalTransfers(
   entries: TransferCandidateEntry[],
@@ -49,21 +50,18 @@ export function findInternalTransfers(
     .filter(e => e.amount > 0 && e.status === 'pendente')
     .sort((a, b) => a.posted_at.localeCompare(b.posted_at));
 
-  const used = new Set<string>();
   const pairs: TransferPair[] = [];
+  const compatible = (o: TransferCandidateEntry, i: TransferCandidateEntry) =>
+    i.account_id !== o.account_id &&
+    Number.isFinite(o.amount) && Number.isFinite(i.amount) &&
+    Math.round(i.amount * 100) === Math.round(Math.abs(o.amount) * 100) &&
+    days(i.posted_at, o.posted_at) <= windowDays;
 
   for (const o of outs) {
-    if (used.has(o.id)) continue;
     const target = Math.abs(o.amount);
-    const match = ins.find(i =>
-      !used.has(i.id) &&
-      i.account_id !== o.account_id &&
-      Math.abs(i.amount - target) <= 0.01 &&
-      days(i.posted_at, o.posted_at) <= windowDays
-    );
-    if (!match) continue;
-    used.add(o.id);
-    used.add(match.id);
+    const matches = ins.filter(i => compatible(o, i));
+    const match = matches[0];
+    if (matches.length !== 1 || !match || outs.filter(other => compatible(other, match)).length !== 1) continue;
     pairs.push({ out: o, in: match, dayGap: days(match.posted_at, o.posted_at), amount: target });
   }
 
