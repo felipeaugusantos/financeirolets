@@ -24,7 +24,8 @@ describe('transfer database safety contract', () => {
  it('cancels both legs and clears both statement links without deleting history', () => {
   expect(undo).toContain("UPDATE public.transactions SET status='cancelado'");
   expect(undo).toContain("transaction_id=NULL,status='pendente'");
-  expect(undo.match(/WHERE (?:id|transaction_id)=ANY\(ids\)/g)).toHaveLength(2);
+  expect(undo).toMatch(/UPDATE public\.transactions SET[^;]+WHERE id=ANY\(ids\)/);
+  expect(undo).toMatch(/UPDATE public\.bank_statement_entries SET[^;]+WHERE transaction_id=ANY\(ids\)/);
   expect(undo).not.toMatch(/DELETE FROM/);
  });
 });
