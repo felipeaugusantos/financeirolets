@@ -259,9 +259,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   /** Só desfaz o vínculo; o lançamento fica. */
   const confirmDeleteLink = async () => {
     if (!deleteTarget) return;
-    await unlinkEntry(deleteTarget.id);
+    const ok = await unlinkEntry(deleteTarget.id);
+    if (!ok) return;
     setDeleteTarget(null);
-    toast({ title: 'Conciliação desfeita', description: 'A linha voltou para pendente. O lançamento não foi apagado.' });
   };
 
   /** Desfaz o vínculo e exclui o lançamento (padrão). */
@@ -269,7 +269,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
     if (!deleteTarget?.transaction_id) return;
     const target = deleteTarget;
     setDeleteTarget(null);
-    await unlinkAndDeleteEntry(target.id, target.transaction_id!, {
+    const transactionId = target.transaction_id;
+    if (!transactionId) return;
+    await unlinkAndDeleteEntry(target.id, transactionId, {
       createdFromExtract: createdFromStatement(target),
       matchNote: target.match_note,
     });
@@ -731,7 +733,7 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
         />
       )}
 
-      {accountId && <InternalTransfersPanel from={from} to={to} />}
+      {accountId && <InternalTransfersPanel from={from} to={to} accountId={accountId} revision={entries} onRegistered={() => void reload()} />}
 
       {accountId && (
         <PatternGroupsPanel

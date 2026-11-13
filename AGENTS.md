@@ -13,5 +13,6 @@
 - Helpdesk tickets go through the authenticated `helpdesk-ticket` Cloud function (token stays server-side); automatic failure tickets use `reportFailureTicket` in src/lib/helpdesk.ts, deduplicated to one per error per day and never interrupting the flow.
 - Helpdesk image attachments for tickets and replies reuse the private attachments bucket with expiring signed links in the message — support can view images without making financial attachments public.
 - Single-entry OFX creation uses OfxAllocationEditor for explicit manual splits and preserves rule allocations when disabled — allocation options must not depend on selecting multiple entries.
+- Own-account OFX transfers use invoker RPCs to commit/cancel both cash legs atomically, exclude DRE, and derive each unit from its account; only unambiguous mirror entries are suggested and confirmation never rewrites historical transactions.
 - Validate public connection values for local/CI Vite configurations without hardcoded fallbacks; delegate the generated .lovable/preview-supabase.config.ts build to Cloud — its connection configuration is not exposed in configResolved env/define.
 - Keep the Cloud-generated `.env` (public connection values only) tracked in git — production publish builds from the repository and fails the connection check without it; put secrets only in Cloud secrets.
