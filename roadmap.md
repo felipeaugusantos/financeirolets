@@ -1,4 +1,5 @@
 # Tasks
+- [ ] Implement atomic, confirmed own-account transfers in OFX reconciliation, preserving account units and excluding DRE; validate without production financial writes.
 - [x] Schedule publication of version 1.7.0 with updated release notes; current connection values present and public /login verified with email/password fields and no page errors, without financial writes. Deployment completion is not confirmed.
 - [x] Resolve the legacy migration replay conflict without touching financial data; original history retained intact and additive CRM migrations applied.
 - [x] CRM phase 1: companies, contacts, agenda, opportunities, coffee-break briefing and isolated permissions; 29 targeted tests pass.
