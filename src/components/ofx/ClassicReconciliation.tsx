@@ -17,6 +17,25 @@ type LeftTab = 'nao' | 'similares' | 'relacionados';
 type SortKey = 'data' | 'valor';
 type SortDir = 'asc' | 'desc';
 
+export type RowKind = 'transferencia' | 'exata' | 'regra' | 'pendente' | null;
+
+/** Classifica a linha do extrato para a cor: transferência própria > sugestão exata > regra > pendente. */
+export function rowKind(v: EnrichedEntry): RowKind {
+  const note = (v.entry as { match_note?: string | null }).match_note ?? '';
+  if (/transfer[êe]ncia interna/i.test(note)) return 'transferencia';
+  if (v.entry.status !== 'pendente') return null;
+  if (v.suggestions.some(s => s.basis === 'exato' && s.confidence === 'alta')) return 'exata';
+  if (v.ruleLabel) return 'regra';
+  return 'pendente';
+}
+
+const KIND_STYLE: Record<Exclude<RowKind, null>, { row: string; badge: string; label: string }> = {
+  exata: { row: 'border-l-4 border-l-success bg-success/5', badge: 'bg-success text-success-foreground', label: 'Sugestão exata' },
+  regra: { row: 'border-l-4 border-l-secondary bg-secondary/5', badge: 'bg-secondary text-secondary-foreground', label: 'Regra' },
+  transferencia: { row: 'border-l-4 border-l-transfer bg-transfer/5', badge: 'bg-transfer text-transfer-foreground', label: 'Transf. própria' },
+  pendente: { row: 'border-l-4 border-l-warning bg-warning/5', badge: 'bg-warning text-warning-foreground', label: 'Pendente' },
+};
+
 export interface ClassicReconciliationProps {
   accountName: string;
   from: string;
@@ -182,6 +201,13 @@ export default function ClassicReconciliation({
           <span><strong className="text-foreground">{Math.max(0, progress.total - progress.done)}</strong> pendentes</span>
           <span>{progress.total} linhas no período</span>
         </div>
+        <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Legenda de cores">
+          {(Object.keys(KIND_STYLE) as Exclude<RowKind, null>[]).map(k => (
+            <span key={k} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className={cn('h-2.5 w-2.5 rounded-full', KIND_STYLE[k].badge)} />{KIND_STYLE[k].label}
+            </span>
+          ))}
+        </div>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         {/* ------------------------------- Extrato ------------------------------- */}
@@ -232,10 +258,12 @@ export default function ClassicReconciliation({
                 <tbody>
                   {leftRows.map(v => {
                     const sel = entrySel.has(v.entry.id);
+                    const kind = rowKind(v);
+                    const ks = kind ? KIND_STYLE[kind] : null;
                     return (
                       <tr
                         key={v.entry.id}
-                        className={cn('border-t border-border cursor-pointer', sel ? 'bg-primary/10' : 'hover:bg-muted/40')}
+                        className={cn('border-t border-border cursor-pointer', ks?.row, sel ? 'bg-primary/10' : 'hover:bg-muted/40')}
                         onClick={() => toggle(entrySel, v.entry.id, setEntrySel)}
                       >
                         <td className="p-2" onClick={e => e.stopPropagation()}>
@@ -249,9 +277,12 @@ export default function ClassicReconciliation({
                         </td>
                         <td className="p-2">
                           <span className="line-clamp-1">{v.entry.memo}</span>
-                          {v.ruleLabel && (
-                            <Badge variant="outline" className="mt-0.5 text-[10px]">regra: {v.ruleLabel}</Badge>
-                          )}
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {ks && <Badge className={cn('text-[10px] border-0 hover:opacity-90', ks.badge)}>{ks.label}</Badge>}
+                            {v.ruleLabel && (
+                              <Badge variant="outline" className="text-[10px]">regra: {v.ruleLabel}</Badge>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
