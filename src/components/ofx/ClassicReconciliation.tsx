@@ -164,6 +164,25 @@ export default function ClassicReconciliation({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-2xl border border-border bg-card p-3 shadow-card" aria-label="Progresso da conciliação">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-heading font-semibold">Progresso da conciliação</span>
+            <Badge variant={progress.pct >= 100 ? 'default' : 'secondary'} className={cn('text-[10px]', progress.pct >= 100 && 'bg-success text-success-foreground hover:bg-success')}>
+              {progress.total === 0 ? 'Sem linhas' : progress.pct >= 100 ? 'Concluída' : 'Em andamento'}
+            </Badge>
+          </div>
+          <span className="text-2xl font-heading font-bold tabular-nums">{progress.pct}%</span>
+        </div>
+        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={progress.pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className={cn('h-full rounded-full transition-all duration-500', progress.pct >= 100 ? 'bg-success' : 'bg-secondary')} style={{ width: `${Math.min(100, progress.pct)}%` }} />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span><strong className="text-foreground">{progress.done}</strong> conciliadas</span>
+          <span><strong className="text-foreground">{Math.max(0, progress.total - progress.done)}</strong> pendentes</span>
+          <span>{progress.total} linhas no período</span>
+        </div>
+      </div>
       <div className="grid gap-3 lg:grid-cols-2">
         {/* ------------------------------- Extrato ------------------------------- */}
         <Card className="shadow-card rounded-2xl border-border overflow-hidden">
