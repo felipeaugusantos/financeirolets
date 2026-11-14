@@ -57,6 +57,12 @@ const navItems = [
   { title: 'Manual', url: '/manual', icon: BookOpen },
 ];
 
+const pick = (...urls: string[]) => navItems.filter((i) => urls.includes(i.url));
+const overviewItems = pick('/', '/relatorios');
+const financeItems = pick('/lancamentos', '/lancamentos-contabeis');
+const operationsItems = pick('/fabrica', '/crm/agenda', '/ifood');
+const supportItems = pick('/manual', '/chamados');
+
 const managementItems = [
   { title: 'Contas a Pagar', url: '/contas?tab=pagar', match: (p: string, s: string) => p === '/contas' && !s.includes('tab=receber') },
   { title: 'Contas a Receber', url: '/contas?tab=receber', match: (p: string, s: string) => p === '/contas' && s.includes('tab=receber') },
@@ -130,6 +136,23 @@ export function AppSidebar() {
   );
 
 
+  const renderNav = (list: typeof navItems) => list.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url.split('/').slice(0, 2).join('/') + '/'))}>
+                    <NavLink
+                      to={item.url}
+                      end={item.url === '/'}
+                      className="hover:bg-sidebar-accent/50"
+                      activeClassName="bg-sidebar-accent text-primary font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                  {!collapsed && starButton(item.url, item.title)}
+                </SidebarMenuItem>
+              ));
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4 group-data-[collapsible=icon]:px-2">
@@ -195,25 +218,19 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>Visão Geral</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url.split('/').slice(0, 2).join('/') + '/'))}>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === '/'}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                  {!collapsed && starButton(item.url, item.title)}
-                </SidebarMenuItem>
-              ))}
+              {renderNav(overviewItems)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Financeiro & Caixa</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {renderNav(financeItems)}
 
               <Collapsible defaultOpen={managementActive} className="group/collapsible">
                 <SidebarMenuItem>
@@ -291,21 +308,24 @@ export function AppSidebar() {
               </Collapsible>
               )}
 
-              {tailItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink
-                      to={item.url}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                  {!collapsed && starButton(item.url, item.title)}
-                </SidebarMenuItem>
-              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Operações & Vendas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {renderNav(operationsItems)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Apoio</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {renderNav([...supportItems, ...tailItems])}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
