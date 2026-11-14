@@ -16,7 +16,9 @@ import {
   ChevronsRight,
   LifeBuoy,
   BookOpen,
+  Star,
 } from 'lucide-react';
+import { useMenuFavorites } from '@/hooks/useMenuFavorites';
 import { useState } from 'react';
 import { HelpdeskDialog } from '@/components/HelpdeskDialog';
 import { NavLink } from '@/components/NavLink';
@@ -33,6 +35,7 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
+  SidebarMenuAction,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
@@ -89,6 +92,42 @@ export function AppSidebar() {
     : [settingsItem, releasesItem];
   const reconciliationActive = location.pathname.startsWith('/conciliacao');
   const managementActive = location.pathname === '/contas' || location.pathname.startsWith('/gestao');
+  const { favorites, toggle, isFavorite } = useMenuFavorites(user?.id);
+  const allEntries = [
+    ...items.map((i) => ({ title: i.title, url: i.url, icon: i.icon })),
+    ...managementItems.map((i) => ({ title: i.title, url: i.url, icon: Briefcase })),
+    ...(canReconcile ? reconciliationItems.map((i) => ({ title: i.title, url: i.url, icon: Landmark })) : []),
+    ...tailItems.map((i) => ({ title: i.title, url: i.url, icon: i.icon })),
+  ];
+  const favoriteEntries = favorites
+    .map((url) => allEntries.find((e) => e.url === url))
+    .filter((e): e is (typeof allEntries)[number] => Boolean(e));
+  const isUrlActive = (url: string) => {
+    const [path, query] = url.split('?');
+    if (query) return location.pathname === path && location.search.includes(query);
+    return location.pathname === path;
+  };
+  const starButton = (url: string, title: string) => (
+    <SidebarMenuAction
+      showOnHover={!isFavorite(url)}
+      onClick={() => toggle(url)}
+      aria-label={isFavorite(url) ? `Remover ${title} dos favoritos` : `Favoritar ${title}`}
+      title={isFavorite(url) ? 'Remover dos favoritos' : 'Favoritar'}
+    >
+      <Star className={isFavorite(url) ? 'fill-accent text-accent' : 'text-muted-foreground'} />
+    </SidebarMenuAction>
+  );
+  const subStar = (url: string, title: string) => (
+    <button
+      type="button"
+      onClick={() => toggle(url)}
+      aria-label={isFavorite(url) ? `Remover ${title} dos favoritos` : `Favoritar ${title}`}
+      title={isFavorite(url) ? 'Remover dos favoritos' : 'Favoritar'}
+      className={`absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-sidebar-accent ${isFavorite(url) ? '' : 'opacity-0 group-hover/sub:opacity-100 focus:opacity-100'}`}
+    >
+      <Star className={`h-3.5 w-3.5 ${isFavorite(url) ? 'fill-accent text-accent' : 'text-muted-foreground'}`} />
+    </button>
+  );
 
 
   return (
@@ -126,6 +165,36 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel className="gap-1"><Star className="h-3 w-3" /> Favoritos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            {favoriteEntries.length === 0 ? (
+              !collapsed && (
+                <p className="px-2 py-1 text-xs text-muted-foreground">
+                  Toque na estrela ao lado de um item do menu para fixá-lo aqui.
+                </p>
+              )
+            ) : (
+              <SidebarMenu>
+                {favoriteEntries.map((item) => (
+                  <SidebarMenuItem key={`fav-${item.url}`}>
+                    <SidebarMenuButton asChild isActive={isUrlActive(item.url)} tooltip={item.title}>
+                      <Link
+                        to={item.url}
+                        className={isUrlActive(item.url) ? 'bg-sidebar-accent text-primary font-medium' : 'hover:bg-sidebar-accent/50'}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                    {!collapsed && starButton(item.url, item.title)}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -142,6 +211,7 @@ export function AppSidebar() {
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
+                  {!collapsed && starButton(item.url, item.title)}
                 </SidebarMenuItem>
               ))}
 
@@ -164,7 +234,7 @@ export function AppSidebar() {
                         {managementItems.map((sub) => {
                           const active = sub.match(location.pathname, location.search);
                           return (
-                            <SidebarMenuSubItem key={sub.url}>
+                            <SidebarMenuSubItem key={sub.url} className="group/sub relative">
                               <SidebarMenuSubButton asChild isActive={active}>
                                 <Link
                                   to={sub.url}
@@ -173,6 +243,7 @@ export function AppSidebar() {
                                   <span>{sub.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
+                              {subStar(sub.url, sub.title)}
                             </SidebarMenuSubItem>
                           );
                         })}
@@ -200,7 +271,7 @@ export function AppSidebar() {
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {reconciliationItems.map((sub) => (
-                          <SidebarMenuSubItem key={sub.url}>
+                          <SidebarMenuSubItem key={sub.url} className="group/sub relative">
                             <SidebarMenuSubButton asChild isActive={location.pathname === sub.url}>
                               <NavLink
                                 to={sub.url}
@@ -210,6 +281,7 @@ export function AppSidebar() {
                                 <span>{sub.title}</span>
                               </NavLink>
                             </SidebarMenuSubButton>
+                            {subStar(sub.url, sub.title)}
                           </SidebarMenuSubItem>
                         ))}
                       </SidebarMenuSub>
@@ -231,6 +303,7 @@ export function AppSidebar() {
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
+                  {!collapsed && starButton(item.url, item.title)}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
