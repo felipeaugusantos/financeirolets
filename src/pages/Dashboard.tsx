@@ -569,8 +569,6 @@ export default function Dashboard() {
         );
       })()}
 
-      <ReconciliationCard from={period.from} to={period.to} unitId={dashFilters.unitId} refreshKey={updatedAt} />
-
       {/* KPI Cards */}
       <div className={cn('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 transition-opacity', refreshing && 'opacity-60')}>
         {cards.map((card) => (
@@ -598,6 +596,8 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      <ReconciliationCard from={period.from} to={period.to} unitId={dashFilters.unitId} refreshKey={updatedAt} />
 
       {/* Incomplete data alert */}
       {(semCategoria > 0 || semUnidade > 0) && (
