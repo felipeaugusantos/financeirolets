@@ -39,6 +39,8 @@
 
     --info: 184 100% 39%;              /* same as teal */
     --info-foreground: 0 0% 100%;
+    --transfer: 217 91% 50%;
+    --transfer-foreground: 0 0% 100%;
 
     --border: 30 15% 88%;              /* #E8E2DD */
     --input: 30 18% 70%;               /* visible field border */
@@ -98,6 +100,8 @@
 
     --info: 184 70% 55%;
     --info-foreground: 340 40% 10%;
+    --transfer: 217 91% 65%;
+    --transfer-foreground: 340 40% 10%;
 
     --border: 340 25% 25%;
     --input: 340 25% 38%;

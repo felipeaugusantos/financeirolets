@@ -44,6 +44,10 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        transfer: {
+          DEFAULT: "hsl(var(--transfer))",
+          foreground: "hsl(var(--transfer-foreground))",
+        },
         info: {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
