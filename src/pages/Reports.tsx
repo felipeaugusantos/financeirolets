@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Star } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMenuFavorites } from '@/hooks/useMenuFavorites';
+import { reportUrl } from '@/lib/reportViews';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, TrendingUp, Columns3, GitCompare, BarChart3 } from 'lucide-react';
 import DreReport from '@/components/reports/DreReport';
@@ -11,7 +15,26 @@ import CashFlowByUnit from '@/components/reports/CashFlowByUnit';
 type View = 'menu' | 'dre' | 'dre-gerencial' | 'cashflow' | 'dre-comparativo' | 'reconciliacao' | 'cashflow-unidade';
 
 export default function Reports() {
-  const [view, setView] = useState<View>('menu');
+  const [params, setParams] = useSearchParams();
+  const view = (params.get('r') as View) || 'menu';
+  const setView = (v: View) => setParams(v === 'menu' ? {} : { r: v });
+  const { user } = useAuth();
+  const { isFavorite, toggle } = useMenuFavorites(user?.id);
+  const star = (v: View, title: string) => {
+    const url = reportUrl(v);
+    const fav = isFavorite(url);
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); toggle(url); }}
+        aria-label={fav ? `Remover ${title} dos favoritos` : `Favoritar ${title}`}
+        title={fav ? 'Remover dos favoritos' : 'Favoritar'}
+        className="ml-auto rounded-md p-1.5 hover:bg-muted"
+      >
+        <Star className={`h-4 w-4 ${fav ? 'fill-accent text-accent' : 'text-muted-foreground'}`} />
+      </button>
+    );
+  };
 
   if (view === 'dre') return <DreReport onBack={() => setView('menu')} />;
   if (view === 'dre-gerencial') return <DreGerencial onBack={() => setView('menu')} />;
@@ -40,6 +63,7 @@ export default function Reports() {
               <CardTitle className="text-base font-heading">Fluxo de Caixa por Unidade</CardTitle>
               <p className="text-xs text-muted-foreground">Receitas e despesas por unidade</p>
             </div>
+            {star('cashflow-unidade', 'Fluxo de Caixa por Unidade')}
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -60,6 +84,7 @@ export default function Reports() {
               <CardTitle className="text-base font-heading">DRE</CardTitle>
               <p className="text-xs text-muted-foreground">Demonstrativo de Resultado</p>
             </div>
+            {star('dre', 'DRE')}
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -80,6 +105,7 @@ export default function Reports() {
               <CardTitle className="text-base font-heading">DRE Gerencial</CardTitle>
               <p className="text-xs text-muted-foreground">Margens e resultado contábil</p>
             </div>
+            {star('dre-gerencial', 'DRE Gerencial')}
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -100,6 +126,7 @@ export default function Reports() {
               <CardTitle className="text-base font-heading">DRE Comparativo</CardTitle>
               <p className="text-xs text-muted-foreground">Unidades lado a lado</p>
             </div>
+            {star('dre-comparativo', 'DRE Comparativo')}
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -120,6 +147,7 @@ export default function Reports() {
               <CardTitle className="text-base font-heading">Fluxo de Caixa</CardTitle>
               <p className="text-xs text-muted-foreground">Entradas, saídas e saldo</p>
             </div>
+            {star('cashflow', 'Fluxo de Caixa')}
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -140,6 +168,7 @@ export default function Reports() {
               <CardTitle className="text-base font-heading">Reconciliação</CardTitle>
               <p className="text-xs text-muted-foreground">Dashboard ↔ DRE</p>
             </div>
+            {star('reconciliacao', 'Reconciliação')}
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">

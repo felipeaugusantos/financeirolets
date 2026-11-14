@@ -19,6 +19,7 @@ import {
   Star,
 } from 'lucide-react';
 import { useMenuFavorites } from '@/hooks/useMenuFavorites';
+import { reportViews, reportUrl } from '@/lib/reportViews';
 import { useState } from 'react';
 import { HelpdeskDialog } from '@/components/HelpdeskDialog';
 import { NavLink } from '@/components/NavLink';
@@ -58,7 +59,8 @@ const navItems = [
 ];
 
 const pick = (...urls: string[]) => navItems.filter((i) => urls.includes(i.url));
-const overviewItems = pick('/', '/relatorios');
+const overviewItems = pick('/');
+const reportItems = reportViews.map((r) => ({ title: r.title, url: reportUrl(r.key) }));
 const financeItems = pick('/lancamentos', '/lancamentos-contabeis');
 const operationsItems = pick('/fabrica', '/crm/agenda', '/ifood');
 const supportItems = pick('/manual', '/chamados');
@@ -101,6 +103,7 @@ export function AppSidebar() {
   const { favorites, toggle, isFavorite } = useMenuFavorites(user?.id);
   const allEntries = [
     ...items.map((i) => ({ title: i.title, url: i.url, icon: i.icon })),
+    ...reportItems.map((i) => ({ title: i.title, url: i.url, icon: BarChart3 })),
     ...managementItems.map((i) => ({ title: i.title, url: i.url, icon: Briefcase })),
     ...(canReconcile ? reconciliationItems.map((i) => ({ title: i.title, url: i.url, icon: Landmark })) : []),
     ...tailItems.map((i) => ({ title: i.title, url: i.url, icon: i.icon })),
@@ -110,7 +113,11 @@ export function AppSidebar() {
     .filter((e): e is (typeof allEntries)[number] => Boolean(e));
   const isUrlActive = (url: string) => {
     const [path, query] = url.split('?');
-    if (query) return location.pathname === path && location.search.includes(query);
+    if (query) {
+      const want = new URLSearchParams(query);
+      const have = new URLSearchParams(location.search);
+      return location.pathname === path && [...want.entries()].every(([k, v]) => have.get(k) === v);
+    }
     return location.pathname === path;
   };
   const starButton = (url: string, title: string) => (
@@ -231,6 +238,45 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {renderNav(overviewItems)}
+              <Collapsible defaultOpen={location.pathname === '/relatorios'} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={location.pathname === '/relatorios'} className="hover:bg-sidebar-accent/50" tooltip="Relatórios">
+                      <BarChart3 className="h-4 w-4" />
+                      {!collapsed && (
+                        <>
+                          <span>Relatórios</span>
+                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  {!collapsed && (
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem className="group/sub relative">
+                          <SidebarMenuSubButton asChild isActive={location.pathname === '/relatorios' && !location.search.includes('r=')}>
+                            <Link to="/relatorios" className="hover:bg-sidebar-accent/50"><span>Todos os relatórios</span></Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        {reportItems.map((sub) => (
+                          <SidebarMenuSubItem key={sub.url} className="group/sub relative">
+                            <SidebarMenuSubButton asChild isActive={isUrlActive(sub.url)}>
+                              <Link
+                                to={sub.url}
+                                className={isUrlActive(sub.url) ? 'bg-sidebar-accent text-primary font-medium pr-7' : 'hover:bg-sidebar-accent/50 pr-7'}
+                              >
+                                <span>{sub.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                            {subStar(sub.url, sub.title)}
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  )}
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
           </CollapsibleContent>

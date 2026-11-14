@@ -19,11 +19,21 @@ export function useMenuFavorites(userId?: string | null) {
     }
   }, [key]);
 
+  useEffect(() => {
+    const onChange = (e: Event) => {
+      const d = (e as CustomEvent<{ key: string; list: string[] }>).detail;
+      if (d?.key === key) setFavorites(d.list);
+    };
+    window.addEventListener('menu-favorites-change', onChange);
+    return () => window.removeEventListener('menu-favorites-change', onChange);
+  }, [key]);
+
   const toggle = useCallback(
     (url: string) => {
       setFavorites((prev) => {
         const next = toggleFavorite(prev, url);
         try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* ignore */ }
+        setTimeout(() => window.dispatchEvent(new CustomEvent('menu-favorites-change', { detail: { key, list: next } })), 0);
         return next;
       });
     },
