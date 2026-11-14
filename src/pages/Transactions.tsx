@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,6 +44,11 @@ export default function Transactions({ accountingCategory }: { accountingCategor
     setEditingTx(tx);
     setDialogOpen(true);
   };
+
+  // Atalho do topo: /lancamentos?novo=1 abre o formulário direto.
+  useEffect(() => {
+    if (searchParams.get('novo') === '1' && !accountingCategory) { setEditingTx(null); setDialogOpen(true); }
+  }, [searchParams, accountingCategory]);
 
   const handleNew = () => {
     setEditingTx(null);

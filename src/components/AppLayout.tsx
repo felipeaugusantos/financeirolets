@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { BottomTabs } from '@/components/BottomTabs';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { HeaderUserMenu } from '@/components/HeaderUserMenu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { APP_VERSION, IS_HOMOLOG } from '@/lib/appEnv';
 
@@ -24,15 +25,16 @@ export function AppLayout({ children }: AppLayoutProps) {
             {isMobile && (
               <img src="/logo-circle.jpg" alt="Let's Cookies" className="h-8 w-8 rounded-full" />
             )}
-            <h2 className="font-heading text-base font-semibold text-card-foreground">Let's Finance</h2>
+            <h2 className="hidden sm:block font-heading text-base font-semibold text-card-foreground">Let's Finance</h2>
             {IS_HOMOLOG && (
               <span className="rounded-full bg-warning/15 text-warning px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
                 Homologação
               </span>
             )}
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <span className="hidden sm:inline text-[10px] text-muted-foreground">v{APP_VERSION}</span>
               <ThemeToggle />
+              <HeaderUserMenu />
             </div>
           </header>
 
