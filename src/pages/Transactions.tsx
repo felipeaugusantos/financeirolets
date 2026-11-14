@@ -45,6 +45,11 @@ export default function Transactions({ accountingCategory }: { accountingCategor
     setDialogOpen(true);
   };
 
+  // Atalho do topo: /lancamentos?novo=1 abre o formulário direto.
+  useEffect(() => {
+    if (searchParams.get('novo') === '1' && !accountingCategory) { setEditingTx(null); setDialogOpen(true); }
+  }, [searchParams, accountingCategory]);
+
   const handleNew = () => {
     setEditingTx(null);
     setDialogOpen(true);
