@@ -217,17 +217,37 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <Collapsible defaultOpen className="group/section">
         <SidebarGroup>
-          <SidebarGroupLabel>Visão Geral</SidebarGroupLabel>
+          {!collapsed && (
+          <SidebarGroupLabel asChild>
+            <CollapsibleTrigger className="flex w-full items-center hover:text-primary">
+              Visão Geral
+              <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform group-data-[state=open]/section:rotate-180" />
+            </CollapsibleTrigger>
+          </SidebarGroupLabel>
+          )}
+          <CollapsibleContent forceMount={collapsed ? true : undefined} className={collapsed ? '' : 'data-[state=closed]:hidden'}>
           <SidebarGroupContent>
             <SidebarMenu>
               {renderNav(overviewItems)}
             </SidebarMenu>
           </SidebarGroupContent>
+          </CollapsibleContent>
         </SidebarGroup>
+        </Collapsible>
 
+        <Collapsible defaultOpen className="group/section">
         <SidebarGroup>
-          <SidebarGroupLabel>Financeiro & Caixa</SidebarGroupLabel>
+          {!collapsed && (
+          <SidebarGroupLabel asChild>
+            <CollapsibleTrigger className="flex w-full items-center hover:text-primary">
+              Financeiro & Caixa
+              <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform group-data-[state=open]/section:rotate-180" />
+            </CollapsibleTrigger>
+          </SidebarGroupLabel>
+          )}
+          <CollapsibleContent forceMount={collapsed ? true : undefined} className={collapsed ? '' : 'data-[state=closed]:hidden'}>
           <SidebarGroupContent>
             <SidebarMenu>
               {renderNav(financeItems)}
@@ -310,25 +330,49 @@ export function AppSidebar() {
 
             </SidebarMenu>
           </SidebarGroupContent>
+          </CollapsibleContent>
         </SidebarGroup>
+        </Collapsible>
 
+        <Collapsible defaultOpen className="group/section">
         <SidebarGroup>
-          <SidebarGroupLabel>Operações & Vendas</SidebarGroupLabel>
+          {!collapsed && (
+          <SidebarGroupLabel asChild>
+            <CollapsibleTrigger className="flex w-full items-center hover:text-primary">
+              Operações & Vendas
+              <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform group-data-[state=open]/section:rotate-180" />
+            </CollapsibleTrigger>
+          </SidebarGroupLabel>
+          )}
+          <CollapsibleContent forceMount={collapsed ? true : undefined} className={collapsed ? '' : 'data-[state=closed]:hidden'}>
           <SidebarGroupContent>
             <SidebarMenu>
               {renderNav(operationsItems)}
             </SidebarMenu>
           </SidebarGroupContent>
+          </CollapsibleContent>
         </SidebarGroup>
+        </Collapsible>
 
+        <Collapsible defaultOpen className="group/section">
         <SidebarGroup>
-          <SidebarGroupLabel>Apoio</SidebarGroupLabel>
+          {!collapsed && (
+          <SidebarGroupLabel asChild>
+            <CollapsibleTrigger className="flex w-full items-center hover:text-primary">
+              Apoio
+              <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform group-data-[state=open]/section:rotate-180" />
+            </CollapsibleTrigger>
+          </SidebarGroupLabel>
+          )}
+          <CollapsibleContent forceMount={collapsed ? true : undefined} className={collapsed ? '' : 'data-[state=closed]:hidden'}>
           <SidebarGroupContent>
             <SidebarMenu>
               {renderNav([...supportItems, ...tailItems])}
             </SidebarMenu>
           </SidebarGroupContent>
+          </CollapsibleContent>
         </SidebarGroup>
+        </Collapsible>
 
       </SidebarContent>
 
