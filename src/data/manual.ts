@@ -8,7 +8,7 @@ export const MANUAL: ManualRole[] = [
     description: 'Rotina diária da loja: lançar despesas, receitas e anexar comprovantes.',
     sections: [
       { title: 'Entrar no sistema', steps: ['Acesse o endereço do Let\'s Finance e informe seu e-mail e senha.', 'Marque "Lembrar e-mail" no seu aparelho.', 'Esqueceu a senha? Use "Esqueci minha senha" na tela de login.'] },
-      { title: 'Lançar uma despesa ou receita', steps: ['Abra Lançamentos e toque em "Novo".', 'Escolha o tipo, valor, data, categoria e unidade.', 'Se o fornecedor ou categoria não existir, use "+ Adicionar" no próprio campo.', 'Salve. O lançamento aparece na lista na hora.'], link: '/transacoes' },
+      { title: 'Lançar uma despesa ou receita', steps: ['Abra Lançamentos e toque em "Novo".', 'Escolha o tipo, valor, data, categoria e unidade.', 'Se o fornecedor ou categoria não existir, use "+ Adicionar" no próprio campo.', 'Salve. O lançamento aparece na lista na hora.'], link: '/lancamentos' },
       { title: 'Anexar comprovante', steps: ['No lançamento, use o campo de anexos.', 'Aceita foto (JPG/PNG) ou PDF.', 'Confira se o anexo aparece antes de salvar.'] },
       { title: 'Lançamento pago errado', steps: ['Lançamentos pagos não podem ser excluídos.', 'Peça ao financeiro um estorno ou cancelamento.', 'Tudo fica registrado no histórico.'] },
       { title: 'Pedir ajuda', steps: ['Toque em "Abrir chamado" no menu lateral.', 'Descreva o problema e anexe até 3 imagens.', 'Acompanhe a resposta em Chamados.'], link: '/chamados' },
