@@ -3,6 +3,11 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.8.0 — 2026-11-13
+- Manual de uso no sistema por função (Operador, Financeiro, Gerente).
+- Topo com avatar, unidade e atalho "+ Lançamento".
+- Conciliação: barra de progresso e cores por situação nas linhas.
+
 ## 1.7.3 — 2026-11-12
 - Fábrica: romaneio de entrega em PDF por unidade/loja, com conferência e assinaturas.
 - DRE: card de batimento de saldo entre extrato e resultado do período.
