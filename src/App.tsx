@@ -18,6 +18,7 @@ const Transactions = lazy(() => import("./pages/Transactions"));
 const AccountingTransactions = lazy(() => import("./pages/AccountingTransactions"));
 const Crm = lazy(() => import("./pages/Crm"));
 const Helpdesk = lazy(() => import("./pages/Helpdesk"));
+const Manual = lazy(() => import("./pages/Manual"));
 const Accounts = lazy(() => import("./pages/Accounts"));
 const FiscalInvoices = lazy(() => import("./pages/FiscalInvoices"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
             <Route path="/lancamentos-contabeis" element={<ProtectedRoute><AccountingTransactions /></ProtectedRoute>} />
             <Route path="/chamados" element={<ProtectedRoute><Helpdesk /></ProtectedRoute>} />
+            <Route path="/manual" element={<ProtectedRoute><Manual /></ProtectedRoute>} />
             <Route path="/crm" element={<Navigate to="/crm/agenda" replace />} />
             <Route path="/crm/agenda" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
             <Route path="/crm/buscar" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
