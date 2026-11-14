@@ -15,6 +15,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   LifeBuoy,
+  BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { HelpdeskDialog } from '@/components/HelpdeskDialog';
@@ -50,6 +51,7 @@ const navItems = [
   { title: 'Fábrica & Operações', url: '/fabrica', icon: ChefHat },
   { title: 'CRM', url: '/crm/agenda', icon: Building2 },
   { title: 'Chamados', url: '/chamados', icon: LifeBuoy },
+  { title: 'Manual', url: '/manual', icon: BookOpen },
 ];
 
 const managementItems = [
