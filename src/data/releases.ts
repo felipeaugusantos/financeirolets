@@ -45,6 +45,17 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.8.0',
+    date: '2026-11-13',
+    summary: 'Manual de uso no sistema, novo topo com atalho de lançamento e conciliação mais visual.',
+    items: [
+      { area: 'Geral', kind: 'novidade', title: 'Manual de uso dentro do sistema', detail: 'Novo item "Manual" no menu, com passo a passo para Operador de loja, Financeiro e Gerente, busca e botões que levam direto à tela certa.', tech: 'src/pages/Manual.tsx + src/data/manual.ts; rota /manual.' },
+      { area: 'Geral', kind: 'melhoria', title: 'Novo topo com perfil e atalho', detail: 'O topo mostra suas iniciais, sua unidade e o botão "+ Lançamento", que abre direto o formulário de novo lançamento. Pelo menu do perfil você acessa o Manual e sai do sistema.', tech: 'HeaderUserMenu; /lancamentos?novo=1.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Barra de progresso da conciliação', detail: 'Quadro no topo com percentual conciliado, linhas conciliadas e pendentes; a barra fica verde ao chegar a 100%.' },
+      { area: 'Conciliação Bancária', kind: 'melhoria', title: 'Cores nas linhas do extrato', detail: 'Verde para sugestão exata, turquesa para regra, azul para transferência própria e amarelo para pendente, com legenda.', tech: 'rowKind() em ClassicReconciliation; token --transfer.' },
+    ],
+  },
+  {
     version: '1.7.3',
     date: '2026-11-12',
     summary: 'Romaneio de entrega em PDF na Fábrica e batimento de saldo no DRE.',
