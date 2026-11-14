@@ -1,4 +1,5 @@
 # Tasks
+- [x] Connect Dashboard to read-only bank reconciliation progress, pending amounts and verified closing status; 19 tests pass, authenticated desktop/mobile panel and period-preserving navigation verified; no financial writes.
 - [x] Implement atomic, confirmed own-account transfers in OFX reconciliation, preserving account units and excluding DRE; automated tests and authenticated desktop/mobile read-only checks completed, with no matching pair in the current period and no production financial writes.
 - [x] Schedule publication of version 1.7.0 with updated release notes; current connection values present and public /login verified with email/password fields and no page errors, without financial writes. Deployment completion is not confirmed.
 - [x] Resolve the legacy migration replay conflict without touching financial data; original history retained intact and additive CRM migrations applied.

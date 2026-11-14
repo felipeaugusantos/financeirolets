@@ -1,5 +1,7 @@
 # AGENTS
 
+- Executive reconciliation reads imported bank lines in the selected date/account-unit scope with paginated queries; closing requires an exact end-date bank snapshot and configured opening balance, independently of DRE regime, to avoid false closure claims.
+
 - Managed Cloud migrations use `drizzle/migrations`; the original history is retained unchanged in `drizzle/legacy-migrations` because replaying already-applied financial schema blocks additive migrations.
 - CRM screens reuse `useSupabaseCrud` and existing CRUD controls; records are archived rather than deleted to preserve commercial history and remain isolated from financial postings.
 - CRM discovery runs in authenticated Cloud functions, with bounded Google Places requests and single CNPJ lookups; imports use company CRUD and portfolio-scoped external identifiers to prevent duplicates without financial postings.

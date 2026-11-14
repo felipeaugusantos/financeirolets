@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDashboard } from '@/hooks/useDashboard';
 import { CashForecastCard } from '@/components/dashboard/CashForecastCard';
+import { ReconciliationCard } from '@/components/dashboard/ReconciliationCard';
 import { useSupabaseCrud } from '@/hooks/useSupabaseCrud';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { parseView, serializeView, variationTone, compactBRL, drilldownUrl, type DashboardView, type PeriodPreset } from '@/lib/dashboardView';
@@ -567,6 +568,8 @@ export default function Dashboard() {
           </Card>
         );
       })()}
+
+      <ReconciliationCard from={period.from} to={period.to} unitId={dashFilters.unitId} refreshKey={updatedAt} />
 
       {/* KPI Cards */}
       <div className={cn('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 transition-opacity', refreshing && 'opacity-60')}>

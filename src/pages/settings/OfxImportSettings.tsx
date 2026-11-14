@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,6 +43,11 @@ const SHOW_SUGGESTED_RULES = false;
 export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const dateParam = (key: string) => {
+    const value = searchParams.get(key);
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const reprocessRef = useRef<HTMLInputElement>(null);
 
@@ -55,9 +60,9 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
   }, []);
 
   const [accounts, setAccounts] = useState<Tables<'accounts'>[]>([]);
-  const [accountId, setAccountId] = useState<string>(saved.accountId || '');
-  const [from, setFrom] = useState(saved.from || firstDayOfMonth());
-  const [to, setTo] = useState(saved.to || todayLocalISO());
+  const [accountId, setAccountId] = useState<string>(searchParams.get('accountId') || saved.accountId || '');
+  const [from, setFrom] = useState(dateParam('from') || saved.from || firstDayOfMonth());
+  const [to, setTo] = useState(dateParam('to') || saved.to || todayLocalISO());
   const [statusFilter, setStatusFilter] = useState<'pendente' | 'vinculado' | 'ignorado' | 'todos'>(
     (saved.statusFilter as 'pendente') || 'pendente');
   const [search, setSearch] = useState(saved.search || '');
