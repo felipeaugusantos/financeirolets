@@ -3,6 +3,9 @@
 Versões publicadas e validadas com o cliente. A versão exibida no cabeçalho do
 app vem de `APP_VERSION` em `src/lib/appEnv.ts` — atualizar os dois juntos.
 
+## 1.9.0 — 2026-11-15
+- CRM: eventos, painel de eventos com valor das propostas, contrato em PDF e proposta por pessoa.
+
 ## 1.8.0 — 2026-11-13
 - Manual de uso no sistema por função (Operador, Financeiro, Gerente).
 - Topo com avatar, unidade e atalho "+ Lançamento".
