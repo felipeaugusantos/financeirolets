@@ -1,4 +1,6 @@
 # Tasks
+- [x] Sprint 2a: PDF/spreadsheet tools load on demand; batch OFX rule from selected lines (admin/financeiro), tests added.
+- [ ] Sprint 2b: shared cache for accounts/categories/units — planned as separate step (cross-screen refactor).
 - [x] Sprint 1: transaction date/account/unit indexes, home-screen manifest, repo hygiene test aligned with tracked public .env.
 - [x] Fix collapsed Reports navigation and repeatable header transaction shortcut; 9 tests pass and both authenticated browser flows verified, including reload, without financial writes.
 - [x] Connect Dashboard to read-only bank reconciliation progress, pending amounts and verified closing status; 19 tests pass, authenticated desktop/mobile panel and period-preserving navigation verified; no financial writes.

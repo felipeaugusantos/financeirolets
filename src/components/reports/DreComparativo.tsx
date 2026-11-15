@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Columns3, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import { cn, toLocalISODate, todayLocalISO, errorMessage } from '@/lib/utils';
-import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -226,7 +225,7 @@ export default function DreComparativo({ onBack }: { onBack: () => void }) {
     if (!reportRef.current) return;
     setExporting(true);
     try {
-      await exportToPdf({
+      await (await import('@/lib/exportPdf')).exportToPdf({
         title: 'DRE Comparativo por Unidade',
         subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo} | Regime: ${filters.regime === 'competencia' ? 'Competência' : 'Caixa'}`,
         filename: `DRE_Comparativo_${filters.dateFrom}_${filters.dateTo}.pdf`,

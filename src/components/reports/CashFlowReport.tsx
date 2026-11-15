@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, TrendingUp, Loader2, Download, FileSpreadsheet, RotateCcw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
 import { cn, toLocalISODate } from '@/lib/utils';
-import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, CsvCell } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
@@ -119,7 +118,7 @@ export default function CashFlowReport({ onBack }: { onBack: () => void }) {
     if (!reportRef.current) return;
     setExporting(true);
     try {
-      await exportToPdf({
+      await (await import('@/lib/exportPdf')).exportToPdf({
         title: `Fluxo de Caixa — ${mode === 'realizado' ? 'Realizado' : mode === 'projetado' ? 'Projetado' : 'Comparativo'}`,
         subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo}`,
         filename: `FluxoCaixa_${mode}_${filters.dateFrom}_${filters.dateTo}.pdf`,

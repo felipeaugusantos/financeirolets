@@ -48,3 +48,18 @@ export function buildRuleFromEntry(i: RuleFromEntryInput): TablesInsert<'ofx_imp
     created_by: i.userId,
   };
 }
+
+/** Palavras do termo sugerido presentes em TODAS as linhas selecionadas (ordem da primeira). */
+export function commonRulePattern(memos: (string | null | undefined)[]): string {
+  const lists = memos.map(m => suggestRulePattern(m).split(' ').filter(Boolean));
+  if (!lists.length) return '';
+  const rest = lists.slice(1).map(l => new Set(l));
+  return lists[0].filter(w => rest.every(s => s.has(w))).join(' ');
+}
+
+/** Direção da regra para um lote: só receita/despesa quando todas as linhas têm o mesmo sinal. */
+export function batchRuleDirection(amounts: number[]): 'receita' | 'despesa' | 'ambos' {
+  if (amounts.length && amounts.every(a => a >= 0)) return 'receita';
+  if (amounts.length && amounts.every(a => a < 0)) return 'despesa';
+  return 'ambos';
+}

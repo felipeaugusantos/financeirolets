@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { CreditCard, Upload, PlusCircle, Loader2, CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -133,7 +132,8 @@ export default function CardReconciliation() {
     }
     setBusy(true);
     try {
-      const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+      const XLSX = await import('xlsx');
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
       const sheets: CardSheetInput[] = wb.SheetNames.map(name => ({
         name,
         matrix: XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, defval: '', raw: true }),

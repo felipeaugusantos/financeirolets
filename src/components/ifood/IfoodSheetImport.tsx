@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { FileUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ export function IfoodSheetImport({ storeId, storeName, onDone }: { storeId: stri
 
   const read = async (f: File | undefined) => {
     if (!f) return;
+    const XLSX = await import('xlsx');
     const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
     let res = { orders: [] as IfoodSheetOrder[], missing: ['cabeçalho com pedido e valor'] };
     for (const name of wb.SheetNames) {
