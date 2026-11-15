@@ -76,6 +76,7 @@ const App = () => (
             <Route path="/manual" element={<ProtectedRoute><Manual /></ProtectedRoute>} />
             <Route path="/crm" element={<Navigate to="/crm/agenda" replace />} />
             <Route path="/crm/agenda" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
+            <Route path="/crm/eventos" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
             <Route path="/crm/buscar" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
             <Route path="/crm/empresas" element={<ProtectedRoute><Crm /></ProtectedRoute>} />
             <Route path="/crm/empresas/:companyId" element={<ProtectedRoute><Crm /></ProtectedRoute>} />

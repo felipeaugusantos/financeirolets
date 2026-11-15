@@ -7,12 +7,13 @@ const h = vi.hoisted(() => ({
   create: vi.fn().mockResolvedValue('new-id'), update: vi.fn().mockResolvedValue(true), toast: vi.fn(),
   dialog: null as null | { onSave: (v: FormValues) => Promise<boolean | string>; initialData: FormValues },
   companies: [{ id: 'company-1', name: 'Empresa de teste', unit_id: 'unit-1', owner_id: 'seller-1', active: true, do_not_contact: false, status: 'novo', document: null, phone: null, email: null }],
+  events: [{ id: 'event-1', company_id: 'company-1', title: 'Coffee break real', event_date: '2026-11-20', event_time: '14:00', location: 'Auditório', active: true }],
 }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'manager-1' } }) }));
 vi.mock('@/hooks/useUserRoles', () => ({ useCurrentUserRoles: () => ({ roles: ['gerente_unidade'], loading: false }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: h.toast }) }));
 vi.mock('@/hooks/useSupabaseCrud', () => ({ useSupabaseCrud: (table: string) => ({
-  data: table === 'crm_companies' ? h.companies : table === 'units' ? [{ id: 'unit-1', name: 'Unidade de teste', active: true }] : [],
+  data: table === 'crm_companies' ? h.companies : table === 'crm_events' ? h.events : table === 'units' ? [{ id: 'unit-1', name: 'Unidade de teste', active: true }] : [],
   loading: false, create: h.create, update: h.update,
 }) }));
 vi.mock('@/components/settings/CrudDialog', () => ({ CrudDialog: (props: NonNullable<typeof h.dialog>) => { h.dialog = props; return null; } }));
@@ -23,6 +24,14 @@ const setup = (path: string) => render(<MemoryRouter initialEntries={[path]}><Ro
 const opportunity = { company_id: 'company-1', title: 'Coffee break', unit_id: 'unit-1', sale_type: 'coffee_break', stage: 'qualificacao', delivery_mode: 'entrega', estimated_value: 1200, attendees: 20 };
 
 describe('CRM: criação comercial segura', () => {
+  it('vincula a oportunidade ao evento e usa sua data e local', async () => {
+    setup('/crm/funil');
+    fireEvent.click(screen.getByRole('button', { name: 'Nova oportunidade' }));
+    const dialog = h.dialog;
+    if (!dialog) throw new Error('Janela indisponível');
+    await act(async () => { await dialog.onSave({ ...opportunity, event_id: 'event-1' }); });
+    expect(h.create).toHaveBeenCalledWith(expect.objectContaining({ event_id: 'event-1', event_date: '2026-11-20', event_time: '14:00', address: 'Auditório' }));
+  });
   it('manager cria oportunidade na carteira da empresa, não transfere para si', async () => {
     setup('/crm/funil');
     fireEvent.click(screen.getByRole('button', { name: 'Nova oportunidade' }));

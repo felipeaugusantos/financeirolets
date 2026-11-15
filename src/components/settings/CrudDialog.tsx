@@ -16,6 +16,7 @@ export interface FieldConfig {
   placeholder?: string;
   /** Texto de apoio exibido abaixo do campo. */
   hint?: string;
+  onAdd?: (draft: FormValues) => void;
 }
 
 /** Valores brutos do formulário (strings dos inputs/selects); cada tela converte para o tipo da tabela. */
@@ -29,9 +30,10 @@ interface CrudDialogProps {
   fields: FieldConfig[];
   initialData?: FormValues;
   contentClassName?: string;
+  onDraftChange?: (draft: FormValues) => void;
 }
 
-export function CrudDialog({ open, onClose, onSave, title, fields, initialData, contentClassName }: CrudDialogProps) {
+export function CrudDialog({ open, onClose, onSave, title, fields, initialData, contentClassName, onDraftChange }: CrudDialogProps) {
   const [form, setForm] = useState<FormValues>({});
   const [saving, setSaving] = useState(false);
 
@@ -95,6 +97,7 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData, 
                 />
               )}
               {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
+              {f.onAdd && <Button variant="ghost" size="sm" onClick={() => { onDraftChange?.(form); f.onAdd?.(form); }}>+ Adicionar</Button>}
             </div>
           ))}
         </div>

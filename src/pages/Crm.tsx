@@ -17,6 +17,8 @@ import { CompanyDiscovery } from '@/components/crm/CompanyDiscovery';
 import { CrmOrders } from '@/components/crm/CrmOrders';
 import { CrmProducts } from '@/components/crm/CrmProducts';
 import { ProposalDialog } from '@/components/crm/ProposalDialog';
+import { CrmEvents, EventDialog } from '@/components/crm/CrmEvents';
+import { canLinkEvent } from '@/lib/crmEventRules';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Company = Tables<'crm_companies'>;
@@ -29,7 +31,7 @@ const leadStates = [{ value: 'novo', label: 'Novo' }, { value: 'em_contato', lab
 const interests = [{ value: 'coffee_break', label: 'Coffee break' }, { value: 'evento_corporativo', label: 'Evento corporativo' }, { value: 'encomenda', label: 'Encomenda' }, { value: 'distribuicao', label: 'Distribuição / revenda' }];
 const money = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateLabel = (date: string | null) => date ? date.split('-').reverse().join('/') : '—';
-const nav = [{ path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/clientes', label: 'Clientes', icon: Users }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }];
+const nav = [{ path: '/crm/eventos', label: 'Eventos', icon: CalendarDays }, { path: '/crm/agenda', label: 'Minha agenda', icon: CalendarDays }, { path: '/crm/buscar', label: 'Buscar empresas', icon: Search }, { path: '/crm/clientes', label: 'Clientes', icon: Users }, { path: '/crm/empresas', label: 'Leads e empresas', icon: Building2 }, { path: '/crm/funil', label: 'Funil', icon: ListFilter }];
 
 export default function Crm() {
   const { user } = useAuth();
@@ -39,6 +41,8 @@ export default function Crm() {
   const { companyId } = useParams();
   const companies = useSupabaseCrud<Company>('crm_companies');
   const opportunities = useSupabaseCrud<Opportunity>('crm_opportunities');
+  const events = useSupabaseCrud<Tables<'crm_events'>>('crm_events', 'event_date');
+  const [addingEvent, setAddingEvent] = useState(false);
   const activities = useSupabaseCrud<Activity>('crm_activities');
   const contacts = useSupabaseCrud<Contact>('crm_contacts');
   const orders = useSupabaseCrud<Tables<'crm_orders'>>('crm_orders', 'order_date');
@@ -59,6 +63,7 @@ export default function Crm() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const company = companies.data.find(c => c.id === companyId);
+  const isEvents = location.pathname.endsWith('/eventos');
   const isAgenda = location.pathname.endsWith('/agenda');
   const isPipeline = location.pathname.endsWith('/funil');
   const isDiscovery = location.pathname.endsWith('/buscar');
@@ -94,6 +99,7 @@ export default function Crm() {
       { name: 'kind', label: 'Tipo', type: 'select', options: ['tarefa','ligacao','reuniao','degustacao','mensagem'].map(value => ({ value, label: { tarefa: 'Tarefa', ligacao: 'Ligação', reuniao: 'Reunião', degustacao: 'Degustação', mensagem: 'Mensagem' }[value] ?? value })), required: true },
       { name: 'due_date', label: 'Data agendada', type: 'date', required: true }, { name: 'notes', label: 'Registro do contato', type: 'textarea' }];
     return [parent, { name: 'title', label: 'Oportunidade', required: true }, unit,
+      { name: 'event_id', label: 'Evento vinculado', type: 'select', options: [{ value: '__none__', label: 'Sem evento' }, ...events.data.filter(e => e.active && (!companyId || e.company_id === companyId)).map(e => ({ value: e.id, label: `${e.title} · ${dateLabel(e.event_date)} · ${companyName(e.company_id)}` }))], onAdd: (draft) => { setEditor(prev => prev ? { ...prev, data: { ...prev.data, ...draft } } : prev); setAddingEvent(true); } },
       { name: 'sale_type', label: 'Tipo de pedido', type: 'select', options: interests, required: true },
       { name: 'stage', label: 'Etapa', type: 'select', options: CRM_STAGES.map(value => ({ value, label: stages[value] })), required: true },
       { name: 'estimated_value', label: 'Valor estimado (R$)', type: 'number' }, { name: 'event_date', label: 'Data do evento / entrega', type: 'date' },
@@ -103,7 +109,7 @@ export default function Crm() {
       { name: 'address', label: 'Endereço do evento' }, { name: 'requested_items', label: 'Itens e quantidades', type: 'textarea' },
       { name: 'requirements', label: 'Montagem, serviço e restrições alimentares', type: 'textarea' }, { name: 'loss_reason', label: 'Motivo de perda', type: 'textarea' }
     ];
-  }, [editor?.kind, companyOptions, unitOptions]);
+  }, [editor?.kind, companyOptions, unitOptions, events.data, companyId]);
   const save = async (raw: FormValues): Promise<boolean | string> => {
     if (!editor || !user) return false;
     const missing = fields.find(f => f.required && !String(raw[f.name] ?? '').trim());
@@ -120,6 +126,11 @@ export default function Crm() {
     if (!parent || parent.do_not_contact || !parent.active) { toast({ title: 'Empresa indisponível para contato', variant: 'destructive' }); return false; }
     if (row.unit_id !== parent.unit_id) { toast({ title: 'Use a unidade comercial da empresa', variant: 'destructive' }); return false; }
     if (editor.kind === 'opportunity') {
+      if (row.event_id) {
+        const event = events.data.find(e => e.id === row.event_id);
+        if (!event || !canLinkEvent(event, parent.id)) { toast({ title: 'Selecione um evento da mesma empresa', variant: 'destructive' }); return false; }
+        row.event_date = event.event_date; row.event_time = event.event_time; row.address = event.location;
+      }
       if (!validateCrmStage(raw.stage as Opportunity['stage'] & typeof CRM_STAGES[number], String(raw.loss_reason ?? ''))) { toast({ title: 'Informe o motivo de perda', variant: 'destructive' }); return false; }
       row.estimated_value = Number(raw.estimated_value || 0);
       row.attendees = raw.attendees === '' || raw.attendees == null ? null : Number(raw.attendees);
@@ -152,16 +163,16 @@ export default function Crm() {
     {!companyId && !isDiscovery && !isProducts && <div className="flex flex-wrap items-end gap-3">
       <div className="relative flex-1 min-w-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar no CRM" placeholder="Buscar empresa, CNPJ ou contato" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" /></div>
       <Select value={unitFilter} onValueChange={setUnitFilter}><SelectTrigger className="w-full sm:w-52" aria-label="Filtrar unidade"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as unidades</SelectItem>{unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent></Select>
-      {!isAgenda && !isPipeline && !isOrders && !isClients && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
+      {!isEvents && !isAgenda && !isPipeline && !isOrders && !isClients && <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-44" aria-label="Filtrar situação"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as situações</SelectItem>{leadStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>}
       {isAgenda && <><div><Label htmlFor="crm-from">De</Label><Input id="crm-from" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div><div><Label htmlFor="crm-to">Até</Label><Input id="crm-to" type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div></>}
     </div>}
-    {isProducts ? <CrmProducts /> : isOrders ? <CrmOrders companies={companies.data} unitFilter={unitFilter} search={search} /> : isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
+    {isEvents ? <CrmEvents companies={companies.data} events={events} unitFilter={unitFilter} search={search} /> : isProducts ? <CrmProducts /> : isOrders ? <CrmOrders companies={companies.data} unitFilter={unitFilter} search={search} /> : isDiscovery ? <CompanyDiscovery companies={companies.data} unitOptions={unitOptions} create={companies.create} /> : companyId ? loading ? <p>Carregando empresa…</p> : !company ? <p className="text-muted-foreground">Empresa não encontrada ou sem permissão de acesso.</p> : <>
       <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-heading text-xl font-semibold">{company.name}</h2><p className="text-sm text-muted-foreground">{unitName(company.unit_id)} · {company.segment || 'Sem segmento'}</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => openEditor('company', company)}>Editar empresa</Button><Button variant="outline" onClick={() => void companies.update(company.id, { do_not_contact: !company.do_not_contact })}>{company.do_not_contact ? 'Permitir contato' : 'Não contatar'}</Button></div></div>
       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">{[['CNPJ',company.document],['Telefone',company.phone],['E-mail',company.email],['Endereço',company.address],['Origem',company.source],['Observações',company.notes]].map(([label,value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-words">{value || '—'}</dd></div>)}</dl>
       {company.do_not_contact && <Badge variant="destructive">Não contatar</Badge>}
       <CrudTable title="Contatos" hasActive={false} columns={[{ key: 'name', label: 'Nome' }, { key: 'position', label: 'Cargo' }, { key: 'phone', label: 'Telefone' }, { key: 'email', label: 'E-mail' }]} data={contacts.data.filter(c => c.company_id === company.id && c.active)} loading={contacts.loading} onAdd={() => openEditor('contact')} onEdit={c => openEditor('contact', c)} onDelete={id => archive('contact', id)} />
       <CrudTable title="Oportunidades" hasActive={false} columns={[{ key: 'title', label: 'Oportunidade' }, { key: 'stage', label: 'Etapa', render: (v: string) => stages[v] }, { key: 'estimated_value', label: 'Valor estimado', render: (v: number) => money(v) }, { key: 'event_date', label: 'Evento', render: (v: string) => dateLabel(v) }, { key: 'company_id', label: 'Proposta', render: (_: string, o: Opportunity) => <Button size="sm" variant="outline" onClick={() => setProposalFor(o)}>PDF</Button> }, { key: 'id', label: 'Fábrica', render: (_: string, o: Opportunity) => orders.data.some(x => x.opportunity_id === o.id) ? <Link className="text-primary text-sm" to="/fabrica/pedidos">Pedido criado</Link> : o.stage === 'ganha' ? <Button size="sm" variant="outline" onClick={() => void sendToFactory(o)}>Enviar à fábrica</Button> : <span className="text-xs text-muted-foreground">ao ganhar</span> }]} data={visibleOpportunities} loading={opportunities.loading} onAdd={() => openEditor('opportunity')} onEdit={o => openEditor('opportunity', o)} onDelete={id => archive('opportunity', id)} />
-      {proposalFor && <ProposalDialog opportunity={proposalFor} company={companies.data.find(c => c.id === proposalFor.company_id)} onClose={() => setProposalFor(null)} />}
+      {proposalFor && <ProposalDialog opportunity={proposalFor} event={events.data.find(e => e.id === proposalFor.event_id)} eventLoading={events.loading} company={companies.data.find(c => c.id === proposalFor.company_id)} onClose={() => setProposalFor(null)} />}
       <CrudTable title="Histórico e próximas ações" hasActive={false} columns={activityColumns} data={visibleActivities} loading={activities.loading} onAdd={() => openEditor('activity')} onEdit={a => openEditor('activity', a)} onDelete={id => archive('activity', id)} />
     </> : isAgenda ? <>
       <div className="flex flex-wrap justify-between items-center gap-2"><h2 className="font-heading text-lg font-semibold">Próximos eventos</h2><Button variant="outline" asChild><Link to="/crm/funil">Abrir funil <ChevronRight className="ml-1 h-4 w-4" /></Link></Button></div>
@@ -171,6 +182,7 @@ export default function Crm() {
       <div className="flex flex-wrap justify-between items-center gap-2"><h2 className="font-heading text-lg font-semibold">Funil de oportunidades</h2><div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><Link to="/crm/buscar"><Search className="h-4 w-4 mr-1" />Buscar empresas</Link></Button><Button onClick={() => openEditor('opportunity')} size="sm"><Plus className="h-4 w-4 mr-1" />Nova oportunidade</Button></div></div>
       {loading ? <p>Carregando oportunidades…</p> : <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">{CRM_STAGES.map(stage => <section key={stage} className="min-w-0 border-t-2 border-primary pt-3"><div className="flex justify-between mb-3"><h3 className="font-heading font-medium text-sm">{stages[stage]}</h3><Badge variant="secondary">{visibleOpportunities.filter(o => o.stage === stage).length}</Badge></div><div className="space-y-3">{visibleOpportunities.filter(o => o.stage === stage).map(o => <article key={o.id} className="border border-border rounded-lg p-3 space-y-2 bg-card"><Link to={`/crm/empresas/${o.company_id}`} className="text-sm text-primary">{companyName(o.company_id)}</Link><h4 className="font-medium break-words">{o.title}</h4><p className="text-sm">{money(o.estimated_value)}</p><p className="text-xs text-muted-foreground">{dateLabel(o.event_date)} · {unitName(o.unit_id)}</p><Button size="sm" variant="outline" onClick={() => openEditor('opportunity', o)}>Abrir briefing</Button></article>)}{!visibleOpportunities.some(o => o.stage === stage) && <p className="text-xs text-muted-foreground py-4">Nenhuma oportunidade</p>}</div></section>)}</div>}
     </> : isClients ? <CrudTable title="Clientes" columns={companyColumns} data={companies.data.filter(c => c.active && c.status === 'cliente' && matches(c))} loading={loading} hasActive={false} onAdd={() => openEditor('company')} onEdit={c => openEditor('company', c)} onDelete={id => archive('company', id)} /> : <CrudTable title="Leads e empresas" columns={companyColumns} data={filteredCompanies} loading={loading} hasActive={false} onAdd={() => openEditor('company')} onEdit={c => openEditor('company', c)} onDelete={id => archive('company', id)} />}
-    {editor && <CrudDialog open onClose={() => setEditor(null)} title={`${editor.data?.id ? 'Editar' : 'Novo'} ${ {company: isClients ? 'cliente' : 'lead / empresa',contact:'contato',activity:'contato / tarefa',opportunity:'oportunidade e briefing'}[editor.kind]}`} fields={fields} initialData={editor.data} onSave={save} contentClassName="rounded-lg max-w-2xl max-h-[85vh] overflow-y-auto" />}
+    {addingEvent && <EventDialog companies={companies.data} events={events} companyId={typeof editor?.data?.company_id === 'string' ? editor.data.company_id : companyId} onClose={() => setAddingEvent(false)} onCreated={id => setEditor(prev => prev ? { ...prev, data: { ...prev.data, event_id: id } } : prev)} />}
+    {editor && !addingEvent && <CrudDialog open onClose={() => setEditor(null)} title={`${editor.data?.id ? 'Editar' : 'Novo'} ${ {company: isClients ? 'cliente' : 'lead / empresa',contact:'contato',activity:'contato / tarefa',opportunity:'oportunidade e briefing'}[editor.kind]}`} fields={fields} initialData={editor.data} onSave={save} contentClassName="rounded-lg max-w-2xl max-h-[85vh] overflow-y-auto" />}
   </div>;
 }

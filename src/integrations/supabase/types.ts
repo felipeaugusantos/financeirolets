@@ -880,6 +880,69 @@ export type Database = {
           },
         ]
       }
+      crm_events: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          event_date: string
+          event_time: string | null
+          id: string
+          location: string
+          notes: string | null
+          owner_id: string
+          status: string
+          title: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          event_date: string
+          event_time?: string | null
+          id?: string
+          location: string
+          notes?: string | null
+          owner_id: string
+          status?: string
+          title: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          event_date?: string
+          event_time?: string | null
+          id?: string
+          location?: string
+          notes?: string | null
+          owner_id?: string
+          status?: string
+          title?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_events_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_opportunities: {
         Row: {
           active: boolean
@@ -891,6 +954,7 @@ export type Database = {
           delivery_mode: string
           estimated_value: number
           event_date: string | null
+          event_id: string | null
           event_time: string | null
           id: string
           loss_reason: string | null
@@ -914,6 +978,7 @@ export type Database = {
           delivery_mode?: string
           estimated_value?: number
           event_date?: string | null
+          event_id?: string | null
           event_time?: string | null
           id?: string
           loss_reason?: string | null
@@ -937,6 +1002,7 @@ export type Database = {
           delivery_mode?: string
           estimated_value?: number
           event_date?: string | null
+          event_id?: string | null
           event_time?: string | null
           id?: string
           loss_reason?: string | null
@@ -956,6 +1022,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "crm_events"
             referencedColumns: ["id"]
           },
           {
