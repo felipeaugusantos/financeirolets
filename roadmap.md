@@ -1,4 +1,5 @@
 # Tasks
+- [ ] Add CRM events with date, location, notes and status; link opportunities/proposals; validate without financial writes.
 - [x] Sprint 2a: PDF/spreadsheet tools load on demand; batch OFX rule from selected lines (admin/financeiro), tests added.
 - [x] Sprint 3a: card statement preview table extracted into its own component (behavior unchanged, tests pass).
 - [ ] Sprint 3b: further splitting of Dashboard/Factory — next step.
