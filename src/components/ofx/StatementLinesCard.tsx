@@ -1,5 +1,5 @@
 import type { EnrichedEntry, StatementEntry } from '@/hooks/useOfxImport';
-import { Link2, Link2Off, EyeOff, PlusCircle, Zap, CheckSquare } from 'lucide-react';
+import { Link2, Link2Off, EyeOff, PlusCircle, Zap, CheckSquare, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,8 @@ interface Props {
   onLinkSelected: () => void;
   onBulkCreate: () => void;
   onIgnoreSelected: () => void;
+  /** Cria uma regra única a partir das linhas marcadas (só Admin/Financeiro). */
+  onCreateRuleSelected?: () => void;
   onShowWholeYear: () => void;
   onLink: (entryId: string, transactionId: string, note: string) => void;
   onCreate: (item: EnrichedEntry) => void;
@@ -34,7 +36,7 @@ interface Props {
 export default function StatementLinesCard({
   visible, loading, from, to, selected, selectableIds, allVisibleSelected, autoLinkableCount, selectedCount,
   selectedWithSuggestionCount, batchRunning, onToggle, onToggleAll, onAutoLink, onLinkSelected, onBulkCreate,
-  onIgnoreSelected, onShowWholeYear, onLink, onCreate, onIgnore, onReopen,
+  onIgnoreSelected, onCreateRuleSelected, onShowWholeYear, onLink, onCreate, onIgnore, onReopen,
 }: Props) {
   return (
   <Card className="shadow-card rounded-2xl border-border">
@@ -96,6 +98,18 @@ export default function StatementLinesCard({
               <EyeOff className="h-3.5 w-3.5" />
               Ignorar selecionadas
             </Button>
+            {onCreateRuleSelected && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 rounded-xl h-8"
+                disabled={batchRunning}
+                onClick={onCreateRuleSelected}
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                Criar regra com selecionadas
+              </Button>
+            )}
           </>
         )}
       </div>

@@ -23,7 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { reconciledPercent, matchesEntrySearch } from '@/lib/entrySearch';
 import { createdFromStatement } from '@/lib/ofxUnlink';
 import { useCurrentUserRoles } from '@/hooks/useUserRoles';
-import { buildRuleFromEntry } from '@/lib/ruleFromEntry';
+import { buildRuleFromEntry, commonRulePattern, batchRuleDirection } from '@/lib/ruleFromEntry';
 import SuggestedRulesPanel from '@/components/ofx/SuggestedRulesPanel';
 import OfxControlsCard from '@/components/ofx/OfxControlsCard';
 import { LastImportAlert, StatsCards, PendingAlert, DescriptionLinkAlert } from '@/components/ofx/OfxSummary';
@@ -813,6 +813,11 @@ export default function OfxImportSettings({ onBack }: { onBack?: () => void }) {
           onLinkSelected={runLinkSelected}
           onBulkCreate={() => openBulkCreate()}
           onIgnoreSelected={() => setIgnoreOpen(true)}
+          onCreateRuleSelected={canAutoPost ? () => setRuleSeed({
+            pattern: commonRulePattern(selectedItems.map(v => v.entry.memo)),
+            appliesTo: batchRuleDirection(selectedItems.map(v => Number(v.entry.amount))),
+            lineCount: selectedItems.length,
+          }) : undefined}
           onShowWholeYear={() => { setFrom(`${to.slice(0, 4)}-01-01`); setTo(todayLocalISO()); }}
           onLink={linkEntry}
           onCreate={openCreate}
