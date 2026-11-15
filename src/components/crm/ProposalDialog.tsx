@@ -15,13 +15,13 @@ type Product = { id: string; name: string; price: number; package: string };
 type Line = { productId: string; packages: number; unitPrice: number };
 const money = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function ProposalDialog({ opportunity, company, onClose }: { opportunity: Tables<'crm_opportunities'>; company?: Tables<'crm_companies'>; onClose: () => void }) {
+export function ProposalDialog({ opportunity, company, event, eventLoading, onClose }: { opportunity: Tables<'crm_opportunities'>; company?: Tables<'crm_companies'>; event?: Tables<'crm_events'>; eventLoading?: boolean; onClose: () => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [discount, setDiscount] = useState(0);
   const [validDays, setValidDays] = useState(7);
   const [terms, setTerms] = useState(company?.payment_terms && PAYMENT_TERMS[company.payment_terms] ? company.payment_terms : 'boleto_7');
-  const [notes, setNotes] = useState(opportunity.requirements ?? '');
+  const [notes, setNotes] = useState([event?.notes, opportunity.requirements].filter(Boolean).join('\n'));
   const [mode, setMode] = useState<'pessoa' | 'produto'>('pessoa');
   const [attendees, setAttendees] = useState(Number(opportunity.attendees ?? 0));
   const [perPerson, setPerPerson] = useState(0);
@@ -31,13 +31,13 @@ export function ProposalDialog({ opportunity, company, onClose }: { opportunity:
   const named = lines.filter((l) => l.productId).map((l) => ({ name: products.find((p) => p.id === l.productId)?.name ?? '', packages: l.packages, unitPrice: l.unitPrice }));
   const pricedLines = mode === 'pessoa' ? [perPersonLine(packageLabel, attendees, perPerson)] : named;
   const t = proposalTotals(pricedLines, discount);
-  const canDownload = mode === 'pessoa' ? attendees > 0 && perPerson > 0 : named.length > 0;
+  const canDownload = !eventLoading && (!opportunity.event_id || Boolean(event)) && (mode === 'pessoa' ? attendees > 0 && perPerson > 0 : named.length > 0);
   const termLabel = (k: string) => { const v = (PAYMENT_TERMS as Record<string, unknown>)[k]; return typeof v === 'object' && v && 'label' in v ? String((v as { label: string }).label) : k.replace('_', ' '); };
 
   const download = async () => {
     const { buildProposalPdf } = await import('@/lib/proposalPdf');
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    const doc = buildProposalPdf({ company: company?.name ?? 'Cliente', contact: company?.contact_name, title: opportunity.title, eventDate: opportunity.event_date, eventTime: opportunity.event_time, attendees: opportunity.attendees, address: opportunity.address, lines: pricedLines, includedItems: mode === 'pessoa' ? named.map((l) => `${l.name}${l.packages ? ` — ${l.packages}` : ''}`) : undefined, discountPct: discount, paymentTerms: termLabel(terms), validDays, notes, issueDate: today });
+    const doc = buildProposalPdf({ company: company?.name ?? 'Cliente', contact: company?.contact_name, title: opportunity.title, eventDate: event?.event_date ?? opportunity.event_date, eventTime: event?.event_time ?? opportunity.event_time, attendees, address: event?.location ?? opportunity.address, lines: pricedLines, includedItems: mode === 'pessoa' ? named.map((l) => `${l.name}${l.packages ? ` — ${l.packages}` : ''}`) : undefined, discountPct: discount, paymentTerms: termLabel(terms), validDays, notes, issueDate: today });
     doc.save(`Proposta - ${company?.name ?? opportunity.title}.pdf`);
   };
 
@@ -48,6 +48,8 @@ export function ProposalDialog({ opportunity, company, onClose }: { opportunity:
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader><DialogTitle>Proposta em PDF · {opportunity.title}</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {event && <div className="border-b border-border pb-3 text-sm"><b>{event.title}</b><p>{event.event_date.split('-').reverse().join('/')} {event.event_time} · {event.location}</p></div>}
+          {opportunity.event_id && !event && !eventLoading && <p className="text-sm text-destructive">Evento vinculado indisponível.</p>}
           <div className="space-y-1"><Label>Como cobrar</Label>
             <Select value={mode} onValueChange={(v) => setMode(v as 'pessoa' | 'produto')}><SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="pessoa">Preço por pessoa</SelectItem><SelectItem value="produto">Preço por produto</SelectItem></SelectContent></Select></div>
