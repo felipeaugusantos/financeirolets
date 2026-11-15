@@ -240,6 +240,13 @@ export function AppSidebar() {
               {renderNav(overviewItems)}
               <Collapsible defaultOpen={location.pathname === '/relatorios'} className="group/collapsible">
                 <SidebarMenuItem>
+                  {collapsed ? (
+                    <SidebarMenuButton asChild isActive={location.pathname === '/relatorios'} className="hover:bg-sidebar-accent/50" tooltip="Relatórios">
+                      <Link to="/relatorios" aria-label="Relatórios">
+                        <BarChart3 className="h-4 w-4" />
+                      </Link>
+                    </SidebarMenuButton>
+                  ) : (
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton isActive={location.pathname === '/relatorios'} className="hover:bg-sidebar-accent/50" tooltip="Relatórios">
                       <BarChart3 className="h-4 w-4" />
@@ -251,6 +258,7 @@ export function AppSidebar() {
                       )}
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
+                  )}
                   {!collapsed && (
                     <CollapsibleContent>
                       <SidebarMenuSub>

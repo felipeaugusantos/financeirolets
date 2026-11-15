@@ -1,6 +1,7 @@
 import { render, fireEvent, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { act } from 'react';
 import { cleanup } from '@testing-library/react';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -16,6 +17,27 @@ vi.mock('@/components/transactions/TransactionList', () => ({ default: () => nul
 vi.mock('@/components/transactions/CardSaleDialog', () => ({ default: () => null }));
 vi.mock('@/components/transactions/TransactionFilters', () => ({ default: ({ onChange }: { onChange: (v: object) => void }) => <button onClick={() => onChange({})}>Clear</button> }));
 import Transactions from '@/pages/Transactions';
+
+function ShortcutProbe() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  return <><button onClick={() => navigate('/lancamentos?novo=1&type=despesa')}>Atalho</button><output data-testid="search">{location.search}</output></>;
+}
+
+it('consumes the new-entry command, preserves filters and reopens on subsequent shortcuts', () => {
+  render(<MemoryRouter initialEntries={['/lancamentos?novo=1&type=despesa']}><ShortcutProbe /><Transactions /></MemoryRouter>);
+  expect(screen.getByTestId('search').textContent).toBe('?type=despesa');
+  expect(h.form).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }));
+  const props = h.form.mock.calls.at(-1)?.[0] as { onOpenChange: (open: boolean) => void };
+  act(() => props.onOpenChange(false));
+  expect(h.form).toHaveBeenLastCalledWith(expect.objectContaining({ open: false }));
+  fireEvent.click(screen.getByText('Atalho'));
+  expect(h.form).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }));
+  expect(screen.getByTestId('search').textContent).toBe('?type=despesa');
+  cleanup();
+  render(<MemoryRouter initialEntries={['/lancamentos?type=despesa']}><Transactions /></MemoryRouter>);
+  expect(h.form).toHaveBeenLastCalledWith(expect.objectContaining({ open: false }));
+});
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe('Categorias contábeis na tela de lançamentos', () => {
