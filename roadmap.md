@@ -1,4 +1,5 @@
 # Tasks
+- [x] Sprint 1: transaction date/account/unit indexes, home-screen manifest, repo hygiene test aligned with tracked public .env.
 - [x] Fix collapsed Reports navigation and repeatable header transaction shortcut; 9 tests pass and both authenticated browser flows verified, including reload, without financial writes.
 - [x] Connect Dashboard to read-only bank reconciliation progress, pending amounts and verified closing status; 19 tests pass, authenticated desktop/mobile panel and period-preserving navigation verified; no financial writes.
 - [x] Implement atomic, confirmed own-account transfers in OFX reconciliation, preserving account units and excluding DRE; automated tests and authenticated desktop/mobile read-only checks completed, with no matching pair in the current period and no production financial writes.

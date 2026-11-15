@@ -1,0 +1,14 @@
+{
+  "name": "Let's Finance — Controle Financeiro",
+  "short_name": "Let's Finance",
+  "description": "Sistema financeiro do grupo Let's Cookies.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#E91E63",
+  "icons": [
+    { "src": "/logo-circle.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any" }
+  ]
+}
