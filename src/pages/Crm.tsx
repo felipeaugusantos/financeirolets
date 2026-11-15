@@ -99,7 +99,7 @@ export default function Crm() {
       { name: 'kind', label: 'Tipo', type: 'select', options: ['tarefa','ligacao','reuniao','degustacao','mensagem'].map(value => ({ value, label: { tarefa: 'Tarefa', ligacao: 'Ligação', reuniao: 'Reunião', degustacao: 'Degustação', mensagem: 'Mensagem' }[value] ?? value })), required: true },
       { name: 'due_date', label: 'Data agendada', type: 'date', required: true }, { name: 'notes', label: 'Registro do contato', type: 'textarea' }];
     return [parent, { name: 'title', label: 'Oportunidade', required: true }, unit,
-      { name: 'event_id', label: 'Evento vinculado', type: 'select', options: [{ value: '__none__', label: 'Sem evento' }, ...events.data.filter(e => e.active && (!companyId || e.company_id === companyId)).map(e => ({ value: e.id, label: `${e.title} · ${dateLabel(e.event_date)} · ${companyName(e.company_id)}` }))], onAdd: () => setAddingEvent(true) },
+      { name: 'event_id', label: 'Evento vinculado', type: 'select', options: [{ value: '__none__', label: 'Sem evento' }, ...events.data.filter(e => e.active && (!companyId || e.company_id === companyId)).map(e => ({ value: e.id, label: `${e.title} · ${dateLabel(e.event_date)} · ${companyName(e.company_id)}` }))], onAdd: (draft) => { setEditor(prev => prev ? { ...prev, data: { ...prev.data, ...draft } } : prev); setAddingEvent(true); } },
       { name: 'sale_type', label: 'Tipo de pedido', type: 'select', options: interests, required: true },
       { name: 'stage', label: 'Etapa', type: 'select', options: CRM_STAGES.map(value => ({ value, label: stages[value] })), required: true },
       { name: 'estimated_value', label: 'Valor estimado (R$)', type: 'number' }, { name: 'event_date', label: 'Data do evento / entrega', type: 'date' },
