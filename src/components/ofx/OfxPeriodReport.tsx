@@ -7,7 +7,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { StatementEntry } from '@/hooks/useOfxImport';
 import { exportToCsv, csvDate, csvNumber } from '@/lib/exportCsv';
-import { exportToPdf } from '@/lib/exportPdf';
 import { errorMessage } from '@/lib/utils';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -117,7 +116,7 @@ export default function OfxPeriodReport({
     if (!printRef.current) return;
     setExporting(true);
     try {
-      await exportToPdf({
+      await (await import('@/lib/exportPdf')).exportToPdf({
         title: 'Conciliação bancária (OFX)',
         subtitle: `${accountName} · ${periodo}`,
         filename: `${fileBase}.pdf`,

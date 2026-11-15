@@ -6,7 +6,6 @@ import { CrmOrders } from '@/components/crm/CrmOrders';
 import { CrmProducts } from '@/components/crm/CrmProducts';
 import { FactoryBatches } from '@/components/factory/FactoryBatches';
 import { ChefHat, FileDown, Plus, Trash2 } from 'lucide-react';
-import { buildRomaneioPdf } from '@/lib/romaneioPdf';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -91,6 +90,7 @@ export default function Factory() {
     if (!fail(error)) return;
     const rows = (data ?? []) as { id: string; unit_id: string; company_id: string; delivery_date: string | null; crm_order_items: { product_id: string; packages: number; cookies_per_package: number }[] }[];
     if (!rows.length) { toast({ title: 'Nenhum pedido com entrega nesse dia' }); return; }
+    const { buildRomaneioPdf } = await import('@/lib/romaneioPdf');
     buildRomaneioPdf(date, rows.map(o => ({ id: o.id, unit: units.find(u => u.id === o.unit_id)?.name ?? 'Sem unidade', customer: companies.data.find(c => c.id === o.company_id)?.name ?? '—', deliveryDate: o.delivery_date,
       items: o.crm_order_items.map(it => ({ product: productName(it.product_id), packages: Number(it.packages), cookiesPerPackage: Number(it.cookies_per_package) })) }))).save(`romaneio-${date}.pdf`);
   };

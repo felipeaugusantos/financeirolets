@@ -13,7 +13,6 @@ import {
   RotateCcw, ArrowUp, ArrowDown, Minus, Info,
 } from 'lucide-react';
 import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
-import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -147,7 +146,7 @@ export default function DreGerencial({ onBack }: { onBack: () => void }) {
     if (!reportRef.current) return;
     setExporting(true);
     try {
-      await exportToPdf({
+      await (await import('@/lib/exportPdf')).exportToPdf({
         title: 'DRE Gerencial',
         subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo} | Regime: ${filters.regime === 'competencia' ? 'Competência' : 'Caixa'}`,
         filename: `DRE_Gerencial_${filters.dateFrom}_${filters.dateTo}.pdf`,

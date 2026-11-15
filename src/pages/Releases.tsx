@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { releases, formatReleaseDate, KIND_LABEL, type ReleaseKind } from '@/data/releases';
-import { exportReleaseNotesPdf } from '@/lib/releaseNotesPdf';
 
 const KIND_ICON: Record<ReleaseKind, typeof Sparkles> = {
   novidade: Sparkles,
@@ -22,10 +21,10 @@ const KIND_CLASS: Record<ReleaseKind, string> = {
 export default function Releases() {
   const [busy, setBusy] = useState(false);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setBusy(true);
     try {
-      exportReleaseNotesPdf(releases);
+      (await import('@/lib/releaseNotesPdf')).exportReleaseNotesPdf(releases);
     } finally {
       setBusy(false);
     }

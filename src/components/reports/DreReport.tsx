@@ -12,7 +12,6 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, FileText, Loader2, Download, FileSpreadsheet, AlertTriangle, RotateCcw } from 'lucide-react';
 import { cn, toLocalISODate, todayLocalISO } from '@/lib/utils';
-import { exportToPdf } from '@/lib/exportPdf';
 import { exportToCsv, csvNumber, csvCode, csvIndent, CsvCell } from '@/lib/exportCsv';
 import { FilterPresets } from './FilterPresets';
 import { ReportCustomizer, useReportSections, SectionGroup } from './ReportCustomizer';
@@ -188,7 +187,7 @@ export default function DreReport({ onBack }: { onBack: () => void }) {
     if (!reportRef.current) return;
     setExporting(true);
     try {
-      await exportToPdf({
+      await (await import('@/lib/exportPdf')).exportToPdf({
         title: 'DRE – Demonstrativo de Resultado',
         subtitle: `Período: ${filters.dateFrom} a ${filters.dateTo} | Regime: ${filters.regime === 'competencia' ? 'Competência' : 'Caixa'}`,
         filename: `DRE_${filters.dateFrom}_${filters.dateTo}.pdf`,
