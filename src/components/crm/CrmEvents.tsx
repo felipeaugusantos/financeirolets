@@ -6,6 +6,9 @@ import { CrudDialog, type FieldConfig, type FormValues } from '@/components/sett
 import { CrudTable, type ColumnConfig } from '@/components/settings/CrudTable';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileSignature } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ContractDialog } from './ContractDialog';
 import { EVENT_STATUSES, validateEvent } from '@/lib/crmEventRules';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -42,6 +45,7 @@ export function EventDialog({ companies, events, initial, companyId, onClose, on
 export function CrmEvents({ companies, events, unitFilter, search }: { companies: Company[]; events: EventCrud; unitFilter: string; search: string }) {
   const [editing, setEditing] = useState<Event | 'new' | null>(null);
   const [status, setStatus] = useState('all');
+  const [contractFor, setContractFor] = useState<Event | null>(null);
   const companyName = (id: string) => companies.find(c => c.id === id)?.name ?? 'Empresa indisponível';
   const columns: ColumnConfig<Event>[] = [
     { key: 'title', label: 'Evento', render: (_v, e) => <span className="font-medium">{e.title}</span> },
@@ -50,11 +54,13 @@ export function CrmEvents({ companies, events, unitFilter, search }: { companies
     { key: 'location', label: 'Local' },
     { key: 'status', label: 'Status', render: (v: string) => <Badge variant={v === 'confirmado' ? 'default' : 'secondary'}>{EVENT_STATUSES.find(s => s.value === v)?.label ?? v}</Badge> },
     { key: 'notes', label: 'Observações', render: (v: string) => <span className="block max-w-64 whitespace-pre-wrap break-words">{v || '—'}</span> },
+    { key: 'id', label: 'Contrato', render: (_v, e) => <Button size="sm" variant="outline" onClick={() => setContractFor(e)}><FileSignature className="mr-1 h-4 w-4" />Contrato</Button> },
   ];
   const visible = events.data.filter(e => e.active && (unitFilter === 'all' || e.unit_id === unitFilter) && (status === 'all' || e.status === status) && `${e.title} ${e.location} ${companyName(e.company_id)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   return <div className="space-y-4">
     <Select value={status} onValueChange={setStatus}><SelectTrigger aria-label="Filtrar status do evento" className="w-full sm:w-52"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{EVENT_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent></Select>
     <CrudTable title="Eventos" columns={columns} data={visible} loading={events.loading} hasActive={false} onAdd={() => setEditing('new')} onEdit={setEditing} onDelete={id => { if (window.confirm('Arquivar evento? As propostas vinculadas serão preservadas.')) void events.update(id, { active: false }); }} />
     {editing && <EventDialog companies={companies} events={events} initial={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
+    {contractFor && <ContractDialog event={contractFor} company={companies.find(c => c.id === contractFor.company_id)} onClose={() => setContractFor(null)} />}
   </div>;
 }
