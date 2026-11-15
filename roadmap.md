@@ -1,5 +1,7 @@
 # Tasks
 - [x] Sprint 2a: PDF/spreadsheet tools load on demand; batch OFX rule from selected lines (admin/financeiro), tests added.
+- [x] Sprint 3a: card statement preview table extracted into its own component (behavior unchanged, tests pass).
+- [ ] Sprint 3b: further splitting of Dashboard/Factory — next step.
 - [ ] Sprint 2b: shared cache for accounts/categories/units — planned as separate step (cross-screen refactor).
 - [x] Sprint 1: transaction date/account/unit indexes, home-screen manifest, repo hygiene test aligned with tracked public .env.
 - [x] Fix collapsed Reports navigation and repeatable header transaction shortcut; 9 tests pass and both authenticated browser flows verified, including reload, without financial writes.
