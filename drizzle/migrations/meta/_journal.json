@@ -92,6 +92,13 @@
       "when": 1794753381859,
       "tag": "0012_transactions_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794757386450,
+      "tag": "0013_crm_events_and_proposal_links",
+      "breakpoints": true
     }
   ]
 }
