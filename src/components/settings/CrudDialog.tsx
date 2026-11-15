@@ -16,6 +16,7 @@ export interface FieldConfig {
   placeholder?: string;
   /** Texto de apoio exibido abaixo do campo. */
   hint?: string;
+  onAdd?: () => void;
 }
 
 /** Valores brutos do formulário (strings dos inputs/selects); cada tela converte para o tipo da tabela. */
@@ -95,6 +96,7 @@ export function CrudDialog({ open, onClose, onSave, title, fields, initialData, 
                 />
               )}
               {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
+              {f.onAdd && <Button variant="ghost" size="sm" onClick={f.onAdd}>+ Adicionar</Button>}
             </div>
           ))}
         </div>
