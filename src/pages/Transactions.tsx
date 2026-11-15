@@ -21,7 +21,7 @@ function formatCurrency(v: number) {
 }
 
 export default function Transactions({ accountingCategory }: { accountingCategory?: Tables<'categories'> } = {}) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Permite abrir a tela já filtrada: Conferência de lançamentos (q) e cartões do Dashboard (tipo, período, regime).
   const [filters, setFilters] = useState<TFilters>(() => filtersFromUrl(searchParams));
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
@@ -47,8 +47,16 @@ export default function Transactions({ accountingCategory }: { accountingCategor
 
   // Atalho do topo: /lancamentos?novo=1 abre o formulário direto.
   useEffect(() => {
-    if (searchParams.get('novo') === '1' && !accountingCategory) { setEditingTx(null); setDialogOpen(true); }
-  }, [searchParams, accountingCategory]);
+    if (searchParams.get('novo') !== '1' || accountingCategory) return;
+    setEditingTx(null);
+    setDialogOpen(true);
+    // Consome o comando, preservando filtros e permitindo novos cliques no atalho.
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.delete('novo');
+      return next;
+    }, { replace: true });
+  }, [searchParams, setSearchParams, accountingCategory]);
 
   const handleNew = () => {
     setEditingTx(null);
