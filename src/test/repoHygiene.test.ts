@@ -12,16 +12,18 @@ describe('higiene do repositório', () => {
     expect(tracked).not.toContain('x.pdf');
   });
 
-  it('nenhum arquivo .env real é versionado (só o modelo .env.example)', () => {
-    const envFiles = tracked.filter(f => /(^|\/)\.env(\..*)?$/.test(f));
-    expect(envFiles).toEqual(['.env.example']);
+  it('só .env (público, exigido pelo build do Cloud) e .env.example são versionados', () => {
+    const envFiles = tracked.filter(f => /(^|\/)\.env(\..*)?$/.test(f)).sort();
+    expect(envFiles.every(f => f === '.env' || f === '.env.example')).toBe(true);
   });
 
-  it('.gitignore ignora .env e variações, mas mantém o modelo', () => {
-    const ignore = readFileSync('.gitignore', 'utf8').split('\n').map(l => l.trim());
-    expect(ignore).toContain('.env');
-    expect(ignore).toContain('.env.*');
-    expect(ignore).toContain('!.env.example');
+  it('.env versionado contém apenas variáveis públicas VITE_*', () => {
+    if (!existsSync('.env')) return;
+    const keys = readFileSync('.env', 'utf8').split('\n').map(l => l.trim())
+      .filter(l => l && !l.startsWith('#')).map(l => l.split('=')[0]);
+    expect(keys.length).toBeGreaterThan(0);
+    for (const k of keys) expect(k, k).toMatch(/^VITE_[A-Z0-9_]+$/);
+    for (const k of keys) expect(k, k).not.toMatch(/SECRET|SERVICE_ROLE|PASSWORD|PRIVATE/);
   });
 
   it('.env.example tem só nomes, com valores vazios', () => {
