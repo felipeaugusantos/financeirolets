@@ -45,6 +45,17 @@ export const KIND_LABEL: Record<ReleaseKind, string> = {
 
 export const releases: Release[] = [
   {
+    version: '1.9.0',
+    date: '2026-11-15',
+    summary: 'CRM: eventos com painel de acompanhamento, contratos e propostas por pessoa.',
+    items: [
+      { area: 'Geral', kind: 'novidade', title: 'Cadastro de eventos no CRM', detail: 'Cadastre data, horário, local, status e observações de cada evento e ligue as propostas a ele.', tech: 'crm_events + crm_opportunities.event_id; CrmEvents.tsx.' },
+      { area: 'Geral', kind: 'novidade', title: 'Painel de eventos', detail: 'Veja total de eventos, próximos eventos, valor das propostas e valor ganho; cada evento mostra a soma das suas propostas (perdidas ficam fora). Não altera o financeiro.', tech: 'src/lib/eventDashboard.ts proposalTotalsByEvent.' },
+      { area: 'Geral', kind: 'novidade', title: 'Contrato do evento em PDF', detail: 'Gere o contrato com contratante e contratado, valor, pagamento, escopo e assinaturas direto do evento.', tech: 'src/lib/contractPdf.ts + ContractDialog.tsx; sem gravação.' },
+      { area: 'Geral', kind: 'melhoria', title: 'Proposta por pessoa', detail: 'A proposta começa com preço por pessoa; os produtos aparecem como itens inclusos. Condições definidas em cada evento.', tech: 'proposalMath.ts perPersonLine.' },
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-11-13',
     summary: 'Manual de uso no sistema, novo topo com atalho de lançamento e conciliação mais visual.',
