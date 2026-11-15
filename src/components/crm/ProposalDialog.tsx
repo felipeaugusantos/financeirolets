@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PAYMENT_TERMS } from '@/lib/crmRules';
-import { buildProposalPdf, proposalTotals } from '@/lib/proposalPdf';
+import { proposalTotals, perPersonLine } from '@/lib/proposalMath';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = { id: string; name: string; price: number; package: string };
@@ -22,15 +22,22 @@ export function ProposalDialog({ opportunity, company, onClose }: { opportunity:
   const [validDays, setValidDays] = useState(7);
   const [terms, setTerms] = useState(company?.payment_terms && PAYMENT_TERMS[company.payment_terms] ? company.payment_terms : 'boleto_7');
   const [notes, setNotes] = useState(opportunity.requirements ?? '');
+  const [mode, setMode] = useState<'pessoa' | 'produto'>('pessoa');
+  const [attendees, setAttendees] = useState(Number(opportunity.attendees ?? 0));
+  const [perPerson, setPerPerson] = useState(0);
+  const [packageLabel, setPackageLabel] = useState('Coffee break');
   useEffect(() => { supabase.from('crm_products').select('id,name,price,package').eq('active', true).order('name').then(({ data }) => setProducts((data ?? []) as Product[])); }, []);
 
   const named = lines.filter((l) => l.productId).map((l) => ({ name: products.find((p) => p.id === l.productId)?.name ?? '', packages: l.packages, unitPrice: l.unitPrice }));
-  const t = proposalTotals(named, discount);
+  const pricedLines = mode === 'pessoa' ? [perPersonLine(packageLabel, attendees, perPerson)] : named;
+  const t = proposalTotals(pricedLines, discount);
+  const canDownload = mode === 'pessoa' ? attendees > 0 && perPerson > 0 : named.length > 0;
   const termLabel = (k: string) => { const v = (PAYMENT_TERMS as Record<string, unknown>)[k]; return typeof v === 'object' && v && 'label' in v ? String((v as { label: string }).label) : k.replace('_', ' '); };
 
-  const download = () => {
+  const download = async () => {
+    const { buildProposalPdf } = await import('@/lib/proposalPdf');
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    const doc = buildProposalPdf({ company: company?.name ?? 'Cliente', contact: company?.contact_name, title: opportunity.title, eventDate: opportunity.event_date, eventTime: opportunity.event_time, attendees: opportunity.attendees, address: opportunity.address, lines: named, discountPct: discount, paymentTerms: termLabel(terms), validDays, notes, issueDate: today });
+    const doc = buildProposalPdf({ company: company?.name ?? 'Cliente', contact: company?.contact_name, title: opportunity.title, eventDate: opportunity.event_date, eventTime: opportunity.event_time, attendees: opportunity.attendees, address: opportunity.address, lines: pricedLines, includedItems: mode === 'pessoa' ? named.map((l) => `${l.name}${l.packages ? ` — ${l.packages}` : ''}`) : undefined, discountPct: discount, paymentTerms: termLabel(terms), validDays, notes, issueDate: today });
     doc.save(`Proposta - ${company?.name ?? opportunity.title}.pdf`);
   };
 
@@ -41,6 +48,17 @@ export function ProposalDialog({ opportunity, company, onClose }: { opportunity:
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader><DialogTitle>Proposta em PDF · {opportunity.title}</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          <div className="space-y-1"><Label>Como cobrar</Label>
+            <Select value={mode} onValueChange={(v) => setMode(v as 'pessoa' | 'produto')}><SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="pessoa">Preço por pessoa</SelectItem><SelectItem value="produto">Preço por produto</SelectItem></SelectContent></Select></div>
+          {mode === 'pessoa' && (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1"><Label>Pacote</Label><Input value={packageLabel} onChange={(e) => setPackageLabel(e.target.value)} /></div>
+              <div className="space-y-1"><Label>Pessoas</Label><Input type="number" min={0} value={attendees} onChange={(e) => setAttendees(Number(e.target.value))} /></div>
+              <div className="space-y-1"><Label>Preço por pessoa</Label><Input type="number" min={0} step="0.01" value={perPerson} onChange={(e) => setPerPerson(Number(e.target.value))} /></div>
+            </div>
+          )}
+          {mode === 'pessoa' && <p className="text-xs text-muted-foreground">Os produtos abaixo aparecem como "Inclui" no PDF, sem preço.</p>}
           {lines.map((l, i) => (
             <div key={i} className="grid grid-cols-[1fr_70px_100px_32px] items-end gap-2">
               <div className="space-y-1"><Label>Produto</Label>
@@ -67,7 +85,7 @@ export function ProposalDialog({ opportunity, company, onClose }: { opportunity:
             Subtotal {money(t.subtotal)}{t.discount > 0 && ` · Desconto ${money(t.discount)}`} · <b>Total {money(t.total)}</b>
           </div>
         </div>
-        <DialogFooter><Button variant="outline" onClick={onClose}>Fechar</Button><Button disabled={!named.length} onClick={download}><FileDown className="mr-2 h-4 w-4" />Baixar PDF</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={onClose}>Fechar</Button><Button disabled={!canDownload} onClick={download}><FileDown className="mr-2 h-4 w-4" />Baixar PDF</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
