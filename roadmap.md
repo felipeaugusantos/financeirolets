@@ -13,7 +13,7 @@
 - [x] CRM phase 2: CNPJ and location discovery, review and company import implemented; Google Maps linked, function deployed, 35 targeted tests passed; financial records untouched.
 - [ ] Validate live company discovery/import after user signs in; Google Maps must be checked by the user on the authorized published origin (sandbox validation unsupported).
 - [x] CRM phase 3a: distribution orders with month-to-date comparison, customer averages, inactive customers, and one-click receivable.
-- [ ] CRM phase 3b: proposals with commercial prices — requires prices and conditions.
+- [x] CRM phase 3b: per-person proposal pricing (tests pass). Default commercial conditions still to be provided by user.
 - [ ] CRM phase 4: financial handoff — requires explicit approval for financial writes after validation.
 - [x] Prepare a screen-by-screen CRM plan for corporate sales and coffee breaks, including lead search and safe financial handoff.
 - [x] Add a Depreciação e CSLL view using the existing transaction list and form.
