@@ -56,6 +56,7 @@ export default function Crm() {
   };
   const units = useSupabaseCrud<Tables<'units'>>('units', 'name');
   const [editor, setEditor] = useState<Editor | null>(null);
+  const existingEventId = opportunities.data.find(o => o.id === editor?.data?.id)?.event_id;
   const [proposalFor, setProposalFor] = useState<Opportunity | null>(null);
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState('all');
@@ -99,7 +100,7 @@ export default function Crm() {
       { name: 'kind', label: 'Tipo', type: 'select', options: ['tarefa','ligacao','reuniao','degustacao','mensagem'].map(value => ({ value, label: { tarefa: 'Tarefa', ligacao: 'Ligação', reuniao: 'Reunião', degustacao: 'Degustação', mensagem: 'Mensagem' }[value] ?? value })), required: true },
       { name: 'due_date', label: 'Data agendada', type: 'date', required: true }, { name: 'notes', label: 'Registro do contato', type: 'textarea' }];
     return [parent, { name: 'title', label: 'Oportunidade', required: true }, unit,
-      { name: 'event_id', label: 'Evento vinculado', type: 'select', options: [{ value: '__none__', label: 'Sem evento' }, ...events.data.filter(e => e.active && (!companyId || e.company_id === companyId)).map(e => ({ value: e.id, label: `${e.title} · ${dateLabel(e.event_date)} · ${companyName(e.company_id)}` }))], onAdd: (draft) => { setEditor(prev => prev ? { ...prev, data: { ...prev.data, ...draft } } : prev); setAddingEvent(true); } },
+      { name: 'event_id', label: 'Evento vinculado', type: 'select', options: [{ value: '__none__', label: 'Sem evento' }, ...events.data.filter(e => (e.active || e.id === existingEventId) && (!companyId || e.company_id === companyId)).map(e => ({ value: e.id, label: `${e.title}${e.active ? '' : ' (arquivado)'} · ${dateLabel(e.event_date)} · ${companyName(e.company_id)}` }))], onAdd: (draft) => { setEditor(prev => prev ? { ...prev, data: { ...prev.data, ...draft } } : prev); setAddingEvent(true); } },
       { name: 'sale_type', label: 'Tipo de pedido', type: 'select', options: interests, required: true },
       { name: 'stage', label: 'Etapa', type: 'select', options: CRM_STAGES.map(value => ({ value, label: stages[value] })), required: true },
       { name: 'estimated_value', label: 'Valor estimado (R$)', type: 'number' }, { name: 'event_date', label: 'Data do evento / entrega', type: 'date' },
@@ -109,7 +110,7 @@ export default function Crm() {
       { name: 'address', label: 'Endereço do evento' }, { name: 'requested_items', label: 'Itens e quantidades', type: 'textarea' },
       { name: 'requirements', label: 'Montagem, serviço e restrições alimentares', type: 'textarea' }, { name: 'loss_reason', label: 'Motivo de perda', type: 'textarea' }
     ];
-  }, [editor?.kind, companyOptions, unitOptions, events.data, companyId]);
+  }, [editor?.kind, companyOptions, unitOptions, events.data, companyId, existingEventId]);
   const save = async (raw: FormValues): Promise<boolean | string> => {
     if (!editor || !user) return false;
     const missing = fields.find(f => f.required && !String(raw[f.name] ?? '').trim());
@@ -128,7 +129,7 @@ export default function Crm() {
     if (editor.kind === 'opportunity') {
       if (row.event_id) {
         const event = events.data.find(e => e.id === row.event_id);
-        if (!event || !canLinkEvent(event, parent.id)) { toast({ title: 'Selecione um evento da mesma empresa', variant: 'destructive' }); return false; }
+        if (!event || !canLinkEvent(event, parent.id, existingEventId)) { toast({ title: 'Selecione um evento da mesma empresa', variant: 'destructive' }); return false; }
         row.event_date = event.event_date; row.event_time = event.event_time; row.address = event.location;
       }
       if (!validateCrmStage(raw.stage as Opportunity['stage'] & typeof CRM_STAGES[number], String(raw.loss_reason ?? ''))) { toast({ title: 'Informe o motivo de perda', variant: 'destructive' }); return false; }

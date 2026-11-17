@@ -22,6 +22,15 @@ describe('cadastro de eventos', () => {
     expect(canLinkEvent({ company_id: 'empresa-2', active: true }, 'empresa-1')).toBe(false);
     expect(canLinkEvent({ company_id: 'empresa-1', active: false }, 'empresa-1')).toBe(false);
   });
+  it('permite preservar o evento arquivado já vinculado', () => {
+    expect(canLinkEvent({ id: 'evento-1', company_id: 'empresa-1', active: false }, 'empresa-1', 'evento-1')).toBe(true);
+  });
+  it('não permite trocar para outro evento arquivado', () => {
+    expect(canLinkEvent({ id: 'evento-2', company_id: 'empresa-1', active: false }, 'empresa-1', 'evento-1')).toBe(false);
+  });
+  it('não preserva vínculo arquivado ao trocar a empresa', () => {
+    expect(canLinkEvent({ id: 'evento-1', company_id: 'empresa-1', active: false }, 'empresa-2', 'evento-1')).toBe(false);
+  });
 });
 describe('eventos: proteção e isolamento financeiro', () => {
   const sql = readFileSync('drizzle/migrations/0013_crm_events_and_proposal_links.sql', 'utf8');

@@ -13,6 +13,6 @@ export function validateEvent(event: { title: string; event_date: string; locati
   return null;
 }
 
-export function canLinkEvent(event: { company_id: string; active: boolean }, companyId: string) {
-  return event.active && event.company_id === companyId;
+export function canLinkEvent(event: { id?: string; company_id: string; active: boolean }, companyId: string, existingEventId?: string | null) {
+  return event.company_id === companyId && (event.active || (Boolean(existingEventId) && event.id === existingEventId));
 }
